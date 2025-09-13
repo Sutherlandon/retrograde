@@ -1,13 +1,15 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
+import { Routes, Route } from "react-router";
+import { BoardProvider } from "~/components/BoardContext";
+import Header from "~/components/Header";
+import Board from "~/components/Board";
 
-export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
-  ];
-}
-
-export default function Home() {
-  return <Welcome />;
+export default function App() {
+  return (
+    <BoardProvider>
+      <Header />
+      <Routes>
+        <Route path="/" element={<Board />} />
+      </Routes>
+    </BoardProvider>
+  );
 }
