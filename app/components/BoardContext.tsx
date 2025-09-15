@@ -1,8 +1,10 @@
-import { createContext, useContext, useState } from "react";
-import type { Note, Board } from "~/server/boardStore";
-import { useFetcher, useLoaderData } from "react-router";
+import { createContext, useContext, useState, useEffect } from "react";
+import type { Board, BoardState } from "~/server/boardStore";
+import { useFetcher, useLoaderData, useRevalidator } from "react-router";
 
 const defaultBoard: Board = {
+  id: "default-board",
+  title: "Default Board",
   columns: [{ id: 'col-1', title: 'Column 1', notes: [] }],
   addNote: () => { },
   addColumn: () => { },
@@ -16,19 +18,46 @@ const defaultBoard: Board = {
 const BoardContext = createContext<Board>(defaultBoard);
 
 export function BoardProvider({ children }: { children: React.ReactNode }) {
-  const [columns, setColumns] = useState(defaultBoard.columns);
-  const loaderData = useLoaderData() as Board;
+  const loaderData = useLoaderData() as BoardState;
+  const [columns, setColumns] = useState(loaderData.columns);
   const fetcher = useFetcher();
+  const { revalidate } = useRevalidator();
 
-  const sendAction = ({ type, payload }: { type: string, payload: any }) => {
-    fetcher.submit({ type, payload: JSON.stringify(payload) }, { method: "post", action: "/board" });
+  const sendAction = ({ type, board_id, payload }: { type: string, board_id: string, payload: any }) => {
+    fetcher.submit(
+      { type, payload: JSON.stringify(payload) },
+      {
+        method: "post",
+        action: `/board/${board_id}`
+      }
+    );
   }
+
+  useEffect(() => {
+    if (fetcher.data) {
+      console.log("Fetcher data received:", fetcher.data);
+      setColumns(fetcher.data.columns);
+    }
+  }, [fetcher.data]);
+
+  useEffect(() => {
+    setColumns(loaderData.columns);
+  }, [loaderData]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      revalidate(); // re-runs the loader, updates useLoaderData
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [revalidate]);
 
   const addColumn = () => {
     if (columns.length >= 10) return;
     const newCol = { id: Date.now().toString(), title: `Column ${columns.length + 1}`, notes: [] };
     setColumns([...columns, newCol]);
     sendAction({
+      board_id: loaderData.id,
       type: "addColumn",
       payload: { id: newCol.id, title: `Column ${columns.length + 1}` }
     });
@@ -39,6 +68,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       cols.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
     );
     sendAction({
+      board_id: loaderData.id,
       type: "updateColumnTitle",
       payload: { id, newTitle }
     });
@@ -48,6 +78,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     if (confirm("Are you sure you want to delete this column?")) {
       setColumns((cols) => cols.filter((c) => c.id !== id));
       sendAction({
+        board_id: loaderData.id,
         type: "deleteColumn",
         payload: { id }
       });
@@ -63,10 +94,11 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
           : c
       )
     );
-    sendAction({
-      type: "addNote",
-      payload: { id: newNote.id, columnId, text }
-    });
+    // sendAction({
+    //   board_id: loaderData.id,
+    //   type: "addNote",
+    //   payload: { id: newNote.id, columnId, text }
+    // });
   };
 
   const updateNote = (colId: string, noteId: string, newText: string, likeCount: number) => {
@@ -83,6 +115,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       )
     );
     sendAction({
+      board_id: loaderData.id,
       type: "updateNote",
       payload: { colId, noteId, newText, likes: likeCount }
     });
@@ -98,10 +131,14 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         )
       );
     }
-    sendAction({
-      type: "deleteNote",
-      payload: { colId, noteId }
-    });
+
+    if (text) {
+      sendAction({
+        board_id: loaderData.id,
+        type: "deleteNote",
+        payload: { colId, noteId }
+      });
+    }
   };
 
   const moveNote = (fromColId: string, toColId: string, noteId: string) => {
@@ -126,6 +163,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         )
       );
       sendAction({
+        board_id: loaderData.id,
         type: "moveNote",
         payload: { fromColId, toColId, noteId },
       });
@@ -136,6 +174,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     <BoardContext.Provider
       value={{
         columns,
+        id: loaderData.id,
+        title: loaderData.title,
         addColumn,
         updateColumnTitle,
         deleteColumn,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useBoard } from "./BoardContext";
 import type { Note } from "~/server/boardStore";
 
@@ -6,7 +6,7 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(!Boolean(note.text));
   const [text, setText] = useState(note.text);
-  const [likeCount, setLikeCount] = useState(0);
+  const [likeCount, setLikeCount] = useState(note.likes);
 
   const saveNote = () => {
     if (text.trim()) {

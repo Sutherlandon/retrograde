@@ -1,7 +1,7 @@
 // routes/board.tsx
-import { Routes, Route, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
-import { BoardProvider } from "../components/BoardContext";
-import Header from "../components/Header";
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { BoardProvider } from "~/components/BoardContext";
+import Header from "~/components/Header";
 import Board from "~/components/Board";
 import {
   getBoardServer,
@@ -14,11 +14,30 @@ import {
   moveNoteServer,
 } from "../server/boardStore";
 
-export async function loader(_: LoaderFunctionArgs) {
-  return getBoardServer();
+export async function loader({ params }: LoaderFunctionArgs) {
+  const board_id = params.id;
+
+  if (board_id) {
+    const board = getBoardServer(board_id);
+
+    if (board_id) {
+      if (board) {
+        return board;
+      } else {
+        throw new Response("Board Not Found", { status: 404 });
+      }
+    }
+
+    throw new Response("Board ID Missing", { status: 400 });
+  }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {
+  const board_id = params.id;
+  if (!board_id) {
+    throw new Response("Board ID Missing", { status: 400 });
+  }
+
   const data = await request.formData();
 
   if (data.has("type") && data.has("payload")) {
@@ -27,30 +46,25 @@ export async function action({ request }: ActionFunctionArgs) {
 
     switch (type) {
       case "addColumn":
-        return addColumnServer(payload.id, payload.title);
+        return addColumnServer(board_id, payload.id, payload.title);
 
       case "updateColumnTitle":
-        updateColumnTitleServer(payload.id, payload.newTitle);
-        return { ok: true };
+        return updateColumnTitleServer(board_id, payload.id, payload.newTitle);
 
       case "deleteColumn":
-        deleteColumnServer(payload.id);
-        return { ok: true };
+        return deleteColumnServer(board_id, payload.id);
 
       case "addNote":
-        return addNoteServer(payload.id, payload.columnId, payload.text);
+        return addNoteServer(board_id, payload.id, payload.columnId, payload.text);
 
       case "updateNote":
-        updateNoteServer(payload.colId, payload.noteId, payload.newText, payload.likes);
-        return { ok: true };
+        return updateNoteServer(board_id, payload.colId, payload.noteId, payload.newText, payload.likes);
 
       case "deleteNote":
-        deleteNoteServer(payload.colId, payload.noteId);
-        return { ok: true };
+        return deleteNoteServer(board_id, payload.colId, payload.noteId);
 
       case "moveNote":
-        moveNoteServer(payload.fromColId, payload.toColId, payload.noteId);
-        return { ok: true };
+        return moveNoteServer(board_id, payload.fromColId, payload.toColId, payload.noteId);
 
       default:
         throw new Response("Unknown action", { status: 400 });
@@ -65,9 +79,7 @@ export default function BoardRoute() {
   return (
     <BoardProvider>
       <Header />
-      <Routes>
-        <Route path="/board" element={<Board />} />
-      </Routes>
+      <Board />
     </BoardProvider>
   );
 }
