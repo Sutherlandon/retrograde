@@ -1,5 +1,5 @@
 // routes/board.tsx
-import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/components/BoardContext";
 import Header from "~/components/Header";
 import Board from "~/components/Board";
@@ -58,13 +58,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return addNoteServer(board_id, payload.id, payload.columnId, payload.text);
 
       case "updateNote":
-        return updateNoteServer(board_id, payload.colId, payload.noteId, payload.newText, payload.likes);
+        return updateNoteServer(board_id, payload.columnId, payload.noteId, payload.newText, payload.likes);
 
       case "deleteNote":
-        return deleteNoteServer(board_id, payload.colId, payload.noteId);
+        return deleteNoteServer(board_id, payload.columnId, payload.noteId);
 
       case "moveNote":
-        return moveNoteServer(board_id, payload.fromColId, payload.toColId, payload.noteId);
+        return moveNoteServer(board_id, payload.fromcolumnId, payload.tocolumnId, payload.noteId);
 
       default:
         throw new Response("Unknown action", { status: 400 });

@@ -4,13 +4,16 @@ import type { Note } from "~/server/boardStore";
 
 export default function Note({ note, columnId }: { note: Note; columnId: string }) {
   const { updateNote, deleteNote } = useBoard();
-  const [isEditing, setIsEditing] = useState(!Boolean(note.text));
+  const [isEditing, setIsEditing] = useState(note.new);
   const [text, setText] = useState(note.text);
-  const [likeCount, setLikeCount] = useState(note.likes);
+
+  const handleLike = () => {
+    updateNote(columnId, note.id, text, note.likes + 1);
+  }
 
   const saveNote = () => {
     if (text.trim()) {
-      updateNote(columnId, note.id, text.trim(), likeCount);
+      updateNote(columnId, note.id, text.trim(), note.likes);
     } else {
       deleteNote(columnId, note.id);
     }
@@ -25,7 +28,7 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
       onDragStart={(e) => {
         e.dataTransfer.setData(
           "application/json",
-          JSON.stringify({ noteId: note.id, fromColId: columnId })
+          JSON.stringify({ noteId: note.id, fromcolumnId: columnId })
         );
       }}
     >
@@ -47,7 +50,7 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
             <div className="flex flex-col items-start">
               <button
                 onClick={() => deleteNote(columnId, note.id, note.text)}
-                className="ml-2 text-red-600 font-bold hover:text-red-800"
+                className="ml-2 text-red-600 font-bold hover:bg-gray-300 px-1 rounded-sm"
               >
                 ✕
               </button>
@@ -55,14 +58,14 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
           </div>
           <div className='flex justify-between items-center'>
             <button
-              onClick={() => { setLikeCount(likeCount + 1); saveNote(); }}
-              className="font-bold cursor-pointer hover:text-gray-600"
+              onClick={() => handleLike()}
+              className="font-bold cursor-pointer hover:bg-gray-300 px-1 rounded-sm"
             >
-              {likeCount} 👍
+              {note.likes} 👍
             </button>
             <button
               onClick={() => setIsEditing(true)}
-              className="font-bold cursor-pointer hover:text-gray-600"
+              className="font-bold cursor-pointer hover:bg-gray-300 px-1 rounded-sm"
             >
               ✎
             </button>

@@ -4,6 +4,7 @@ export interface Note {
   id: string;
   text: string;
   likes: number
+  new: boolean;
 }
 
 export interface Column {
@@ -23,9 +24,9 @@ export interface BoardModifier {
   updateColumnTitle: (id: string, newTitle: string) => void;
   deleteColumn: (id: string) => void;
   addNote: (columnId: string, text?: string) => void;
-  updateNote: (colId: string, noteId: string, newText: string, likeCount: number) => void;
-  deleteNote: (colId: string, noteId: string, text?: string) => void;
-  moveNote: (fromColId: string, toColId: string, noteId: string) => void;
+  updateNote: (columnId: string, noteId: string, newText: string, likeCount: number) => void;
+  deleteNote: (columnId: string, noteId: string, text?: string) => void;
+  moveNote: (fromcolumnId: string, tocolumnId: string, noteId: string) => void;
 }
 
 export interface Board extends BoardState, BoardModifier { }
@@ -45,8 +46,8 @@ export const collection: BoardCollection = {
         id: 'col-1',
         title: "To Do",
         notes: [
-          { id: 'note-1', text: "This is a note", likes: 0 },
-          { id: 'note-2', text: "This is another note", likes: 2 }
+          { id: 'note-1', text: "This is a note", likes: 0, new: false },
+          { id: 'note-2', text: "This is another note", likes: 2, new: false }
         ]
       },
     ]
@@ -102,7 +103,7 @@ export function addNoteServer(board_id: string, id: string, columnId: string, te
   if (!col) {
     throw new Error(`Column with id ${columnId} not found`);
   }
-  const newNote: Note = { id, text, likes: 0 };
+  const newNote: Note = { id, text, likes: 0, new: false };
   col.notes.push(newNote);
   console.log(board);
   return board;
@@ -119,28 +120,28 @@ export function updateNoteServer(board_id: string, columnId: string, noteId: str
   if (noteIndex !== -1) {
     col.notes[noteIndex] = { ...col.notes[noteIndex], text: newText, likes: likeCount };
   } else {
-    col.notes.push({ id: noteId, text: newText, likes: likeCount });
+    col.notes.push({ id: noteId, text: newText, likes: likeCount, new: false });
   }
   console.log(board);
   return board;
 }
 
-export function deleteNoteServer(board_id: string, colId: string, noteId: string): BoardState {
+export function deleteNoteServer(board_id: string, columnId: string, noteId: string): BoardState {
   const board = collection.get(board_id);
   board.columns = board.columns.map((c) =>
-    c.id === colId ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) } : c
+    c.id === columnId ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) } : c
   );
   console.log(board);
   return board;
 }
 
-export function moveNoteServer(board_id: string, fromColId: string, toColId: string, noteId: string): BoardState | void {
-  if (fromColId === toColId) return;
+export function moveNoteServer(board_id: string, fromcolumnId: string, tocolumnId: string, noteId: string): BoardState | void {
+  if (fromcolumnId === tocolumnId) return;
   const board = collection.get(board_id);
   let movedNote: Note | null = null;
 
   board.columns = board.columns.map((c) => {
-    if (c.id === fromColId) {
+    if (c.id === fromcolumnId) {
       const note = c.notes.find((n) => n.id === noteId);
       if (note) movedNote = note;
       return { ...c, notes: c.notes.filter((n) => n.id !== noteId) };
@@ -150,7 +151,7 @@ export function moveNoteServer(board_id: string, fromColId: string, toColId: str
 
   if (movedNote) {
     board.columns = board.columns.map((c) =>
-      c.id === toColId ? { ...c, notes: [...c.notes, movedNote!] } : c
+      c.id === tocolumnId ? { ...c, notes: [...c.notes, movedNote!] } : c
     );
   }
   console.log(board);

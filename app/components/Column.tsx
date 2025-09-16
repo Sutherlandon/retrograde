@@ -18,10 +18,10 @@ export default function Column({ column }: { column: Column }) {
     e.preventDefault();
     setIsDragOver(false);
     try {
-      const { noteId, fromColId } = JSON.parse(
+      const { noteId, fromcolumnId } = JSON.parse(
         e.dataTransfer.getData("application/json")
       );
-      moveNote(fromColId, column.id, noteId);
+      moveNote(fromcolumnId, column.id, noteId);
     } catch {
       // ignore invalid drops
     }
