@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import type { Board, BoardState } from "~/server/boardStore";
+import type { Board, BoardState } from "~/server/board.types";
 import { useFetcher, useLoaderData, useRevalidator } from "react-router";
 import { nanoid } from "nanoid";
 
 const defaultBoard: Board = {
   id: "default-board",
   title: "Default Board",
-  columns: [{ id: 'col-1', title: 'Column 1', notes: [] }],
+  columns: [{ id: 'col-1', title: 'Column 1', col_order: 0, notes: [] }],
   addNote: () => { },
   addColumn: () => { },
   updateColumnTitle: () => { },
@@ -97,15 +97,34 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [revalidate]);
 
+  // Helper to get the next col_order values
+  function getNextColOrder(board: BoardState): number {
+    if (!board.columns.length) return 1;
+
+    const maxOrder = board.columns.reduce((max, col) => {
+      // If col_order is undefined, treat it as 0
+      const order = (col as any).col_order ?? 0;
+      return order > max ? order : max;
+    }, 0);
+
+    return maxOrder + 1;
+  }
+
   // Creates a new column with a default title
   const addColumn = () => {
     if (columns.length >= 10) return;
-    const newCol = { id: nanoid(), title: `Column ${columns.length + 1}`, notes: [] };
-    setColumns([...columns, newCol]);
+    const nextColOrder = getNextColOrder(loaderData);
+    const newCol = {
+      id: nanoid(),
+      title: `Column ${nextColOrder}`,
+      col_order: nextColOrder,
+      notes: []
+    };
+    setColumns([...columns, newCol].sort((a, b) => a.col_order - b.col_order));
     sendAction({
       board_id: loaderData.id,
       type: "addColumn",
-      payload: { id: newCol.id, title: `Column ${columns.length + 1}` }
+      payload: { id: newCol.id, title: `Column ${nextColOrder}` }
     });
   };
 
@@ -206,6 +225,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       return col;
     });
 
+    // add the note to the target column
     if (movedNote) {
       setColumns(
         newCols.map((col) =>

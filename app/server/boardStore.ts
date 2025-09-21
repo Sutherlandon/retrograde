@@ -1,5 +1,3 @@
-import type { B } from "node_modules/react-router/dist/development/context-jKip1TFB.mjs";
-
 export interface Note {
   id: string;
   text: string;

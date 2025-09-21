@@ -12,7 +12,7 @@ import {
   updateNoteServer,
   deleteNoteServer,
   moveNoteServer,
-} from "../server/boardStore";
+} from "../server/board_model";
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const board_id = params.id;
@@ -55,16 +55,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return deleteColumnServer(board_id, payload.id);
 
       case "addNote":
-        return addNoteServer(board_id, payload.id, payload.columnId, payload.text);
+        return addNoteServer(payload.id, payload.columnId, payload.text);
 
       case "updateNote":
-        return updateNoteServer(board_id, payload.columnId, payload.noteId, payload.newText, payload.likes);
+        return updateNoteServer(payload.columnId, payload.noteId, payload.newText, payload.likes);
 
       case "deleteNote":
-        return deleteNoteServer(board_id, payload.columnId, payload.noteId);
+        return deleteNoteServer(payload.columnId, payload.noteId);
 
       case "moveNote":
-        return moveNoteServer(board_id, payload.fromcolumnId, payload.tocolumnId, payload.noteId);
+        return moveNoteServer(payload.fromcolumnId, payload.tocolumnId, payload.noteId);
 
       default:
         throw new Response("Unknown action", { status: 400 });
