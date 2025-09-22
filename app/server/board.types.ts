@@ -18,6 +18,7 @@ export interface BoardState {
   id: string;
   title: string;
   columns: Column[];
+  next_col_order: number; // Optional: for client-side use only
 }
 
 // Optional: separate "modifier" interfaces if you still want client-only methods

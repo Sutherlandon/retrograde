@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import type { Board, BoardState } from "~/server/board.types";
+import type { Board, BoardState, Column } from "~/server/board.types";
 import { useFetcher, useLoaderData, useRevalidator } from "react-router";
 import { nanoid } from "nanoid";
 
 const defaultBoard: Board = {
   id: "default-board",
   title: "Default Board",
+  next_col_order: 1,
   columns: [{ id: 'col-1', title: 'Column 1', col_order: 0, notes: [] }],
   addNote: () => { },
   addColumn: () => { },
@@ -97,41 +98,36 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [revalidate]);
 
-  // Helper to get the next col_order values
-  function getNextColOrder(board: BoardState): number {
-    if (!board.columns.length) return 1;
-
-    const maxOrder = board.columns.reduce((max, col) => {
-      // If col_order is undefined, treat it as 0
-      const order = (col as any).col_order ?? 0;
-      return order > max ? order : max;
-    }, 0);
-
-    return maxOrder + 1;
-  }
-
   // Creates a new column with a default title
   const addColumn = () => {
     if (columns.length >= 10) return;
-    const nextColOrder = getNextColOrder(loaderData);
-    const newCol = {
+
+    const newCol: Column = {
       id: nanoid(),
-      title: `Column ${nextColOrder}`,
-      col_order: nextColOrder,
+      title: `Column ${loaderData.next_col_order}`,
+      col_order: loaderData.next_col_order,
       notes: []
     };
+
     setColumns([...columns, newCol].sort((a, b) => a.col_order - b.col_order));
     sendAction({
       board_id: loaderData.id,
       type: "addColumn",
-      payload: { id: newCol.id, title: `Column ${nextColOrder}` }
+      payload: {
+        id: newCol.id,
+        title: `Column ${loaderData.next_col_order}`,
+        col_order: newCol.col_order
+      }
     });
   };
 
   // Updates the title of a column
   const updateColumnTitle = (id: string, newTitle: string) => {
     setColumns((cols) =>
-      cols.map((c) => (c.id === id ? { ...c, title: newTitle } : c))
+      cols.map((c) => c.id === id
+        ? { ...c, title: newTitle }
+        : c
+      )
     );
     sendAction({
       board_id: loaderData.id,
@@ -161,10 +157,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       new: true
     };
     setColumns((cols) =>
-      cols.map((c) =>
-        c.id === columnId
-          ? { ...c, notes: [...c.notes, newNote] }
-          : c
+      cols.map((c) => c.id === columnId
+        ? { ...c, notes: [...c.notes, newNote] }
+        : c
       )
     );
   };
@@ -248,6 +243,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         columns,
         id: loaderData.id,
         title: loaderData.title,
+        next_col_order: loaderData.next_col_order,
         addColumn,
         updateColumnTitle,
         deleteColumn,

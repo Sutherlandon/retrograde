@@ -1,32 +1,16 @@
--- 1. Connect to the default postgres DB
--- 2. Create the database
-
-CREATE DATABASE retrograde
-WITH
-    OWNER = postgres -- replace with your actual username
-    ENCODING = 'UTF8' LC_COLLATE = 'en_US.UTF-8' LC_CTYPE = 'en_US.UTF-8' TEMPLATE = template0;
-
--- 3. Connect to the new database
-\c retrograde;
-
--- 5. Create tables
--- Boards
-
--- Boards table
+-- Create tables
 CREATE TABLE boards (
     id TEXT PRIMARY KEY, -- now a string, not UUID
     title TEXT NOT NULL
 );
 
--- Columns table
 CREATE TABLE columns (
     id TEXT PRIMARY KEY,
     board_id TEXT NOT NULL REFERENCES boards (id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    col_order SERIAL NOT NULL -- auto-incrementing order
+    col_order INT NOT NULL
 );
 
--- Notes table
 CREATE TABLE notes (
     id TEXT PRIMARY KEY,
     column_id TEXT NOT NULL REFERENCES columns (id) ON DELETE CASCADE,
@@ -35,7 +19,7 @@ CREATE TABLE notes (
     is_new BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Insert board with fixed string ID
+-- Example Board Data
 INSERT INTO
     boards (id, title)
 VALUES (
@@ -43,16 +27,20 @@ VALUES (
         'Example Board'
     );
 
--- Insert column
 INSERT INTO
-    columns (id, board_id, title)
+    columns (
+        id,
+        board_id,
+        title,
+        col_order
+    )
 VALUES (
         'col-1',
         'example-board',
-        'To Do'
+        'To Do',
+        1
     )
 
--- Insert notes with fixed ids
 INSERT INTO
     notes (
         id,

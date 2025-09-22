@@ -1,5 +1,5 @@
 // routes/board.tsx
-import { useLoaderData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/components/BoardContext";
 import Header from "~/components/Header";
 import Board from "~/components/Board";
@@ -18,18 +18,20 @@ export async function loader({ params }: LoaderFunctionArgs) {
   const board_id = params.id;
 
   if (board_id) {
-    const board = getBoardServer(board_id);
+    const board = await getBoardServer(board_id);
+    if (board) {
+      // Calculate next_col_order for client use
+      board.next_col_order = (board.columns.length > 0)
+        ? Math.max(...board.columns.map(c => c.col_order)) + 1
+        : 1
 
-    if (board_id) {
-      if (board) {
-        return board;
-      } else {
-        throw new Response("Board Not Found", { status: 404 });
-      }
+      return board;
+    } else {
+      throw new Response("Board Not Found", { status: 404 });
     }
-
-    throw new Response("Board ID Missing", { status: 400 });
   }
+
+  throw new Response("Board ID Missing", { status: 400 });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -46,7 +48,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     switch (type) {
       case "addColumn":
-        return addColumnServer(board_id, payload.id, payload.title);
+        return addColumnServer(board_id, payload.id, payload.title, payload.col_order);
 
       case "updateColumnTitle":
         return updateColumnTitleServer(board_id, payload.id, payload.newTitle);

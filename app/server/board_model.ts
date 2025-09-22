@@ -54,16 +54,16 @@ export async function createBoard(id: string, title: string): Promise<void> {
 
   // Add default first column
   await pool.query(
-    `INSERT INTO columns (id, board_id, title, col_order) VALUES (${nanoid()}, $1, 'Column 1', 0)`,
+    `INSERT INTO columns (id, board_id, title, col_order) VALUES (${nanoid()}, $1, 'Column 1', 1)`,
     [id]
   );
 }
 
 // Add a column
-export async function addColumnServer(boardId: string, id: string, title: string): Promise<void> {
+export async function addColumnServer(boardId: string, id: string, title: string, col_order: number): Promise<void> {
   await pool.query(
-    `INSERT INTO columns (id, board_id, title) VALUES ($1, $2, $3)`,
-    [id, boardId, title]
+    `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
+    [id, boardId, title, col_order]
   );
 }
 
