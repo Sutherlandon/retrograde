@@ -2,7 +2,7 @@ import { Form, redirect, useActionData, type ActionFunctionArgs } from "react-ro
 import { nanoid } from "nanoid";
 
 import Header from "~/components/Header";
-import { collection } from "~/server/boardStore";
+import { createBoard } from "~/server/board_model";
 
 export async function action({ request }: ActionFunctionArgs) {
   const data = await request.formData();
@@ -25,10 +25,10 @@ export async function action({ request }: ActionFunctionArgs) {
   // generate a unique board ID
   const board_id = nanoid();
 
-  // At this point, title is guaranteed to be a string with length >= 3
-  // So we can safely assert its type
-  collection.create(board_id, title!);
+  // create the board in the database
+  await createBoard(board_id, title!);
 
+  // redirect to the new board
   return redirect(`/board/${board_id}`);
 }
 
@@ -38,7 +38,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <div className="p-10 bg-gray-100 rounded shadow-md max-w-md mx-auto mt-10 text-gray-800 text-center">
+      <div className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto mt-10 text-gray-100 text-center">
         <h1 className="text-2xl font-bold mb-4">Create a New Board</h1>
         <Form method="post" className="mb-4">
           <div className="mb-4">
@@ -64,9 +64,9 @@ export default function Home() {
               type="submit"
               name="type"
               value="addColumn"
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-800 hover:cursor-pointer"
             >
-              Create Board
+              Create Board <span className="pl-2">🚀</span>
             </button>
           </div>
         </Form>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useBoard } from "./BoardContext";
 import type { Note } from "~/server/boardStore";
 
-export default function Note({ note, columnId }: { note: Note; columnId: string }) {
+export default function Note({ note, columnId, bgClass }: { note: Note; columnId: string, bgClass: string }) {
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.new);
   const [text, setText] = useState(note.text);
@@ -22,7 +22,7 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
 
   return (
     <div
-      className="bg-yellow-100 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs"
+      className={`${bgClass} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs`}
       style={{ width: '47%', maxWidth: '15em' }}
       draggable={!isEditing}
       onDragStart={(e) => {
@@ -50,7 +50,7 @@ export default function Note({ note, columnId }: { note: Note; columnId: string 
             <div className="flex flex-col items-start">
               <button
                 onClick={() => deleteNote(columnId, note.id, note.text)}
-                className="ml-2 text-red-600 font-bold hover:bg-gray-300 px-1 rounded-sm"
+                className="ml-2 text-red-600 font-bold hover:bg-gray-300 hover:cursor-pointer px-1 rounded-sm"
               >
                 ✕
               </button>

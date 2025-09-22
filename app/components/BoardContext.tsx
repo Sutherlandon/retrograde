@@ -100,7 +100,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   // Creates a new column with a default title
   const addColumn = () => {
-    if (columns.length >= 10) return;
+    if (columns.length >= 12)
+      return confirm("You have reached the maximum of 12 columns.)");
 
     const newCol: Column = {
       id: nanoid(),

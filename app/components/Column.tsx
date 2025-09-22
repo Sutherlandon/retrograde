@@ -3,7 +3,7 @@ import { useBoard } from "./BoardContext";
 import type { Column } from "~/server/boardStore";
 import Note from "./Note";
 
-export default function Column({ column }: { column: Column }) {
+export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
   const { updateColumnTitle, deleteColumn, addNote, moveNote } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
@@ -29,7 +29,7 @@ export default function Column({ column }: { column: Column }) {
 
   return (
     <div
-      className={`rounded-md p-3 flex-1 transition-colors ${isDragOver ? "bg-blue-100" : "bg-gray-100"}`}
+      className={`rounded-md p-3 flex-1 transition-colors text-gray-100 ${isDragOver ? "bg-slate-600" : "bg-slate-800"}`}
       style={{ minWidth: "350px", maxWidth: "50%", minHeight: "150px" }}
       onDragOver={(e) => {
         e.preventDefault();
@@ -59,7 +59,7 @@ export default function Column({ column }: { column: Column }) {
         )}
         <button
           onClick={() => addNote(column.id)}
-          className="ml-2 text-sm bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 cursor-pointer whitespace-nowrap"
+          className="ml-2 text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-800 cursor-pointer whitespace-nowrap"
         >
           + Note
         </button>
@@ -73,7 +73,7 @@ export default function Column({ column }: { column: Column }) {
 
       <div className='flex gap-2 flex-wrap'>
         {column.notes.map((note) => (
-          <Note key={note.id} note={note} columnId={column.id} />
+          <Note key={note.id} note={note} columnId={column.id} bgClass={noteColor} />
         ))}
       </div>
     </div >

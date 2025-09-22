@@ -54,8 +54,8 @@ export async function createBoard(id: string, title: string): Promise<void> {
 
   // Add default first column
   await pool.query(
-    `INSERT INTO columns (id, board_id, title, col_order) VALUES (${nanoid()}, $1, 'Column 1', 1)`,
-    [id]
+    `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, 'Column 1', 1)`,
+    [nanoid(), id]
   );
 }
 
