@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useBoard } from "./BoardContext";
 import type { Column } from "~/server/boardStore";
 import Note from "./Note";
+import Button from "./Button";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
   const { updateColumnTitle, deleteColumn, addNote, moveNote } = useBoard();
@@ -57,18 +58,17 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
             {column.title}
           </span>
         )}
-        <button
+        <Button
           onClick={() => addNote(column.id)}
-          className="ml-2 text-sm bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-800 cursor-pointer whitespace-nowrap"
         >
           + Note
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => deleteColumn(column.id)}
-          className="ml-2 text-sm bg-red-500 text-white px-2 py-1 rounded hover:bg-red-800 cursor-pointer"
+          className="ml-2 bg-red-500 hover:bg-red-800"
         >
           ✕
-        </button>
+        </Button>
       </div>
 
       <div className='flex gap-2 flex-wrap'>

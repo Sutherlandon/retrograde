@@ -11,9 +11,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const errors: Record<string, string> = {};
 
+  // validate the form data
   if (!title || title.length < 3) {
     errors.title = "Title must be at least 3 characters.";
   }
+
+  // check if they agreed to the kindness checkbox
   if (!no_jerks) {
     errors.no_jerks = "You must agree to the kindness checkbox.";
   }
