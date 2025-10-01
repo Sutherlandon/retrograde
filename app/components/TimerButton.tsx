@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Button from "./Button";
+import { StopIcon, TimerIcon } from "~/images/icons";
 
 const TimerButton = () => {
   const [showOptions, setShowOptions] = useState(false);
@@ -52,29 +53,28 @@ const TimerButton = () => {
   return (
     <div>
       <Button
+        icon={<TimerIcon />}
+        text={timeLeft === null ? "Timer" : formatTime(timeLeft)}
+        className="relative"
         onClick={() => setShowOptions((prev) => !prev)}
         style={{ width: '75px' }}
-      >
-        {timeLeft === null
-          ? <>+ Timer</>
-          : formatTime(timeLeft)
-        }
-      </Button>
+      />
       {showOptions && (
-        <div className="absolute mt-2 bg-gray-900 rounded shadow-lg p-2 flex flex-col gap-2">
+        <div className="absolute mt-2 bg-gray-900 rounded shadow-lg p-2 flex flex-col gap-2 w-[75px]">
           {timerRunning
             ? (
-              <Button onClick={handleStop}>
-                X Stop
-              </Button>
+              <Button
+                icon={<StopIcon />}
+                text='Stop'
+                onClick={handleStop}
+              />
             )
             : [1, 2, 3, 5, 7].map((m) => (
               <Button
                 key={m}
+                text={`${m} min`}
                 onClick={() => handleStart(m)}
-              >
-                {m} min
-              </Button>
+              />
             ))
           }
         </div>

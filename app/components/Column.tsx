@@ -3,6 +3,7 @@ import { useBoard } from "./BoardContext";
 import type { Column } from "~/server/boardStore";
 import Note from "./Note";
 import Button from "./Button";
+import { PlusIcon, TrashIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
   const { updateColumnTitle, deleteColumn, addNote, moveNote } = useBoard();
@@ -59,16 +60,18 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
           </span>
         )}
         <Button
+          icon={<PlusIcon />}
+          // text="Note"
           onClick={() => addNote(column.id)}
-        >
-          + Note
-        </Button>
+          className="text-white hover:text-green-500"
+          variant="text"
+        />
         <Button
+          icon={<TrashIcon />}
           onClick={() => deleteColumn(column.id)}
-          className="ml-2 bg-red-500 hover:bg-red-800"
-        >
-          ✕
-        </Button>
+          className="ml-2 text-white hover:text-red-500"
+          variant="text"
+        />
       </div>
 
       <div className='flex gap-2 flex-wrap'>

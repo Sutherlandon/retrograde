@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useBoard } from "./BoardContext";
 import type { Note } from "~/server/boardStore";
+import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
+import Button from "./Button";
 
 export default function Note({ note, columnId, bgClass }: { note: Note; columnId: string, bgClass: string }) {
   const { updateNote, deleteNote } = useBoard();
@@ -22,8 +24,7 @@ export default function Note({ note, columnId, bgClass }: { note: Note; columnId
 
   return (
     <div
-      className={`${bgClass} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs`}
-      style={{ width: '47%', maxWidth: '15em' }}
+      className={`${bgClass} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
       draggable={!isEditing}
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -34,7 +35,7 @@ export default function Note({ note, columnId, bgClass }: { note: Note; columnId
     >
       {isEditing ? (
         <textarea
-          className="w-full resize-none p-2 rounded border border-gray-300"
+          className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={saveNote}
@@ -42,33 +43,31 @@ export default function Note({ note, columnId, bgClass }: { note: Note; columnId
           autoFocus
         />
       ) : (
-        <div>
-          <div className="flex gap-2 mb-2">
+        <div className="flex flex-col gap-2 justify-between h-full">
+          <div className="flex gap-2">
             <div className="flex-1 whitespace-pre-wrap">
               {note.text}
             </div>
             <div className="flex flex-col items-start">
-              <button
+              <Button
+                icon={<TrashIcon size={4} />}
                 onClick={() => deleteNote(columnId, note.id, note.text)}
-                className="ml-2 text-red-600 font-bold hover:bg-gray-300 hover:cursor-pointer px-1 rounded-sm"
-              >
-                ✕
-              </button>
+                variant="text"
+              />
             </div>
           </div>
           <div className='flex justify-between items-center'>
-            <button
+            <Button
+              text={note.likes.toString()}
+              icon={<ThumbsUpIcon size={4} />}
               onClick={() => handleLike()}
-              className="font-bold cursor-pointer hover:bg-gray-300 px-1 rounded-sm"
-            >
-              {note.likes} 👍
-            </button>
-            <button
+              variant="text"
+            />
+            <Button
+              icon={<EditIcon size={4} />}
               onClick={() => setIsEditing(true)}
-              className="font-bold cursor-pointer hover:bg-gray-300 px-1 rounded-sm"
-            >
-              ✎
-            </button>
+              variant="text"
+            />
           </div>
         </div>
       )}

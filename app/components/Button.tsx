@@ -1,22 +1,47 @@
 // A reusable button component with consistent styling
 export default function Button({
-  children,
   onClick,
   className = '',
+  icon,
+  text,
   ...props
 }: {
-  children: React.ReactNode;
   onClick?: () => void;
   className?: string
   [key: string]: any;
+  icon?: React.ReactNode;
+  text?: string;
+  variant?: "text" | "solid" | "outline";
 }) {
   return (
     <button
       onClick={onClick}
-      className={`px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-800 hover:cursor-pointer ${className ?? ''}`}
+      className={`
+        ${{
+          "solid": "bg-blue-600 text-white hover:bg-blue-800",
+          "outline": "bg-transparent border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+          "text": "bg-transparent text-gray-800 border-transparent hover:bg-[rgba(0,0,0,0.1)]",
+        }[props.variant ?? "solid"]}
+        flex
+        items-center
+        justify-center
+        gap-1
+        hover:cursor-pointer
+        ${Boolean(text) ? 'px-2' : 'px-1'}
+        py-1
+        rounded
+        text-nowrap
+        text-sm
+        ${className ?? ''}
+      `}
       {...props}
     >
-      {children}
+      {icon &&
+        <span>{icon}</span>
+      }
+      {text &&
+        <span>{text}</span>
+      }
     </button>
   );
 }

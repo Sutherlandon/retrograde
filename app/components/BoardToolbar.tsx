@@ -2,6 +2,7 @@ import React from "react";
 import { useBoard } from "./BoardContext";
 import TimerButton from "./TimerButton";
 import Button from "./Button";
+import { PlusIcon } from "~/images/icons";
 
 export default function BoardToolbar({ title }: { title: string }) {
   const { addColumn } = useBoard();
@@ -12,10 +13,10 @@ export default function BoardToolbar({ title }: { title: string }) {
       <div className="flex-grow" />
       <TimerButton />
       <Button
+        icon={<PlusIcon />}
+        text="Column"
         onClick={() => addColumn()}
-      >
-        + Column
-      </Button>
+      />
     </div>
   );
 }
