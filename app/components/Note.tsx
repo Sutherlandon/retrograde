@@ -50,7 +50,7 @@ export default function Note({ note, columnId, bgClass }: { note: Note; columnId
             </div>
             <div className="flex flex-col items-start">
               <Button
-                icon={<TrashIcon size={4} />}
+                icon={<TrashIcon size="sm" />}
                 onClick={() => deleteNote(columnId, note.id, note.text)}
                 variant="text"
               />
@@ -59,12 +59,12 @@ export default function Note({ note, columnId, bgClass }: { note: Note; columnId
           <div className='flex justify-between items-center'>
             <Button
               text={note.likes.toString()}
-              icon={<ThumbsUpIcon size={4} />}
+              icon={<ThumbsUpIcon size="sm" />}
               onClick={() => handleLike()}
               variant="text"
             />
             <Button
-              icon={<EditIcon size={4} />}
+              icon={<EditIcon size="sm" />}
               onClick={() => setIsEditing(true)}
               variant="text"
             />

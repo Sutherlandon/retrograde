@@ -1,4 +1,20 @@
-export function LikeIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+import type { I } from "node_modules/react-router/dist/development/context-jKip1TFB.mjs";
+
+interface IconProps {
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}
+
+// map size prop to tailwind classes
+const sizeMap: { [key: string]: string } = {
+  xs: 'w-3 h-3',
+  sm: 'w-4 h-4',
+  md: 'w-5 h-5',
+  lg: 'w-6 h-6',
+  xl: 'w-7 h-7',
+};
+
+export function LikeIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -6,7 +22,7 @@ export function LikeIcon({ size = 5, className = '' }: { size?: number, classNam
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <path
         strokeLinecap="round"
@@ -18,13 +34,13 @@ export function LikeIcon({ size = 5, className = '' }: { size?: number, classNam
 }
 
 // thumbs up icon like on facebook
-export function ThumbsUpIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function ThumbsUpIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="none"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
       <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
@@ -46,7 +62,7 @@ export function ThumbsUpIcon({ size = 5, className = '' }: { size?: number, clas
   );
 }
 
-export function TimerIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function TimerIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -54,7 +70,7 @@ export function TimerIcon({ size = 5, className = '' }: { size?: number, classNa
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <path
         strokeLinecap="round"
@@ -65,7 +81,7 @@ export function TimerIcon({ size = 5, className = '' }: { size?: number, classNa
   );
 }
 
-export function PlusIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function PlusIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -73,7 +89,7 @@ export function PlusIcon({ size = 5, className = '' }: { size?: number, classNam
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={`h-${size} w-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <path
         strokeLinecap="round"
@@ -84,7 +100,7 @@ export function PlusIcon({ size = 5, className = '' }: { size?: number, classNam
   );
 }
 
-export function TrashIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function TrashIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -92,7 +108,7 @@ export function TrashIcon({ size = 5, className = '' }: { size?: number, classNa
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <path
         strokeLinecap="round"
@@ -103,13 +119,13 @@ export function TrashIcon({ size = 5, className = '' }: { size?: number, classNa
   );
 }
 
-export function EditIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function EditIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
       <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
@@ -126,7 +142,7 @@ export function EditIcon({ size = 5, className = '' }: { size?: number, classNam
 }
 
 // a square icon like stop on a cassette player
-export function StopIcon({ size = 5, className = '' }: { size?: number, className?: string }) {
+export function StopIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -134,7 +150,7 @@ export function StopIcon({ size = 5, className = '' }: { size?: number, classNam
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={`w-${size} h-${size} ${className}`}
+      className={`${sizeMap[size]} ${className}`}
     >
       <rect
         width="14"
