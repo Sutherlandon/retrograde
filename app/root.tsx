@@ -16,6 +16,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        {/* <!-- Favicon --> */}
+        <link rel="icon" href="/icons/retrograde_logo.svg" type="image/svg+xml" />
+        <link rel="alternate icon" href="/icons/retrograde_logo-32.png" sizes="32x32" type="image/png" />
+        <link rel="alternate icon" href="/icons/retrograde_logo-16.png" sizes="16x16" type="image/png" />
+
+        {/* <!-- Apple Touch Icon --> */}
+        <link rel="apple-touch-icon" href="/icons/retrograde_logo-180.png" sizes="180x180" />
+
+        {/* <!-- Android/Chrome Manifest Icon --> */}
+        <link rel="icon" href="/icons/retrograde_logo-192.png" sizes="192x192" type="image/png" />
+        <link rel="icon" href="/icons/retrograde_logo-512.png" sizes="512x512" type="image/png" />
+
+        {/* <!-- Microsoft Tiles --> */}
+        <meta name="msapplication-TileColor" content="#000000" />
+        <meta name="msapplication-TileImage" content="/icons/retrograde_logo-270.png" />
+
+        {/* <!-- PWA Manifest --> */}
+        <link rel="manifest" href="/manifest.json" />
+
+        {/* <!-- Theme colors --> */}
+        <meta name="theme-color" content="#000000" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
         <Meta />
         <Links />
       </head>

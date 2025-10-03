@@ -1,4 +1,4 @@
-import logo from '~/images/retrograde_logo.svg';
+import { Logo } from '~/images/icons';
 
 export default function Header() {
   return (
@@ -7,8 +7,8 @@ export default function Header() {
         href="/"
         className="flex justify-between items-center text-white hover:cursor-pointer"
       >
-        <img src={logo} alt="Retrograde Logo" className="h-8 w-8 mr-2" />
-        <h1 className="text-lg font-bold">Retrograde</h1>
+        <Logo size="2xl" className='mr-2' />
+        <h1 className="text-2xl font-bold">Retrograde</h1>
       </a>
       <div className="flex-grow" />
       <a

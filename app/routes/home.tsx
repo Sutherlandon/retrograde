@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 
 import Header from "~/components/Header";
 import { createBoard } from "~/server/board_model";
+import RocketIcon from "~/images/icons";
 
 export async function action({ request }: ActionFunctionArgs) {
   const data = await request.formData();
@@ -67,9 +68,9 @@ export default function Home() {
               type="submit"
               name="type"
               value="addColumn"
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-800 hover:cursor-pointer"
+              className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded hover:from-green-800 hover:to-blue-800 hover:cursor-pointer flex items-center justify-center m-auto"
             >
-              Create Board <span className="pl-2">🚀</span>
+              Create Board <RocketIcon size="md" className="ml-2" />
             </button>
           </div>
         </Form>
