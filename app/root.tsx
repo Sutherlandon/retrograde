@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="msapplication-TileImage" content="/icons/retrograde_logo-270.png" />
 
         {/* <!-- PWA Manifest --> */}
-        <link rel="manifest" href="/manifest.json" />
+        {/* <link rel="manifest" href="/manifest.json" /> */}
 
         {/* <!-- Theme colors --> */}
         <meta name="theme-color" content="#000000" />

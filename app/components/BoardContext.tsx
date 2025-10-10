@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import type { Board, BoardState, Column } from "~/server/board.types";
 import { useFetcher, useLoaderData, useRevalidator } from "react-router";
 import { nanoid } from "nanoid";
+import type { Board, BoardState, Column } from "~/server/board.types";
 
 const defaultBoard: Board = {
   id: "default-board",
@@ -155,7 +155,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       id: nanoid(),
       text: "",
       likes: 0,
-      new: true
+      new: true,
+      created: Date.now().toString(),
     };
     setColumns((cols) =>
       cols.map((c) => c.id === columnId
@@ -166,7 +167,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   };
 
   // updates the text and likes of a note
-  const updateNote = (columnId: string, noteId: string, newText: string, likes: number) => {
+  const updateNote = (columnId: string, noteId: string, newText: string, likes: number, created: string) => {
     setColumns((cols) =>
       cols.map((c) =>
         c.id === columnId
@@ -182,7 +183,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     sendAction({
       board_id: loaderData.id,
       type: "updateNote",
-      payload: { columnId, noteId, newText, likes }
+      payload: { columnId, noteId, newText, likes, created }
     });
   };
 

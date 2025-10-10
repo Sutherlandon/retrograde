@@ -1,10 +1,11 @@
-// boardStore.types.ts
+// board.types.ts
 
 export interface Note {
   id: string;
   text: string;
   likes: number;
   new: boolean;
+  created: string;
 }
 
 export interface Column {
@@ -31,7 +32,8 @@ export interface BoardModifier {
     columnId: string,
     noteId: string,
     newText: string,
-    likeCount: number
+    likes: number,
+    created: string,
   ) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (

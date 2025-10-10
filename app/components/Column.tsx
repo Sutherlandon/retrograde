@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useBoard } from "./BoardContext";
-import type { Column } from "~/server/boardStore";
+import type { Column } from "~/server/board.types";
 import Note from "./Note";
 import Button from "./Button";
 import { PlusIcon, TrashIcon } from "~/images/icons";

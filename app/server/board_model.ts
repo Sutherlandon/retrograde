@@ -1,6 +1,6 @@
+import { nanoid } from "nanoid";
 import { pool } from "./db_config";
 import type { BoardState } from "./board.types";
-import { nanoid } from "nanoid";
 
 // ---------- QUERIES ----------
 
@@ -23,8 +23,9 @@ export async function getBoardServer(id: string): Promise<BoardState | null> {
                    'id', n.id,
                    'text', n.text,
                    'likes', n.likes,
-                   'is_new', n.is_new
-                 ) ORDER BY n.id
+                   'is_new', n.is_new,
+                   'created', n.created
+                 ) ORDER BY n.created
                )
                FROM notes n
                WHERE n.column_id = c.id
@@ -84,20 +85,20 @@ export async function deleteColumnServer(boardId: string, colId: string): Promis
 }
 
 // Add a note
-export async function addNoteServer(noteId: string, columnId: string, text = ""): Promise<void> {
+export async function addNoteServer(noteId: string, columnId: string, text: string = "", created: string): Promise<void> {
   await pool.query(
-    `INSERT INTO notes (id, column_id, text, likes, is_new) VALUES ($1, $2, $3, 0, false)`,
-    [noteId, columnId, text]
+    `INSERT INTO notes (id, column_id, text, likes, is_new) VALUES ($1, $2, $3, 0, false, $4)`,
+    [noteId, columnId, text, created]
   );
 }
 
 // Update or insert a note
-export async function updateNoteServer(columnId: string, noteId: string, newText: string, likeCount: number): Promise<void> {
+export async function updateNoteServer(columnId: string, noteId: string, newText: string, likeCount: number, created: string): Promise<void> {
   await pool.query(
-    `INSERT INTO notes (id, column_id, text, likes, is_new)
-     VALUES ($1, $2, $3, $4, false)
+    `INSERT INTO notes (id, column_id, text, likes, is_new, created)
+     VALUES ($1, $2, $3, $4, false, $5)
      ON CONFLICT (id) DO UPDATE SET text = EXCLUDED.text, likes = EXCLUDED.likes`,
-    [noteId, columnId, newText, likeCount]
+    [noteId, columnId, newText, likeCount, created]
   );
 }
 

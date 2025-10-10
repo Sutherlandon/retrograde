@@ -1,21 +1,29 @@
 import React, { useEffect, useState } from "react";
 import { useBoard } from "./BoardContext";
-import type { Note } from "~/server/boardStore";
+import type { Note } from "~/server/board.types";
 import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
 import Button from "./Button";
 
-export default function Note({ note, columnId, bgClass }: { note: Note; columnId: string, bgClass: string }) {
+export default function Note({
+  note,
+  columnId,
+  bgClass
+}: {
+  note: Note;
+  columnId: string,
+  bgClass: string
+}) {
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.new);
   const [text, setText] = useState(note.text);
 
   const handleLike = () => {
-    updateNote(columnId, note.id, text, note.likes + 1);
+    updateNote(columnId, note.id, text, note.likes + 1, note.created);
   }
 
   const saveNote = () => {
     if (text.trim()) {
-      updateNote(columnId, note.id, text.trim(), note.likes);
+      updateNote(columnId, note.id, text.trim(), note.likes, note.created);
     } else {
       deleteNote(columnId, note.id);
     }

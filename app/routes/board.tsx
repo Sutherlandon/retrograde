@@ -57,10 +57,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return deleteColumnServer(board_id, payload.id);
 
       case "addNote":
-        return addNoteServer(payload.id, payload.columnId, payload.text);
+        return addNoteServer(payload.id, payload.columnId, payload.text, payload.created);
 
       case "updateNote":
-        return updateNoteServer(payload.columnId, payload.noteId, payload.newText, payload.likes);
+        return updateNoteServer(payload.columnId, payload.noteId, payload.newText, payload.likes, payload.created);
 
       case "deleteNote":
         return deleteNoteServer(payload.columnId, payload.noteId);
