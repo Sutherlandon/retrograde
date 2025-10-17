@@ -32,7 +32,7 @@ export const exampleBoardTutorial: Board = {
           text: 'You can edit notes by double-clicking the text or clicking the pencil icon.',
           likes: 0,
           is_new: false,
-          created: '1760074762200'
+          created: '1760074762201'
         },
         {
           id: 'note-4',
@@ -40,7 +40,7 @@ export const exampleBoardTutorial: Board = {
           text: 'You can like notes by clicking the thumbs-up icon.  Now try deleting this note by clicking the trash can icon.',
           likes: 0,
           is_new: false,
-          created: '1760074762200'
+          created: '1760074762202'
         },
         {
           id: 'note-5',
@@ -48,7 +48,7 @@ export const exampleBoardTutorial: Board = {
           text: 'Now try dragging and dropping notes between columns!',
           likes: 0,
           is_new: false,
-          created: '1760074762200'
+          created: '1760074762203'
         },
       ]
     },
@@ -58,28 +58,28 @@ export const exampleBoardTutorial: Board = {
       col_order: 0,
       notes: [
         {
-          id: 'note-1',
+          id: 'note-6',
           column_id: 'col-2',
           text: 'Next, try adding a new column by clicking the "+ Column" button at the top right corner of the board.',
           likes: 0,
           is_new: false,
-          created: '1760074762199'
+          created: '1760074762204'
         },
         {
-          id: 'note-2',
+          id: 'note-7',
           column_id: 'col-2',
           text: 'You can change the title of any column by clicking on it.',
           likes: 0,
           is_new: false,
-          created: '1760074762199'
+          created: '1760074762205'
         },
         {
-          id: 'note-4',
+          id: 'note-8',
           column_id: 'col-2',
           text: 'Now try deleting this column by clicking the trash can icon in the column header.',
           likes: 0,
           is_new: false,
-          created: '1760074762199'
+          created: '1760074762206'
         },
       ]
     },
@@ -89,20 +89,20 @@ export const exampleBoardTutorial: Board = {
       col_order: 0,
       notes: [
         {
-          id: 'note-3',
+          id: 'note-9',
           column_id: 'col-3',
           text: 'Next try the timer feature by clicking the "Timer" in the header. Start a 3 minute timer. Click on it again to stop it. Timers are not synced across clients yet so only you will see it.',
           likes: 0,
           is_new: false,
-          created: '1760074762199'
+          created: '1760074762207'
         },
         {
-          id: 'note-4',
+          id: 'note-10',
           column_id: 'col-3',
           text: 'Lastly, have fun, like notes a bunch, and we hope this app helps your team achieve thoughtful converstations!',
           likes: 0,
           is_new: false,
-          created: '1760074762199'
+          created: '1760074762208'
         },
       ]
     }
