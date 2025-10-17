@@ -26,6 +26,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const { revalidate } = useRevalidator();
 
   const sendAction = ({ type, board_id, payload }: { type: string, board_id: string, payload: any }) => {
+    // no DB actions on example board
+    if (board_id === "example-board")
+      return;
+
     fetcher.submit(
       { type, payload: JSON.stringify(payload) },
       {
@@ -69,13 +73,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
           // if the local note is new, it won't be on the server yet 
           // otherwise, take the server version
-          return localNote.new
+          return localNote.is_new
             ? { ...serverNote, text: localNote.text }
             : serverNote;
         });
 
         // keep any new notes being edited
-        const newNote = localCol.notes.find((n) => n.new);
+        const newNote = localCol.notes.find((n) => n.is_new);
         if (newNote) {
           notes.push(newNote);
         }
@@ -91,6 +95,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
    * Periodically revalidate to get server-side updates (e.g. from other users)
    */
   useEffect(() => {
+    // no revalidation on example board 
+    if (loaderData.id === "example-board")
+      return;
+
     const interval = setInterval(() => {
       revalidate(); // re-runs the loader, updates useLoaderData
     }, 10000);
@@ -155,7 +163,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       id: nanoid(),
       text: "",
       likes: 0,
-      new: true,
+      is_new: true,
+      column_id: columnId,
       created: Date.now().toString(),
     };
     setColumns((cols) =>
@@ -174,7 +183,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
           ? {
             ...c,
             notes: c.notes.map((n) =>
-              n.id === noteId ? { ...n, text: newText, likes, new: false } : n
+              n.id === noteId ? { ...n, text: newText, likes, is_new: false } : n
             ),
           }
           : c
@@ -197,14 +206,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
             : c
         )
       );
-    }
-
-    if (text) {
-      sendAction({
-        board_id: loaderData.id,
-        type: "deleteNote",
-        payload: { columnId, noteId }
-      });
+      if (text) {
+        sendAction({
+          board_id: loaderData.id,
+          type: "deleteNote",
+          payload: { columnId, noteId }
+        });
+      }
     }
   };
 

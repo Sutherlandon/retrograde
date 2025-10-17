@@ -14,7 +14,7 @@ export default function Note({
   bgClass: string
 }) {
   const { updateNote, deleteNote } = useBoard();
-  const [isEditing, setIsEditing] = useState(note.new);
+  const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
 
   const handleLike = () => {
@@ -51,7 +51,7 @@ export default function Note({
           autoFocus
         />
       ) : (
-        <div className="flex flex-col gap-2 justify-between h-full">
+        <div className="flex flex-col gap-2 justify-between h-full" onDoubleClick={() => setIsEditing(true)}>
           <div className="flex gap-2">
             <div className="flex-1 whitespace-pre-wrap">
               {note.text}
@@ -69,6 +69,7 @@ export default function Note({
               text={note.likes.toString()}
               icon={<ThumbsUpIcon size="sm" />}
               onClick={() => handleLike()}
+              onDoubleClick={(e: Event) => e.stopPropagation()}
               variant="text"
             />
             <Button

@@ -13,9 +13,14 @@ import {
   deleteNoteServer,
   moveNoteServer,
 } from "../server/board_model";
+import { exampleBoardTutorial } from "~/example_board_tutorial";
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const board_id = params.id;
+
+  if (board_id === "example-board") {
+    return exampleBoardTutorial;
+  }
 
   if (board_id) {
     const board = await getBoardServer(board_id);

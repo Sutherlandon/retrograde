@@ -2,9 +2,10 @@
 
 export interface Note {
   id: string;
+  column_id: string;
   text: string;
   likes: number;
-  new: boolean;
+  is_new: boolean;
   created: string;
 }
 

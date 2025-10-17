@@ -100,35 +100,10 @@ export async function initializeDatabase() {
       );
     `);
 
-    console.log("Tables created successfully");
-
-    // Insert example data
-    console.log("Inserting example data...");
-
-    await client.query(`
-      INSERT INTO boards (id, title)
-      VALUES ('example-board', 'Example Board')
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    await client.query(`
-      INSERT INTO columns (id, board_id, title, col_order)
-      VALUES ('col-1', 'example-board', 'To Do', 1)
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
-    await client.query(`
-      INSERT INTO notes (id, column_id, text, likes, is_new, created)
-      VALUES
-        ('note-1', 'col-1', 'This is a note', 0, FALSE, '1760074762199'),
-        ('note-2', 'col-1', 'This is another note', 2, FALSE, '1760074762205')
-      ON CONFLICT (id) DO NOTHING;
-    `);
-
     // Commit transaction
     await client.query("COMMIT");
 
-    console.log("Database initialized successfully!");
+    console.log("Tables created successfully");
 
   } catch (error) {
     // Rollbak in case of error

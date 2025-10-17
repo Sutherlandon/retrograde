@@ -15,7 +15,7 @@ export default function Header() {
         href="/board/example-board"
         className="text-gray-200 px-3 py-1 rounded transition hover:cursor-pointer hover:bg-blue-500 hover:text-white"
       >
-        View Example Board
+        View Example Board Tutorial
       </a>
     </header>
   );
