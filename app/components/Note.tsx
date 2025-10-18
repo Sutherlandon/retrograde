@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useBoard } from "./BoardContext";
 import type { Note } from "~/server/board.types";
 import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
@@ -16,6 +16,10 @@ export default function Note({
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
+
+  useEffect(() => {
+    setText(note.text);
+  }, [note.text]);
 
   const handleLike = () => {
     updateNote(columnId, note.id, text, note.likes + 1, note.created);

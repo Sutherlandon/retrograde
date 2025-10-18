@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useBoard } from "./BoardContext";
 import type { Column } from "~/server/board.types";
 import Note from "./Note";
@@ -10,6 +10,10 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  useEffect(() => {
+    setTitle(column.title);
+  }, [column.title]);
 
   const saveTitle = () => {
     updateColumnTitle(column.id, title.trim() || "Untitled");

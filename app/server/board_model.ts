@@ -94,6 +94,7 @@ export async function addNoteServer(noteId: string, columnId: string, text: stri
 
 // Update or insert a note
 export async function updateNoteServer(columnId: string, noteId: string, newText: string, likeCount: number, created: string): Promise<void> {
+  // TODO: check if likes > likesCount and increment likes accordingly
   await pool.query(
     `INSERT INTO notes (id, column_id, text, likes, is_new, created)
      VALUES ($1, $2, $3, $4, false, $5)
