@@ -147,14 +147,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   // deletes a column after confirmation
   const deleteColumn = (id: string) => {
-    if (confirm("Are you sure you want to delete this column?")) {
-      setColumns((cols) => cols.filter((c) => c.id !== id));
-      sendAction({
-        board_id: loaderData.id,
-        type: "deleteColumn",
-        payload: { id }
-      });
-    }
+    setColumns((cols) => cols.filter((c) => c.id !== id));
+    sendAction({
+      board_id: loaderData.id,
+      type: "deleteColumn",
+      payload: { id }
+    });
   };
 
   // adds a new blank note to a column
@@ -198,21 +196,19 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   // deletes a note after confirmation if it has text
   const deleteNote = (columnId: string, noteId: string, text?: string) => {
-    if (!text || confirm("Are you sure you want to delete this note?")) {
-      setColumns((cols) =>
-        cols.map((c) =>
-          c.id === columnId
-            ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) }
-            : c
-        )
-      );
-      if (text) {
-        sendAction({
-          board_id: loaderData.id,
-          type: "deleteNote",
-          payload: { columnId, noteId }
-        });
-      }
+    setColumns((cols) =>
+      cols.map((c) =>
+        c.id === columnId
+          ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) }
+          : c
+      )
+    );
+    if (text) {
+      sendAction({
+        board_id: loaderData.id,
+        type: "deleteNote",
+        payload: { columnId, noteId }
+      });
     }
   };
 

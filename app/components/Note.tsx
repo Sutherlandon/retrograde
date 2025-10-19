@@ -8,16 +8,17 @@ import Button from "./Button";
 export default function Note({
   note,
   columnId,
-  bgClass
+  noteColor
 }: {
   note: Note;
   columnId: string,
-  bgClass: string
+  noteColor: string
 }) {
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
   const [likes, setLikes] = useState(note.likes);
+  const [deleteMode, setDeleteMode] = useState(false);
 
   // sync local state when note prop changes
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function Note({
 
   return (
     <div
-      className={`${bgClass} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
+      className={`bg-${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
       draggable={!isEditing}
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -67,48 +68,65 @@ export default function Note({
         );
       }}
     >
-      {isEditing ? (
-        <textarea
-          className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={saveNote}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
-          autoFocus
-        />
-      ) : (
-        <div
-          className="flex flex-col gap-2 justify-between h-full"
-          onDoubleClick={() => setIsEditing(true)}
-        >
+      {deleteMode ? (
+        <div className={`flex flex-col items-center justify-center h-full`}>
+          <p className="mb-4">Are you sure you want to delete this note?</p>
           <div className="flex gap-2">
-            <div className="flex-1 whitespace-pre-wrap">
-              {note.text}
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
+              text="Yes"
+            />
+            <Button
+              className="bg-gray-600 hover:bg-gray-700 text-white"
+              onClick={() => setDeleteMode(false)}
+              text="Abort!"
+            />
+          </div>
+        </div>
+      ) :
+        isEditing ? (
+          <textarea
+            className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={saveNote}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
+            autoFocus
+          />
+        ) : (
+          <div
+            className="flex flex-col gap-2 justify-between h-full"
+            onDoubleClick={() => setIsEditing(true)}
+          >
+            <div className="flex gap-2">
+              <div className="flex-1 whitespace-pre-wrap">
+                {note.text}
+              </div>
+              <div className="flex flex-col items-start">
+                <Button
+                  icon={<TrashIcon size="sm" />}
+                  onClick={() => setDeleteMode(true)}
+                  variant="text"
+                />
+              </div>
             </div>
-            <div className="flex flex-col items-start">
+            <div className='flex justify-between items-center'>
               <Button
-                icon={<TrashIcon size="sm" />}
-                onClick={() => deleteNote(columnId, note.id, note.text)}
+                text={likes.toString()}
+                icon={<ThumbsUpIcon size="sm" />}
+                onClick={handleLike}
+                onDoubleClick={(e: Event) => e.stopPropagation()}
+                variant="text"
+              />
+              <Button
+                icon={<EditIcon size="sm" />}
+                onClick={() => setIsEditing(true)}
                 variant="text"
               />
             </div>
           </div>
-          <div className='flex justify-between items-center'>
-            <Button
-              text={likes.toString()}
-              icon={<ThumbsUpIcon size="sm" />}
-              onClick={handleLike}
-              onDoubleClick={(e: Event) => e.stopPropagation()}
-              variant="text"
-            />
-            <Button
-              icon={<EditIcon size="sm" />}
-              onClick={() => setIsEditing(true)}
-              variant="text"
-            />
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
