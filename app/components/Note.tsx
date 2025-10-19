@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import debounce from "lodash.debounce";
 import { useBoard } from "./BoardContext";
 import type { Note } from "~/server/board.types";
 import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
@@ -16,15 +17,36 @@ export default function Note({
   const { updateNote, deleteNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
+  const [likes, setLikes] = useState(note.likes);
 
+  // sync local state when note prop changes
   useEffect(() => {
     setText(note.text);
-  }, [note.text]);
+    setLikes(note.likes);
+  }, [note.text, note.likes]);
 
+  // repeated like clicks within 300ms will only trigger one update
+  const submitLikes = useMemo(
+    () => debounce((newLikes: number) => {
+      updateNote(columnId, note.id, text, newLikes, note.created);
+    }, 1000),
+    [updateNote, columnId, note.id, text, note.created]
+  );
+
+  // cleanup likes debounce on unmount
+  useEffect(() => {
+    return () => {
+      submitLikes.cancel();
+    };
+  }, [submitLikes]);
+
+  // handle like button click
   const handleLike = () => {
-    updateNote(columnId, note.id, text, note.likes + 1, note.created);
-  }
+    setLikes(likes + 1);
+    submitLikes(likes + 1);
+  };
 
+  // save note (on blur or enter)
   const saveNote = () => {
     if (text.trim()) {
       updateNote(columnId, note.id, text.trim(), note.likes, note.created);
@@ -55,7 +77,10 @@ export default function Note({
           autoFocus
         />
       ) : (
-        <div className="flex flex-col gap-2 justify-between h-full" onDoubleClick={() => setIsEditing(true)}>
+        <div
+          className="flex flex-col gap-2 justify-between h-full"
+          onDoubleClick={() => setIsEditing(true)}
+        >
           <div className="flex gap-2">
             <div className="flex-1 whitespace-pre-wrap">
               {note.text}
@@ -70,9 +95,9 @@ export default function Note({
           </div>
           <div className='flex justify-between items-center'>
             <Button
-              text={note.likes.toString()}
+              text={likes.toString()}
               icon={<ThumbsUpIcon size="sm" />}
-              onClick={() => handleLike()}
+              onClick={handleLike}
               onDoubleClick={(e: Event) => e.stopPropagation()}
               variant="text"
             />
