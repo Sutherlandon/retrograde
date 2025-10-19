@@ -3,12 +3,12 @@ import BoardToolbar from "./BoardToolbar";
 import Column from "./Column";
 
 const noteColors = [
-  'yellow-200',
-  'green-300',
-  'blue-300',
-  'red-300',
-  'purple-300',
-  'pink-300',
+  'bg-yellow-200',
+  'bg-green-300',
+  'bg-blue-300',
+  'bg-red-300',
+  'bg-purple-300',
+  'bg-pink-300',
 ];
 
 export default function Board() {
