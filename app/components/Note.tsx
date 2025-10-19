@@ -59,7 +59,7 @@ export default function Note({
 
   return (
     <div
-      className={`bg-${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
+      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
       draggable={!isEditing}
       onDragStart={(e) => {
         e.dataTransfer.setData(
