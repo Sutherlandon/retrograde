@@ -100,10 +100,28 @@ export async function initializeDatabase() {
       );
     `);
 
-    console.log("Tables created successfully");
+    console.log("Done");
+    console.log("Starting migrations...");
 
-    // Insert example data
-    console.log("Inserting example data...");
+    // Migration for adding 'created' column if it doesn't exist
+    await client.query(`
+      -- 1 Add the column if it doesn't exist
+      ALTER TABLE notes
+      ADD COLUMN IF NOT EXISTS created TEXT;
+
+      -- 2 Populate existing rows with the default value "1"
+      UPDATE notes
+      SET created = '1'
+      WHERE created IS NULL;
+
+      -- 3 Set the column to NOT NULL and default to "1" for future inserts
+      ALTER TABLE notes
+      ALTER COLUMN created SET DEFAULT '1',
+      ALTER COLUMN created SET NOT NULL;
+    `);
+
+    console.log("Done");
+    console.log("Inserting dev data...");
 
     await client.query(`
       INSERT INTO boards (id, title)
@@ -128,6 +146,7 @@ export async function initializeDatabase() {
     // Commit transaction
     await client.query("COMMIT");
 
+    console.log("Done");
     console.log("Database initialized successfully!");
 
   } catch (error) {
