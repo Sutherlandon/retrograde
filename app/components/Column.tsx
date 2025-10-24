@@ -11,10 +11,24 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   const [title, setTitle] = useState(column.title);
   const [isDragOver, setIsDragOver] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTitle(column.title);
   }, [column.title]);
+
+  // Focus and select the title input when entering editing mode
+  useEffect(() => {
+    if (editingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [editingTitle]);
+
+  // Automatically enter title editing mode when a column is created
+  useEffect(() => {
+    setEditingTitle(true);
+  }, []);
 
   const saveTitle = () => {
     updateColumnTitle(column.id, title.trim() || "Untitled");
@@ -67,6 +81,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
             {editingTitle ? (
               <input
                 type="text"
+                ref={titleInputRef}
                 className="flex-1 font-bold px-2 py-1 border rounded"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
