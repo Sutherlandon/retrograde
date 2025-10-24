@@ -50,8 +50,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
 
   return (
     <div
-      className={`rounded-md p-3 flex-1 transition-colors text-gray-100 border-1 ${isDragOver ? "bg-slate-600" : "bg-slate-800"} ${deleteMode ? "border-red-600" : "border-slate-800"}`}
-      style={{ minWidth: "350px", maxWidth: "50%", minHeight: "150px" }}
+      className={` min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors text-gray-100 border-1 ${isDragOver ? "bg-slate-600" : "bg-slate-800"} ${deleteMode ? "border-red-600" : "border-slate-800"}`}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragOver(true);
