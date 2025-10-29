@@ -25,16 +25,10 @@ export default function Button({
           "outline": "bg-transparent border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
           "text": "bg-transparent text-gray-800 border-transparent hover:bg-[rgba(0,0,0,0.1)]",
         }[props.variant ?? "solid"]}
-        flex
-        items-center
-        justify-center
-        gap-1
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:cursor-pointer'}
         ${Boolean(text) ? 'px-2' : 'px-1'}
-        py-1
-        rounded
-        text-nowrap
-        text-sm
+        flex items-center justify-center gap-1
+        py-1 rounded text-nowrap text-sm
       `}
       disabled={disabled}
       {...props}

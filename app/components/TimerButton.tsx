@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Button from "./Button";
 import { StopIcon, TimerIcon } from "~/images/icons";
 import TimerEndModal from "./TimerEndModal";
@@ -9,6 +9,28 @@ const TimerButton = () => {
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
   const [showTimerEnded, setShowTimerEnded] = useState(false);
+  const [timeAmount, setTimeAmount] = useState(3);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Detect clicks outside this component and close the dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setShowOptions(false);
+      }
+    };
+
+    if (showOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    // cleanup
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showOptions]);
 
   // Format seconds -> M:SS
   const formatTime = (seconds: number) => {
@@ -17,8 +39,8 @@ const TimerButton = () => {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleStart = (minutes: number) => {
-    setTimeLeft(minutes * 60);
+  const handleStart = () => {
+    setTimeLeft(timeAmount * 60);
     setShowOptions(false);
     setTimerRunning(true);
   };
@@ -54,7 +76,7 @@ const TimerButton = () => {
   }, [timeLeft]);
 
   return (
-    <div>
+    <div ref={wrapperRef} className="relative inline-block">
       <Button
         icon={<TimerIcon />}
         text={timeLeft === null ? "Timer" : formatTime(timeLeft)}
@@ -63,22 +85,35 @@ const TimerButton = () => {
         style={{ width: '75px' }}
       />
       {showOptions && (
-        <div className="absolute mt-2 bg-gray-900 rounded shadow-lg p-2 flex flex-col gap-2 w-[75px]">
-          {timerRunning
-            ? (
+        <div className="absolute mt-2 bg-gray-950 rounded shadow-lg p-2 flex flex-col gap-2 w-[150px] -translate-x-1/4 transform text-center">
+          {timerRunning ? (
+            <Button
+              icon={<StopIcon />}
+              text='Stop'
+              onClick={handleStop}
+            />
+          ) : (
+            <div>
+              <div className="flex gap-1 mb-2">
+                <Button
+                  text="-"
+                  onClick={() => setTimeAmount(timeAmount - 1 || 1)}
+                  className="h-8 w-8"
+                />
+                <div className="p-1 whitespace-nowrap flex-1 center">{timeAmount} min</div>
+                <Button
+                  text="+"
+                  onClick={() => setTimeAmount(timeAmount + 1)}
+                  className="h-8 w-8"
+                />
+              </div>
               <Button
-                icon={<StopIcon />}
-                text='Stop'
-                onClick={handleStop}
+                text="Start"
+                onClick={() => handleStart()}
+                className="w-full"
               />
-            )
-            : [1, 2, 3, 5, 7].map((m) => (
-              <Button
-                key={m}
-                text={`${m} min`}
-                onClick={() => handleStart(m)}
-              />
-            ))
+            </div>
+          )
           }
         </div>
       )}

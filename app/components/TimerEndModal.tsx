@@ -1,4 +1,5 @@
 import React from "react";
+import RocketIcon from "~/images/icons";
 
 export default function TimerEndModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen)
@@ -15,13 +16,13 @@ export default function TimerEndModal({ isOpen, onClose }: { isOpen: boolean; on
       {/* Modal content */}
       <div className="relative bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4 animate-scaleIn">
         <h2 className="text-xl font-semibold text-center text-slate-800 dark:text-white mb-4">
-          Timer Ended
+          LIFT OFF! <RocketIcon className="inline-block w-6 h-6 ml-2" />
         </h2>
         <button
           onClick={onClose}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition"
         >
-          Dismiss
+          Timer Complete
         </button>
       </div>
 
