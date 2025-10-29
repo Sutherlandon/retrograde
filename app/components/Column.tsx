@@ -11,6 +11,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   const [title, setTitle] = useState(column.title);
   const [isDragOver, setIsDragOver] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
+  const [warningMode, setWarningMode] = useState(false);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,6 +49,14 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
     }
   };
 
+  const handleDelete = () => {
+    if (column.notes.length === 0) {
+      setDeleteMode(true);
+    } else {
+      setWarningMode(true);
+    }
+  };
+
   return (
     <div
       className={` min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors text-gray-100 border-1 ${isDragOver ? "bg-slate-600" : "bg-slate-800"} ${deleteMode ? "border-red-600" : "border-slate-800"}`}
@@ -58,17 +67,36 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
       onDragLeave={() => setIsDragOver(false)}
       onDrop={handleDrop}
     >
-      {deleteMode ? (
+      {warningMode ? (
         <div className={`flex flex-col items-center justify-center h-full`}>
-          <p className="mb-4">Are you sure you want to delete this column and all of the notes it contains?</p>
+          <p className="mb-4">This column still contains notes. You should move or delete them before deleting the column.</p>
+          <div className="flex gap-2">
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={() => setWarningMode(false)}
+              text="Okay"
+            />
+            <Button
+              className="bg-gray-600 hover:bg-gray-700 text-white"
+              onClick={() => {
+                setWarningMode(false);
+                setDeleteMode(true);
+              }}
+              text="Override!"
+            />
+          </div>
+        </div>
+      ) : deleteMode ? (
+        <div className={`flex flex-col items-center justify-center h-full`}>
+          <p className="mb-4">Are you sure you want to delete this column?</p>
           <div className="flex gap-2">
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => { deleteColumn(column.id); setDeleteMode(false); }}
-              text="Yes"
+              text="Delete"
             />
             <Button
-              className="bg-gray-600 hover:bg-gray-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => setDeleteMode(false)}
               text="Abort!"
             />
@@ -105,7 +133,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
             />
             <Button
               icon={<TrashIcon />}
-              onClick={() => setDeleteMode(true)}
+              onClick={() => handleDelete()}
               className="ml-2 text-white hover:text-red-500"
               variant="text"
             />

@@ -4,6 +4,7 @@ export default function Button({
   className = '',
   icon,
   text,
+  disabled,
   ...props
 }: {
   onClick?: () => void;
@@ -12,11 +13,13 @@ export default function Button({
   icon?: React.ReactNode;
   text?: string;
   variant?: "text" | "solid" | "outline";
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       className={`
+        ${className ?? ''}
         ${{
           "solid": "bg-blue-600 text-white hover:bg-blue-800",
           "outline": "bg-transparent border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
@@ -26,14 +29,14 @@ export default function Button({
         items-center
         justify-center
         gap-1
-        hover:cursor-pointer
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:cursor-pointer'}
         ${Boolean(text) ? 'px-2' : 'px-1'}
         py-1
         rounded
         text-nowrap
         text-sm
-        ${className ?? ''}
       `}
+      disabled={disabled}
       {...props}
     >
       {icon &&
