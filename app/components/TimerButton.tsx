@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import Button from "./Button";
 import { StopIcon, TimerIcon } from "~/images/icons";
+import TimerEndModal from "./TimerEndModal";
 
 const TimerButton = () => {
   const [showOptions, setShowOptions] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
   const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [showTimerEnded, setShowTimerEnded] = useState(false);
 
   // Format seconds -> M:SS
   const formatTime = (seconds: number) => {
@@ -38,6 +40,7 @@ const TimerButton = () => {
     if (timeLeft === 0) {
       setTimeLeft(null);
       setTimerRunning(false);
+      setShowTimerEnded(true);
       return;
     }
 
@@ -79,6 +82,7 @@ const TimerButton = () => {
           }
         </div>
       )}
+      <TimerEndModal isOpen={showTimerEnded} onClose={() => setShowTimerEnded(false)} />
     </div>
   );
 };
