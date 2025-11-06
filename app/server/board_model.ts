@@ -102,7 +102,7 @@ export async function updateNoteServer(columnId: string, noteId: string, newText
     SET 
       text = EXCLUDED.text,
       likes = CASE
-        WHEN notes.likes >= EXCLUDED.likes THEN notes.likes + 1
+        WHEN notes.likes > EXCLUDED.likes THEN notes.likes + 1
         ELSE EXCLUDED.likes
       END
     `,

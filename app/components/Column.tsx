@@ -26,11 +26,6 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
     }
   }, [editingTitle]);
 
-  // Automatically enter title editing mode when a column is created
-  useEffect(() => {
-    setEditingTitle(true);
-  }, []);
-
   const saveTitle = () => {
     updateColumnTitle(column.id, title.trim() || "Untitled");
     setEditingTitle(false);
@@ -77,7 +72,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               text="Okay"
             />
             <Button
-              className="bg-gray-600 hover:bg-gray-700 text-white"
+              className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => {
                 setWarningMode(false);
                 setDeleteMode(true);
@@ -96,7 +91,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               text="Delete"
             />
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-gray-600 hover:bg-gray-700 text-white"
               onClick={() => setDeleteMode(false)}
               text="Abort!"
             />

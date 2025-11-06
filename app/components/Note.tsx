@@ -75,7 +75,7 @@ export default function Note({
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
               onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
-              text="Yes"
+              text="Delete"
             />
             <Button
               className="bg-gray-600 hover:bg-gray-700 text-white"
