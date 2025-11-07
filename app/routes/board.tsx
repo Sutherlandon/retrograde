@@ -13,13 +13,17 @@ import {
   deleteNoteServer,
   moveNoteServer,
 } from "../server/board_model";
-import { exampleBoardTutorial } from "~/example_board_tutorial";
+import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
+import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const board_id = params.id;
 
   if (board_id === "example-board") {
     return exampleBoardTutorial;
+  }
+  if (board_id === "example-real-world") {
+    return exampleBoardRealWorld;
   }
 
   if (board_id) {

@@ -2,7 +2,7 @@ import { type Board } from "~/server/board.types";
 
 export const exampleBoardTutorial: Board = {
   id: "example-board",
-  title: "Example Board Tutorial",
+  title: "Tutorial",
   next_col_order: 2,
   columns: [
     {
