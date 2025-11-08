@@ -1,5 +1,5 @@
 import React from "react";
-import RocketIcon from "~/images/icons";
+import { RocketIcon } from "~/images/icons";
 
 export default function TimerEndModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   if (!isOpen)

@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 
 import Header from "~/components/Header";
 import { createBoard } from "~/server/board_model";
-import RocketIcon, { CloudIcon } from "~/images/icons";
+import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 
 export const meta = () => {
@@ -81,7 +81,7 @@ export default function Home() {
               the agile retrospective and idea board for productive teams.
             </section>
           </div>
-          <div className="p-10 bg-slate-900 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] max-w-[600px]">
+          <div className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] max-w-[600px]">
             <h2 className="text-2xl font-bold mb-4">Create a New Board</h2>
             <Form method="post" className="mb-4">
               <div className="mb-4">
@@ -115,8 +115,8 @@ export default function Home() {
             </Form>
           </div>
         </section>
-        <section className="text-center mb-10">
-          <h2 className="text-2xl px-5 mb-4 max-w-[800px] mx-auto">
+        <section className="text-center mb-20">
+          <h2 className="text-2xl px-5 mb-20 max-w-[800px] mx-auto ">
             Empower each crew member to speak up and share insights -
             turning retros into real conversations that move your mission forward.
           </h2>
@@ -128,17 +128,47 @@ export default function Home() {
             />
           </div>
         </section>
-        <section className="mx-auto text-center text-gray-800 flex gap-2 items-center justify-center">
-          <span>Built with</span>
-          <CloudIcon size="xl" className="text-gray-300" />
-          <span>by <a
+        <section className="text-center mb-10">
+          <h2 className="text-3xl px-5 mb-10 max-w-[800px] mx-auto font-bold">
+            Hosted Anywhere
+          </h2>
+          <div className="flex flex-col md:flex-row gap-6 justify-center max-w-[900px] mx-auto mb-20">
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <CloudIcon className="h-25 w-25 mb-4 mx-auto" />
+              <h3 className="text-xl font-bold mb-2">Cloud Hosting</h3>
+              <p>
+                Let us handle the infrastructure. Our cloud-hosted solution ensures your boards are always accessible,
+                secure, and scalable without any hassle on your part.
+              </p>
+            </div>
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <ServerIcon className="h-25 w-25 mb-4 mx-auto" />
+              <h3 className="text-xl font-bold mb-2">Self-Hosting</h3>
+              <p>
+                Prefer to keep things in-house? No problem. Download our application and deploy it on your own servers
+                for complete control over your data and environment.
+              </p>
+            </div>
+            <div className="bg-gray-900 p-4 rounded-lg">
+              <AstronautIcon className="h-25 w-25 mb-4 mx-auto" />
+              <h3 className="text-xl font-bold mb-2">Consulting</h3>
+              <p>
+                Need help getting started or customizing your setup? Our team of experts is here to assist you with
+                tailored solutions that fit your team's unique needs.
+              </p>
+            </div>
+          </div>
+        </section>
+        <section className="mx-auto text-center flex gap-2 items-center justify-center text-slate-800">
+          <span>Built by <a
             href="https://sutherlandon.com"
             target="_blank"
             rel="noopener noreferrer"
             className="underline"
           >
             Sutherlandon
-          </a></span>
+          </a> with</span>
+          <RocketIcon size="xl" />
         </section>
       </div>
     </>
