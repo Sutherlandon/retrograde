@@ -3,8 +3,10 @@ import { nanoid } from "nanoid";
 
 import Header from "~/components/Header";
 import { createBoard } from "~/server/board_model";
-import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon } from "~/images/icons";
+import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, ExternalLinkIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
+import Button from "~/components/Button";
+import Card from '~/components/Card';
 
 export const meta = () => {
   return [
@@ -71,17 +73,28 @@ export default function Home() {
     <>
       <Header />
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400'>
+        <h1 className="text-4xl font-bold mb-20 mx-auto w-fit">
+          Mission control for retrospectives
+        </h1>
         <section className="flex gap-6 flex-wrap mb-20 max-w-[1200px] mx-auto">
-          <div className="max-w-[600px] min-w-[350px] text-center mx-auto mb-6 flex flex-col justify-center">
-            <h1 className="text-4xl font-bold mb-6">
-              Mission control for retrospectives
-            </h1>
-            <section className="text-2xl text-gray-300">
+          <div className="md:max-w-[45%] min-w-[350px] text-center mx-auto mb-6 flex flex-col justify-center">
+            <section className="text-2xl text-gray-300 mb-10">
               Reflect, align, and launch your next sprint with clarity and momentum using Retrograde,
               the agile retrospective and idea board for productive teams.
             </section>
+            <div className="mb-10">
+              <Button
+                as='a'
+                href="/board/example-board"
+                text="Try the tutorial"
+                className="mx-auto  px-4 py-2"
+                style={{ width: 'fit-content' }}
+                icon={<BookIcon />}
+                variant="outline"
+              />
+            </div>
           </div>
-          <div className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] max-w-[600px]">
+          <div className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%]">
             <h2 className="text-2xl font-bold mb-4">Create a New Board</h2>
             <Form method="post" className="mb-4">
               <div className="mb-4">
@@ -116,11 +129,11 @@ export default function Home() {
           </div>
         </section>
         <section className="text-center mb-20">
-          <h2 className="text-2xl px-5 mb-20 max-w-[800px] mx-auto ">
-            Empower each crew member to speak up and share insights -
-            turning retros into real conversations that move your mission forward.
+          <h2 className="text-2xl px-5 mb-10 max-w-[800px] mx-auto ">
+            Empower each crew member to share insights - turning retros into real
+            conversations that move your mission forward.
           </h2>
-          <div className="bg-gray-900 p-4 rounded">
+          <div className="bg-gray-900 p-4 rounded max-w-[900px] mx-auto shadow-md">
             <img
               src={retrogradeSnapshot}
               alt="Schemantics Retrograde Diagram"
@@ -133,32 +146,44 @@ export default function Home() {
             Hosted Anywhere
           </h2>
           <div className="flex flex-col md:flex-row gap-6 justify-center max-w-[900px] mx-auto mb-20">
-            <div className="bg-gray-900 p-4 rounded-lg">
-              <CloudIcon className="h-25 w-25 mb-4 mx-auto" />
-              <h3 className="text-xl font-bold mb-2">Cloud Hosting</h3>
-              <p>
-                Let us handle the infrastructure. Our cloud-hosted solution ensures your boards are always accessible,
-                secure, and scalable without any hassle on your part.
-              </p>
-            </div>
-            <div className="bg-gray-900 p-4 rounded-lg">
-              <ServerIcon className="h-25 w-25 mb-4 mx-auto" />
-              <h3 className="text-xl font-bold mb-2">Self-Hosting</h3>
-              <p>
-                Prefer to keep things in-house? No problem. Download our application and deploy it on your own servers
-                for complete control over your data and environment.
-              </p>
-            </div>
-            <div className="bg-gray-900 p-4 rounded-lg">
-              <AstronautIcon className="h-25 w-25 mb-4 mx-auto" />
-              <h3 className="text-xl font-bold mb-2">Consulting</h3>
-              <p>
-                Need help getting started or customizing your setup? Our team of experts is here to assist you with
-                tailored solutions that fit your team's unique needs.
-              </p>
-            </div>
+            <Card
+              Icon={ServerIcon}
+              title="Self-Hosting"
+              text="Prefer to keep things in-house? No problem. Download our application and deploy it on your own servers for complete control over your data and environment."
+              buttonProps={{
+                as: 'a',
+                href: 'https://github.com/sutherlandon/retrograde',
+                icon: <ExternalLinkIcon />,
+                iconPosition: 'right',
+                text: 'View on GitHub',
+              }}
+            />
+            <Card
+              Icon={CloudIcon}
+              title='Cloud Hosting'
+              text='Let us handle the infrastructure. Our cloud-hosted solution ensures your boards are always accessible, secure, and scalable without any hassle on your part.'
+              buttonProps={{
+                as: 'a',
+                href: '/signup',
+                text: 'Get Started',
+                icon: <StartIcon />,
+                iconPosition: 'right',
+              }}
+            />
+            <Card
+              Icon={AstronautIcon}
+              title="Consulting"
+              text="Need help getting started or customizing your setup? Our team of experts is here to assist you with tailored solutions that fit your team's unique needs."
+              buttonProps={{
+                as: 'a',
+                href: '/contact',
+                text: 'Contact Us',
+                icon: <EmailIcon />,
+                iconPosition: 'right',
+              }}
+            />
           </div>
-        </section>
+        </section >
         <section className="mx-auto text-center flex gap-2 items-center justify-center text-slate-800">
           <span>Built by <a
             href="https://sutherlandon.com"
@@ -170,7 +195,7 @@ export default function Home() {
           </a> with</span>
           <RocketIcon size="xl" />
         </section>
-      </div>
+      </div >
     </>
   );
 }

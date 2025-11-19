@@ -1,8 +1,9 @@
-import { Logo } from '~/images/icons';
+import { Logo, UserIcon } from '~/images/icons';
+import Button from './Button';
 
 export default function Header() {
   return (
-    <header className='flex items-center bg-slate-950 text-gray-100 px-4 py-3'>
+    <header className='flex items-center bg-black text-gray-100 px-4 py-3'>
       <a
         href="/"
         className="flex justify-between items-center text-white hover:cursor-pointer"
@@ -11,12 +12,15 @@ export default function Header() {
         <h1 className="text-2xl font-bold">Retrograde</h1>
       </a>
       <div className="flex-grow" />
-      <a
-        href="/board/example-board"
-        className="text-gray-200 px-3 py-1 rounded transition hover:cursor-pointer hover:bg-blue-500 hover:text-white"
-      >
-        Tutorial Board
-      </a>
+      <Button
+        as='a'
+        href="/signup"
+        text="Sign in"
+        color='secondary'
+        icon={<UserIcon />}
+        variant='outline'
+        className='py-2'
+      />
     </header>
   );
 }

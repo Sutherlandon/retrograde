@@ -57,14 +57,6 @@ export const exampleBoardRealWorld: Board = {
           is_new: false,
           created: "1760074763005",
         },
-        {
-          id: "note-6",
-          column_id: "col-2",
-          text: "Standups sometimes ran long; we should stick to key blockers and updates.",
-          likes: 1,
-          is_new: false,
-          created: "1760074763006",
-        },
       ],
     },
     {
