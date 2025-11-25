@@ -82,7 +82,6 @@ const TimerButton = () => {
         text={timeLeft === null ? "Timer" : formatTime(timeLeft)}
         className="relative"
         onClick={() => setShowOptions((prev) => !prev)}
-        style={{ width: '75px' }}
       />
       {showOptions && (
         <div className="absolute mt-2 bg-gray-950 rounded shadow-lg p-2 flex flex-col gap-2 w-[150px] -translate-x-1/4 transform text-center">

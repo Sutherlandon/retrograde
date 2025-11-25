@@ -1,5 +1,6 @@
-import { Logo, UserIcon } from '~/images/icons';
 import Button from './Button';
+import { feature } from '~/features';
+import { Logo, UserIcon } from '~/images/icons';
 
 export default function Header() {
   return (
@@ -12,15 +13,17 @@ export default function Header() {
         <h1 className="text-2xl font-bold">Retrograde</h1>
       </a>
       <div className="flex-grow" />
-      <Button
-        as='a'
-        href="/signup"
-        text="Sign in"
-        color='secondary'
-        icon={<UserIcon />}
-        variant='outline'
-        className='py-2'
-      />
+      {feature('--accounts') &&
+        <Button
+          as='a'
+          href="/signup"
+          text="Sign in"
+          color='secondary'
+          icon={<UserIcon />}
+          variant='outline'
+          className='py-2 px-4'
+        />
+      }
     </header>
   );
 }

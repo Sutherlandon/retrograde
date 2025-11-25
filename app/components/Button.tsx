@@ -47,20 +47,17 @@ export default function Button({
   ...props
 }: ButtonProps) {
   // Calculate the classnames
-  const classNames = `
-    ${className ?? ''}
-    ${{
+  const classNames = `${className ?? ''
+    } ${{
       "solid": {
         "primary": "bg-blue-600 text-white hover:bg-blue-800",
         "secondary": "bg-green-600 text-white hover:bg-green-800",
       }[props.color ?? "primary"],
       "outline": "bg-transparent border border-green-500 text-green-500 hover:bg-green-800 hover:text-white",
       "text": "bg-transparent text-gray-800 border-transparent hover:bg-[rgba(0,0,0,0.1)]",
-    }[props.variant ?? "solid"]}
-    ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:cursor-pointer'}
-    ${Boolean(text) ? 'px-4' : 'px-2'}
-    flex items-center justify-center gap-2 py-1 rounded text-nowrap text-sm
-  `
+    }[props.variant ?? "solid"]
+    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:cursor-pointer'
+    } flex items-center justify-center gap-2 py-1 px-2 rounded text-nowrap text-sm`
 
   const inner = <ButtonInner icon={icon} iconPosition={iconPosition} text={text} />
 

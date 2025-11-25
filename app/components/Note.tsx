@@ -118,6 +118,7 @@ export default function Note({
                 onClick={handleLike}
                 onDoubleClick={(e: Event) => e.stopPropagation()}
                 variant="text"
+                className="px-1"
               />
               <Button
                 icon={<EditIcon size="sm" />}
