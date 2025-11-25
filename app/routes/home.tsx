@@ -74,7 +74,7 @@ export default function Home() {
       <Header />
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit">
-          Mission control for retrospectives
+          Mission Control for Retrospectives
         </h1>
         <section className="flex gap-6 flex-wrap mb-20 max-w-[1200px] mx-auto">
           <div className="md:max-w-[45%] min-w-[350px] text-center mx-auto mb-6 flex flex-col justify-center">
@@ -94,11 +94,11 @@ export default function Home() {
               />
             </div>
           </div>
-          <div className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%]">
+          <div id='create-form' className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%]">
             <h2 className="text-2xl font-bold mb-4">Create a New Board</h2>
             <Form method="post" className="mb-4">
               <div className="mb-4">
-                <label htmlFor='title' className="text-lg font-bold text-left block">Title</label>
+                <label htmlFor='title' className="text-lg font-bold text-left block mb-2">Title</label>
                 <input type='text' id='title' name='title' placeholder="Board Title" className="p-2 w-full border rounded" />
                 {actionData?.errors?.title && (
                   <p className="text-red-500 text-sm mt-1 text-left">
@@ -114,6 +114,13 @@ export default function Home() {
                     {actionData.errors.no_jerks}
                   </p>
                 )}
+                <div className='mx-auto w-fit'>
+                  <a href='/Retrograde_Terms_of_Service.pdf' target='_blank' className="text-sm text-blue-400 underline">
+                    Terms of Service
+                  </a> & <a href='/Retrograde_Privacy_Policy.pdf' target='_blank' className="text-sm text-blue-400 underline">
+                    Privacy Policy
+                  </a>
+                </div>
               </div>
               <div className="mb-4">
                 <button
@@ -147,30 +154,37 @@ export default function Home() {
           </h2>
           <div className="flex flex-col md:flex-row gap-6 justify-center max-w-[900px] mx-auto mb-20">
             <Card
-              Icon={ServerIcon}
-              title="Self-Hosting"
-              text="Prefer to keep things in-house? No problem. Download our application and deploy it on your own servers for complete control over your data and environment."
-              buttonProps={{
-                as: 'a',
-                href: 'https://github.com/sutherlandon/retrograde',
-                icon: <ExternalLinkIcon />,
-                iconPosition: 'right',
-                text: 'View on GitHub',
-              }}
-            />
-            <Card
               Icon={CloudIcon}
-              title='Cloud Hosting'
+              title='Saas Solution'
               text='Let us handle the infrastructure. Our cloud-hosted solution ensures your boards are always accessible, secure, and scalable without any hassle on your part.'
               buttonProps={{
-                as: 'a',
-                href: '/signup',
-                text: 'Get Started',
+                text: 'Create your first board',
                 icon: <StartIcon />,
                 iconPosition: 'right',
+                onClick: () => {
+                  const el = document.getElementById("create-form");
+                  const y = el!.getBoundingClientRect().top + window.scrollY;
+
+                  window.scrollTo({
+                    top: y - 16,   // 1rem offset
+                    behavior: "smooth"
+                  });
+                }
               }}
             />
             <Card
+              Icon={AstronautIcon}
+              title="Self-Hosting"
+              text="Want to self-host? Deploy the app on your own servers for full control, and our team can help you get started or customize your setup as needed."
+              buttonProps={{
+                as: 'a',
+                href: 'mailto:support@retrograde.sh?subject=Self-Hosting%20Inquiry',
+                text: 'Contact Us',
+                icon: <EmailIcon />,
+                iconPosition: 'right',
+              }}
+            />
+            {/* <Card
               Icon={AstronautIcon}
               title="Consulting"
               text="Need help getting started or customizing your setup? Our team of experts is here to assist you with tailored solutions that fit your team's unique needs."
@@ -181,7 +195,7 @@ export default function Home() {
                 icon: <EmailIcon />,
                 iconPosition: 'right',
               }}
-            />
+            /> */}
           </div>
         </section >
         <section className="mx-auto text-center flex gap-2 items-center justify-center text-slate-800">

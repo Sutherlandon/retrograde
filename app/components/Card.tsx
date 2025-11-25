@@ -14,7 +14,7 @@ export default function Card({
   link: string;
 }) {
   return (
-    <div className="bg-gray-900 p-4 rounded-lg">
+    <div className="bg-gray-900 p-4 rounded-lg max-w-84 mx-auto">
       <Icon className="h-25 w-25 mb-4 mx-auto" />
       <h3 className="text-xl font-bold mb-2">{title}</h3>
       <div className="mb-5">{text}</div>
