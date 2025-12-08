@@ -99,14 +99,10 @@ export default function Note({
             className="flex flex-col gap-2 justify-between h-full"
             onDoubleClick={() => setIsEditing(true)}
           >
-            <div className="flex gap-2">
-              <div className="flex-1 whitespace-pre-wrap">
-                {note.text}
-              </div>
-              <div className="flex flex-col items-start">
-              </div>
+            <div className="flex-1 whitespace-pre-wrap">
+              {note.text}
             </div>
-            <div className='flex justify-between items-center'>
+            <div className='flex justify-start items-center'>
               <Button
                 text={likes.toString()}
                 icon={<ThumbsUpIcon size="sm" />}

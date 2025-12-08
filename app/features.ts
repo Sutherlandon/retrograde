@@ -3,7 +3,7 @@
  */
 export const FEATURES: { [key: string]: string[] } = {
   development: [
-    "--accounts",
+    // "--accounts",
   ],
   production: [
 
