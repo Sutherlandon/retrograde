@@ -104,11 +104,6 @@ export default function Note({
                 {note.text}
               </div>
               <div className="flex flex-col items-start">
-                <Button
-                  icon={<TrashIcon size="sm" />}
-                  onClick={() => setDeleteMode(true)}
-                  variant="text"
-                />
               </div>
             </div>
             <div className='flex justify-between items-center'>
@@ -120,9 +115,15 @@ export default function Note({
                 variant="text"
                 className="px-1"
               />
+              <div className='grow' />
               <Button
                 icon={<EditIcon size="sm" />}
                 onClick={() => setIsEditing(true)}
+                variant="text"
+              />
+              <Button
+                icon={<TrashIcon size="sm" />}
+                onClick={() => setDeleteMode(true)}
                 variant="text"
               />
             </div>
