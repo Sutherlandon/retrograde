@@ -1,5 +1,5 @@
 // routes/board.tsx
-import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { type ActionFunctionArgs, type ClientLoaderFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/components/BoardContext";
 import Header from "~/components/Header";
 import Board from "~/components/Board";
@@ -16,32 +16,60 @@ import {
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
 
+let force_fail = false; // for testing offline mode
+
 export async function loader({ params }: LoaderFunctionArgs) {
   const board_id = params.id;
+
+  if (force_fail) {
+    const err = new Error('Failed to fetch');
+    throw err;
+  } else {
+    console.log("Next load will fail to fetch for testing offline mode");
+    // force_fail = true;
+  }
 
   if (board_id === "example-board") {
     return exampleBoardTutorial;
   }
-  if (board_id === "example-real-world") {
+  if (board_id === "example-board-real-world") {
     return exampleBoardRealWorld;
   }
 
   if (board_id) {
-    const board = await getBoardServer(board_id);
-    if (board) {
-      // Calculate next_col_order for client use
-      board.next_col_order = (board.columns.length > 0)
-        ? Math.max(...board.columns.map(c => c.col_order)) + 1
-        : 1
+    try {
+      const board = await getBoardServer(board_id);
+      if (board) {
+        // Calculate next_col_order for client use
+        board.next_col_order = (board.columns.length > 0)
+          ? Math.max(...board.columns.map(c => c.col_order)) + 1
+          : 1
 
-      return board;
-    } else {
-      throw new Response("Board Not Found", { status: 404 });
+        return board;
+      } else {
+        throw new Response("Board Not Found", { status: 404 });
+      }
+    } catch (error) {
+      console.error("Error2 loading board:", error);
     }
   }
 
   throw new Response("Board ID Missing", { status: 400 });
 }
+
+export async function clientLoader({ serverLoader }: ClientLoaderFunctionArgs) {
+  try {
+    const serverData = await serverLoader();
+    console.log({ serverData });
+    return serverData;
+  } catch (error) {
+    console.log("Client loader caught error:");
+    console.error(error);
+    throw error;
+  }
+}
+
+clientLoader.hydrate = true as const;
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const board_id = params.id;
