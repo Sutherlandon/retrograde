@@ -59,7 +59,7 @@ export default function Note({
 
   return (
     <div
-      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15em]`}
+      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-sm cursor-grab text-xs w-[47%] max-w-[15rem] min-h-[6rem]`}
       draggable={!isEditing}
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -99,19 +99,10 @@ export default function Note({
             className="flex flex-col gap-2 justify-between h-full"
             onDoubleClick={() => setIsEditing(true)}
           >
-            <div className="flex gap-2">
-              <div className="flex-1 whitespace-pre-wrap">
-                {note.text}
-              </div>
-              <div className="flex flex-col items-start">
-                <Button
-                  icon={<TrashIcon size="sm" />}
-                  onClick={() => setDeleteMode(true)}
-                  variant="text"
-                />
-              </div>
+            <div className="flex-1 whitespace-pre-wrap">
+              {note.text}
             </div>
-            <div className='flex justify-between items-center'>
+            <div className='flex justify-start items-center'>
               <Button
                 text={likes.toString()}
                 icon={<ThumbsUpIcon size="sm" />}
@@ -120,9 +111,15 @@ export default function Note({
                 variant="text"
                 className="px-1"
               />
+              <div className='grow' />
               <Button
                 icon={<EditIcon size="sm" />}
                 onClick={() => setIsEditing(true)}
+                variant="text"
+              />
+              <Button
+                icon={<TrashIcon size="sm" />}
+                onClick={() => setDeleteMode(true)}
                 variant="text"
               />
             </div>

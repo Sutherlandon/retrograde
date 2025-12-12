@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "1.0.1",
   "name": "retrograde",
   "private": true,
   "type": "module",
@@ -17,12 +17,12 @@
     "lodash.debounce": "^4.0.8",
     "nanoid": "^5.1.5",
     "pg": "^8.16.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router": "^7.9.3"
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "react-router": "^7.10.1"
   },
   "devDependencies": {
-    "@react-router/dev": "^7.9.3",
+    "@react-router/dev": "^7.10.1",
     "@tailwindcss/vite": "^4.1.4",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20",
