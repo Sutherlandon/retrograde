@@ -10,6 +10,7 @@ import { Analytics } from "@vercel/analytics/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { useTheme } from "./useTheme";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -50,6 +51,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <ScrollRestoration />
         <Scripts />
         <Analytics />
+        <script>
+          {`(function () {
+            const stored = localStorage.getItem('theme')
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+            const theme = stored ?? (prefersDark ? 'dark' : 'light')
+            if (theme === 'dark') {
+              document.documentElement.classList.add('dark')
+            }
+          })()`}
+        </script>
       </body>
     </html>
   );

@@ -1,5 +1,6 @@
 import type { JSX } from 'react'
 import Button, { type ButtonProps } from "./Button";
+import type { IconProps } from '~/images/icons';
 
 export default function Card({
   buttonProps,
@@ -10,8 +11,8 @@ export default function Card({
   buttonProps: ButtonProps;
   text: string;
   title: string;
-  Icon: JSX.Element;
-  link: string;
+  Icon: ({ size, className }: IconProps) => JSX.Element;
+  link?: string;
 }) {
   return (
     <div className="bg-gray-900 p-4 rounded-lg max-w-84 mx-auto">

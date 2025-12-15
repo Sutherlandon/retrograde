@@ -84,7 +84,7 @@ const TimerButton = () => {
         onClick={() => setShowOptions((prev) => !prev)}
       />
       {showOptions && (
-        <div className="absolute mt-2 bg-gray-950 rounded shadow-lg p-2 flex flex-col gap-2 w-[150px] -translate-x-1/4 transform text-center">
+        <div className="absolute mt-2 bg-white dark:bg-gray-950 rounded shadow-xl/30 p-2 flex flex-col gap-2 w-[150px] -translate-x-1/4 transform text-center border-1 border-slate-400">
           {timerRunning ? (
             <Button
               icon={<StopIcon />}

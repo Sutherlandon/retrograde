@@ -54,7 +54,9 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
 
   return (
     <div
-      className={` min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors text-gray-100 border-1 ${isDragOver ? "bg-slate-600" : "bg-slate-800"} ${deleteMode ? "border-red-600" : "border-slate-800"}`}
+      className={`${isDragOver ? "bg-slate-200 dark:bg-slate-600" : "dark:bg-slate-800"
+        } ${deleteMode ? "border-red-600" : "border-slate-400 dark:border-slate-700"
+        } min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors border-1 shadow-md/20`}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -113,7 +115,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               />
             ) : (
               <span
-                className="font-bold cursor-pointer flex-1"
+                className="font-bold cursor-text flex-1"
                 onClick={() => setEditingTitle(true)}
               >
                 {column.title}
@@ -121,19 +123,17 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
             )}
             <Button
               icon={<PlusIcon />}
-              // text="Note"
               onClick={() => addNote(column.id)}
-              className="text-white hover:text-green-500"
+              className="hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500"
               variant="text"
             />
             <Button
               icon={<TrashIcon />}
               onClick={() => handleDelete()}
-              className="ml-2 text-white hover:text-red-500"
+              className="ml-1 hover:bg-red-300 dark:hover:bg-slate-900 dark:hover:text-red-500"
               variant="text"
             />
           </div>
-
           <div className='flex gap-2 flex-wrap'>
             {column.notes.map((note) => (
               <Note key={note.id} note={note} columnId={column.id} noteColor={noteColor} />
