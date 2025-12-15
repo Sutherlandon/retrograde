@@ -8,6 +8,7 @@ const defaultBoard: Board = {
   title: "Default Board",
   next_col_order: 1,
   columns: [{ id: 'col-1', title: 'Column 1', col_order: 0, notes: [] }],
+  offline: false,
   addNote: () => { },
   addColumn: () => { },
   updateColumnTitle: () => { },
@@ -22,6 +23,7 @@ const BoardContext = createContext<Board>(defaultBoard);
 export function BoardProvider({ children }: { children: React.ReactNode }) {
   const loaderData = useLoaderData() as BoardState;
   const [columns, setColumns] = useState(loaderData.columns);
+  const [offline, setOffline] = useState(false);
   const fetcher = useFetcher();
   const { revalidate } = useRevalidator();
 
@@ -92,19 +94,44 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [loaderData]);
 
   /**
-   * Periodically revalidate to get server-side updates (e.g. from other users)
-   */
+ * Periodically revalidate to get server-side updates (e.g. from other users)
+ */
   useEffect(() => {
-    // no revalidation on example board 
-    if (loaderData.id === "example-board")
-      return;
+    // no revalidation on example board
+    if (loaderData.id === "example-board") return;
 
-    const interval = setInterval(() => {
-      revalidate(); // re-runs the loader, updates useLoaderData
-    }, 10000);
+    let cancelled = false;
 
-    return () => clearInterval(interval);
-  }, [revalidate]);
+    async function safeRevalidate() {
+      try {
+        await revalidate(); // triggers loader
+        if (!cancelled) {
+          setOffline(false);
+        }
+      } catch (err) {
+        console.error("Revalidation error:", err);
+        // Browser/network failure -> TypeError("Failed to fetch")
+        if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
+          if (!cancelled) {
+            console.warn("Server unreachable, going offline");
+            setOffline(true);
+          }
+          return; // prevent bubbling into router errorBoundary
+        }
+
+        // Non-network errors should still bubble to router boundaries
+        throw err;
+      }
+    }
+
+    const interval = setInterval(safeRevalidate, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [revalidate, loaderData.id, setOffline]);
+
 
   // Creates a new column with a default title
   const addColumn = () => {
@@ -257,6 +284,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         updateNote,
         deleteNote,
         moveNote,
+        offline,
       }}
     >
       {children}

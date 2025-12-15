@@ -12,12 +12,17 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title } = useBoard();
+  const { columns, title, offline } = useBoard();
 
   return (
     <main className="p-4">
       <BoardToolbar title={title} />
-      <div className="flex flex-wrap gap-4 text-gray-800">
+      <div className="flex flex-wrap gap-4">
+        {offline && (
+          <div className="w-full p-2 mb-4 text-center bg-red-200 text-red-800 rounded">
+            You are currently offline. Changes will be synced when you reconnect.
+          </div>
+        )}
         {columns.map((col, index) => (
           <Column key={col.id} column={col} noteColor={noteColors[index % noteColors.length]} />
         ))}
