@@ -70,8 +70,8 @@ export default function Home() {
   const actionData = useActionData<{ errors?: Record<string, string> }>();
 
   return (
-    <>
-      <Header />
+    <div className='text-gray-100 min-h-screen'>
+      <Header home />
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit">
           Mission Control for Retrospectives
@@ -210,6 +210,6 @@ export default function Home() {
           <RocketIcon size="xl" />
         </section>
       </div >
-    </>
+    </div>
   );
 }

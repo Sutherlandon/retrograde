@@ -5,12 +5,15 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+/* NOTE: This makes “dark:” work based on .dark on an ancestor */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body {
   /* @apply bg-white dark:bg-gray-900; */
-  @apply bg-gray-900 text-gray-100;
+  @apply dark:bg-gray-900 dark:text-gray-100 text-gray-900 bg-white;
 
-  /* @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: dark) {
     color-scheme: dark;
-  } */
+  }
 }
