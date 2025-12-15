@@ -99,6 +99,14 @@ export const exampleBoardTutorial: Board = {
         {
           id: 'note-10',
           column_id: 'col-3',
+          text: 'Now checkout light mode by clicking the sun icon in the header. You can toggle back to dark mode by clicking the moon icon.',
+          likes: 0,
+          is_new: false,
+          created: '1760074762208'
+        },
+        {
+          id: 'note-11',
+          column_id: 'col-3',
           text: 'Lastly, have fun, like notes a bunch, and we hope this app helps your team achieve thoughtful converstations!',
           likes: 0,
           is_new: false,
