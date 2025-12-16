@@ -70,10 +70,10 @@ export default function Home() {
   const actionData = useActionData<{ errors?: Record<string, string> }>();
 
   return (
-    <div className='text-gray-100 min-h-screen'>
+    <div className='text-gray-100 h-screen'>
       <Header home />
-      <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400'>
-        <h1 className="text-4xl font-bold mb-20 mx-auto w-fit">
+      <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
+        <h1 className="text-4xl font-bold mb-20 mx-auto w-fit text-center">
           Mission Control for Retrospectives
         </h1>
         <section className="flex gap-6 flex-wrap mb-20 max-w-[1200px] mx-auto">
