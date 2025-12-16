@@ -10,7 +10,7 @@ import { Analytics } from "@vercel/analytics/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { useTheme } from "./useTheme";
+import ThemeInitializer from "./components/ThemeInitializer";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -45,22 +45,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <Meta />
         <Links />
+        {/* Inline theme bootstrap to prevent wrong theme flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  const theme = localStorage.getItem("theme") || "system";
+                  const isDark =
+                    theme === "dark" ||
+                    (theme === "system" &&
+                      window.matchMedia("(prefers-color-scheme: dark)").matches);
+                  document.documentElement.classList.toggle("dark", isDark);
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
+        <ThemeInitializer />
         {children}
         <ScrollRestoration />
         <Scripts />
         <Analytics />
-        <script>
-          {`(function () {
-            const stored = localStorage.getItem('theme')
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-            const theme = stored ?? (prefersDark ? 'dark' : 'light')
-            if (theme === 'dark') {
-              document.documentElement.classList.add('dark')
-            }
-          })()`}
-        </script>
       </body>
     </html>
   );
