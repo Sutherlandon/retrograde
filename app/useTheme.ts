@@ -69,7 +69,5 @@ export function useTheme() {
     toggleTheme,
   };
 
-  console.log(theme, '/', resolvedTheme);
-
   return themeObject;
 }

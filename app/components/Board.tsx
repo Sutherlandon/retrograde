@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from "react";
 import { useBoard } from "./BoardContext";
 import BoardToolbar from "./BoardToolbar";
 import Column from "./Column";
+import TimerEndModal from "./TimerEndModal";
 
 const noteColors = [
   'bg-yellow-200',
@@ -12,7 +14,17 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline } = useBoard();
+  const { columns, title, offline, timeLeft } = useBoard();
+  const [showTimerEndModal, setShowTimerEndModal] = useState(false);
+  const prevTimeLeft = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (prevTimeLeft.current !== null && prevTimeLeft.current > 0 && timeLeft === 0) {
+      setShowTimerEndModal(true);
+    }
+
+    prevTimeLeft.current = timeLeft;
+  }, [timeLeft]);
 
   return (
     <main className="p-4">
@@ -27,6 +39,10 @@ export default function Board() {
           <Column key={col.id} column={col} noteColor={noteColors[index % noteColors.length]} />
         ))}
       </div>
+      <TimerEndModal
+        isOpen={showTimerEndModal}
+        onClose={() => setShowTimerEndModal(false)}
+      />
     </main>
   );
 }

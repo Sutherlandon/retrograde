@@ -4,6 +4,10 @@ export const exampleBoardTutorial: Board = {
   id: "example-board",
   title: "Tutorial",
   next_col_order: 2,
+  timerRunning: false,
+  timerEndsAt: null,
+  timeLeft: null,
+  offline: false,
   columns: [
     {
       id: 'col-1',
@@ -91,7 +95,7 @@ export const exampleBoardTutorial: Board = {
         {
           id: 'note-9',
           column_id: 'col-3',
-          text: 'Next try the timer feature by clicking the "Timer" in the header. Start a 3 minute timer. Click on it again to stop it. Timers are not synced across clients yet so only you will see it.',
+          text: 'Next try the timer feature by clicking the "Timer" in the header. Start a 3 minute timer. Click on it again to stop it.',
           likes: 0,
           is_new: false,
           created: '1760074762207'
@@ -122,4 +126,6 @@ export const exampleBoardTutorial: Board = {
   updateNote: () => { },
   deleteNote: () => { },
   moveNote: () => { },
+  startTimer: () => { },
+  stopTimer: () => { },
 };

@@ -103,7 +103,7 @@ export async function initializeDatabase() {
     console.log("Done");
     console.log("Starting migrations...");
 
-    // Migration for adding 'created' column if it doesn't exist
+    // Migration for updating existing tables if needed
     await client.query(`
       -- 1 Add the column if it doesn't exist
       ALTER TABLE notes
@@ -118,6 +118,13 @@ export async function initializeDatabase() {
       ALTER TABLE notes
       ALTER COLUMN created SET DEFAULT '1',
       ALTER COLUMN created SET NOT NULL;
+
+     -- 4 Move timers to the backend so it can sync across clients 
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS timer_ends_at TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS timer_duration_seconds INTEGER NULL,
+      ADD COLUMN IF NOT EXISTS timer_running BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS timer_started_at TIMESTAMP NULL;
     `);
 
     console.log("Done");

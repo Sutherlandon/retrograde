@@ -12,6 +12,8 @@ import {
   updateNoteServer,
   deleteNoteServer,
   moveNoteServer,
+  startTimerServer,
+  stopTimerServer,
 } from "../server/board_model";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
@@ -25,7 +27,7 @@ export async function loader({ params }: LoaderFunctionArgs) {
     const err = new Error('Failed to fetch');
     throw err;
   } else {
-    console.log("Next load will fail to fetch for testing offline mode");
+    // console.log("Next load will fail to fetch for testing offline mode");
     // force_fail = true;
   }
 
@@ -45,6 +47,14 @@ export async function loader({ params }: LoaderFunctionArgs) {
           ? Math.max(...board.columns.map(c => c.col_order)) + 1
           : 1
 
+        if (board.timerRunning && board.timerEndsAt) {
+          if (new Date(board.timerEndsAt).getTime() <= Date.now()) {
+            await stopTimerServer(board.id);
+            board.timerRunning = false;
+            board.timerEndsAt = null;
+          }
+        }
+
         return board;
       } else {
         throw new Response("Board Not Found", { status: 404 });
@@ -57,19 +67,19 @@ export async function loader({ params }: LoaderFunctionArgs) {
   throw new Response("Board ID Missing", { status: 400 });
 }
 
-export async function clientLoader({ serverLoader }: ClientLoaderFunctionArgs) {
-  try {
-    const serverData = await serverLoader();
-    console.log({ serverData });
-    return serverData;
-  } catch (error) {
-    console.log("Client loader caught error:");
-    console.error(error);
-    throw error;
-  }
-}
+// export async function clientLoader({ serverLoader }: ClientLoaderFunctionArgs) {
+//   try {
+//     const serverData = await serverLoader();
+//     console.log({ serverData });
+//     return serverData;
+//   } catch (error) {
+//     console.log("Client loader caught error:");
+//     console.error(error);
+//     throw error;
+//   }
+// }
 
-clientLoader.hydrate = true as const;
+// clientLoader.hydrate = true as const;
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const board_id = params.id;
@@ -104,6 +114,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       case "moveNote":
         return moveNoteServer(payload.fromcolumnId, payload.tocolumnId, payload.noteId);
+
+      case "startTimer":
+        const minutes = payload.minutes;
+
+        if (typeof minutes !== "number" || minutes <= 0) {
+          throw new Response("Invalid timer duration", { status: 400 });
+        }
+
+        return startTimerServer(board_id, minutes * 60);
+
+      case "stopTimer":
+        return stopTimerServer(board_id);
 
       default:
         throw new Response("Unknown action", { status: 400 });

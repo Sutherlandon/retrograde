@@ -22,6 +22,9 @@ export interface BoardState {
   columns: Column[];
   next_col_order: number; // Optional: for client-side use only
   offline: boolean;
+  timerRunning: boolean;
+  timerEndsAt: string | null;
+  timeLeft: number | null;
 }
 
 // Optional: separate "modifier" interfaces if you still want client-only methods
@@ -30,19 +33,11 @@ export interface BoardModifier {
   updateColumnTitle: (id: string, newTitle: string) => void;
   deleteColumn: (id: string) => void;
   addNote: (columnId: string, text?: string) => void;
-  updateNote: (
-    columnId: string,
-    noteId: string,
-    newText: string,
-    likes: number,
-    created: string,
-  ) => void;
+  updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
-  moveNote: (
-    fromcolumnId: string,
-    tocolumnId: string,
-    noteId: string
-  ) => void;
+  moveNote: (fromcolumnId: string, tocolumnId: string, noteId: string) => void;
+  startTimer: (minutes: number) => void;
+  stopTimer: () => void;
 }
 
 export interface Board extends BoardState, BoardModifier { }

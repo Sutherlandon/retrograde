@@ -1,124 +1,118 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Button from "./Button";
 import { StopIcon, TimerIcon } from "~/images/icons";
-import TimerEndModal from "./TimerEndModal";
+import { useBoard } from "./BoardContext";
 
-const TimerButton = () => {
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const TimerControl = () => {
+  const { timerRunning, startTimer, stopTimer } = useBoard();
   const [showOptions, setShowOptions] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
-  const [timerId, setTimerId] = useState<NodeJS.Timeout | null>(null);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [showTimerEnded, setShowTimerEnded] = useState(false);
-  const [timeAmount, setTimeAmount] = useState(3);
+  const [minutes, setMinutes] = useState(3);
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Detect clicks outside this component and close the dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+    const handler = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setShowOptions(false);
       }
     };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-    if (showOptions) {
-      document.addEventListener("mousedown", handleClickOutside);
-    } else {
-      document.removeEventListener("mousedown", handleClickOutside);
-    }
+  const adjustSeconds = (delta: number) => {
+    let total = minutes * 60 + seconds + delta;
+    total = Math.max(1, total); // prevent zero-length timers
 
-    // cleanup
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showOptions]);
-
-  // Format seconds -> M:SS
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    setMinutes(Math.floor(total / 60));
+    setSeconds(total % 60);
   };
 
   const handleStart = () => {
-    setTimeLeft(timeAmount * 60);
+    const totalSeconds = minutes * 60 + seconds;
+    if (totalSeconds <= 0) {
+      return setError("time must be greater than 0.");
+    }
+
+    setError(null);
+    startTimer(totalSeconds / 60);
     setShowOptions(false);
-    setTimerRunning(true);
   };
-
-  const handleStop = () => {
-    if (timerId) {
-      clearInterval(timerId);
-    }
-    setTimeLeft(null);
-    setTimerRunning(false);
-    setShowOptions(false);
-  }
-
-  // Countdown effect
-  useEffect(() => {
-    if (timeLeft === null)
-      return;
-
-    if (timeLeft === 0) {
-      setTimeLeft(null);
-      setTimerRunning(false);
-      setShowTimerEnded(true);
-      return;
-    }
-
-    const id = setInterval(() => {
-      setTimeLeft((prev) => (prev !== null ? prev - 1 : null));
-    }, 1000);
-
-    setTimerId(id);
-
-    return () => clearInterval(id);
-  }, [timeLeft]);
 
   return (
     <div ref={wrapperRef} className="relative inline-block">
       <Button
         icon={<TimerIcon />}
-        text={timeLeft === null ? "Timer" : formatTime(timeLeft)}
-        className="relative"
-        onClick={() => setShowOptions((prev) => !prev)}
+        text="Timer"
+        onClick={() => setShowOptions((v) => !v)}
       />
+
       {showOptions && (
-        <div className="absolute mt-2 bg-white dark:bg-gray-950 rounded shadow-xl/30 p-2 flex flex-col gap-2 w-[150px] -translate-x-1/4 transform text-center border-1 border-slate-400">
+        <div className="absolute mt-2 bg-white dark:bg-slate-800 rounded shadow-xl/30 p-2 flex flex-col gap-2 w-[180px] -translate-x-1/4 transform text-center border border-slate-400 dark:border-slate-700">
           {timerRunning ? (
             <Button
               icon={<StopIcon />}
-              text='Stop'
-              onClick={handleStop}
+              text="Stop"
+              onClick={() => {
+                stopTimer();
+                setShowOptions(false);
+              }}
             />
           ) : (
-            <div>
-              <div className="flex gap-1 mb-2">
+            <>
+              {/* Time inputs */}
+              <div className="flex items-center gap-1">
                 <Button
                   text="-"
-                  onClick={() => setTimeAmount(timeAmount - 1 || 1)}
                   className="h-8 w-8"
+                  onClick={() => adjustSeconds(-60)}
                 />
-                <div className="p-1 whitespace-nowrap flex-1 center">{timeAmount} min</div>
+
+                <input
+                  min={0}
+                  className="w-10 h-8 text-center border rounded border-slate-300 dark:border-slate-700 dark:bg-black"
+                  value={minutes}
+                  onChange={(e) =>
+                    setMinutes(clamp(parseInt(e.target.value || "0", 10), 0, 999))
+                  }
+                />
+                <span className="text-sm">:</span>
+                <input
+                  min={0}
+                  max={59}
+                  className="w-10 h-8 text-center border rounded border-slate-300 dark:border-slate-700 dark:bg-black"
+                  value={seconds.toString().padStart(2, "0")}
+                  onChange={(e) =>
+                    setSeconds(
+                      clamp(parseInt(e.target.value || "0", 10), 0, 59)
+                    )
+                  }
+                />
                 <Button
                   text="+"
-                  onClick={() => setTimeAmount(timeAmount + 1)}
                   className="h-8 w-8"
+                  onClick={() => adjustSeconds(60)}
                 />
               </div>
+              {error && (
+                <div className="text-xs text-red-500">{error}</div>
+              )}
               <Button
                 text="Start"
-                onClick={() => handleStart()}
                 className="w-full"
+                onClick={handleStart}
               />
-            </div>
-          )
-          }
+            </>
+          )}
         </div>
       )}
-      <TimerEndModal isOpen={showTimerEnded} onClose={() => setShowTimerEnded(false)} />
     </div>
   );
 };
 
-export default TimerButton;
+export default TimerControl;

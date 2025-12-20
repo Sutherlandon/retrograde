@@ -198,16 +198,16 @@ export default function Home() {
             /> */}
           </div>
         </section >
-        <section className="mx-auto text-center flex gap-2 items-center justify-center text-slate-800">
-          <span>Built by <a
+        <section className="mx-auto text-center flex gap-2 items-center justify-center text-black">
+          <span>Made with </span><RocketIcon size="xl" /><span>at <a
             href="https://sutherlandon.com"
             target="_blank"
             rel="noopener noreferrer"
             className="underline"
           >
-            Sutherlandon
-          </a> with</span>
-          <RocketIcon size="xl" />
+            Sutherlandon, LLC
+          </a>
+          </span>
         </section>
       </div >
     </div>

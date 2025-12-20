@@ -11,6 +11,9 @@ export async function getBoardServer(id: string): Promise<BoardState | null> {
     SELECT json_build_object(
       'id', b.id,
       'title', b.title,
+      'timerRunning', b.timer_running,
+      'timerStartedAt', b.timer_started_at,
+      'timerEndsAt', b.timer_ends_at,
       'columns', COALESCE(
         json_agg(
           json_build_object(
@@ -126,3 +129,70 @@ export async function moveNoteServer(fromColId: string, toColId: string, noteId:
     [toColId, noteId, fromColId]
   );
 }
+
+export async function startTimerServer(
+  boardId: string,
+  durationSeconds: number
+): Promise<void> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 🔒 Lock the board row
+    const res = await client.query(
+      `SELECT timer_running FROM boards WHERE id = $1 FOR UPDATE`,
+      [boardId]
+    );
+
+    if (res.rowCount === 0) {
+      throw new Error("Board not found");
+    }
+
+    // Don't start if already running
+    if (res.rows[0].timer_running) {
+      throw new Error("TIMER_ALREADY_RUNNING");
+    }
+
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + durationSeconds * 1000);
+
+    await client.query(`
+      UPDATE boards
+      SET
+        timer_running = true,
+        timer_started_at = $1,
+        timer_ends_at = $2
+      WHERE id = $3
+    `, [now, endsAt, boardId]);
+
+    await client.query("COMMIT");
+
+    // return {
+    //   timer_running: true,
+    //   timer_ends_at: endsAt.toISOString(),
+    // };
+  } catch (err) {
+    await client.query("ROLLBACK");
+
+    if ((err as Error).message === "TIMER_ALREADY_RUNNING") {
+      throw new Response("Timer already running", { status: 409 });
+    }
+
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function stopTimerServer(boardId: string): Promise<void> {
+  await pool.query(`
+    UPDATE boards
+    SET
+      timer_running = false,
+      timer_started_at = NULL,
+      timer_ends_at = NULL
+    WHERE id = $1
+  `, [boardId]);
+}
+

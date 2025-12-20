@@ -9,6 +9,9 @@ const defaultBoard: Board = {
   next_col_order: 1,
   columns: [{ id: 'col-1', title: 'Column 1', col_order: 0, notes: [] }],
   offline: false,
+  timerRunning: false,
+  timerEndsAt: null,
+  timeLeft: null,
   addNote: () => { },
   addColumn: () => { },
   updateColumnTitle: () => { },
@@ -16,16 +19,22 @@ const defaultBoard: Board = {
   updateNote: () => { },
   deleteNote: () => { },
   moveNote: () => { },
+  startTimer: () => { },
+  stopTimer: () => { },
 };
 
 const BoardContext = createContext<Board>(defaultBoard);
 
 export function BoardProvider({ children }: { children: React.ReactNode }) {
   const loaderData = useLoaderData() as BoardState;
-  const [columns, setColumns] = useState(loaderData.columns);
-  const [offline, setOffline] = useState(false);
   const fetcher = useFetcher();
+  const [columns, setColumns] = useState(loaderData.columns);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [timerEndsAt, setTimerEndsAt] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [offline, setOffline] = useState(false);
   const { revalidate } = useRevalidator();
+  const boardId = loaderData.id;
 
   const sendAction = ({ type, board_id, payload }: { type: string, board_id: string, payload: any }) => {
     // no DB actions on example board
@@ -94,11 +103,11 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [loaderData]);
 
   /**
- * Periodically revalidate to get server-side updates (e.g. from other users)
- */
+   * Periodically revalidate to get server-side updates (e.g. from other users)
+   */
   useEffect(() => {
     // no revalidation on example board
-    if (loaderData.id === "example-board") return;
+    if (boardId === "example-board") return;
 
     let cancelled = false;
 
@@ -130,7 +139,59 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [revalidate, loaderData.id, setOffline]);
+  }, [revalidate, boardId, setOffline]);
+
+  // Detect a timer state changea from the server
+  useEffect(() => {
+    if (!loaderData) return;
+
+    // server truth
+    const serverRunning = loaderData.timerRunning;
+    const serverEndsAt = loaderData.timerEndsAt;
+
+    // client not running but server is → start it
+    if (serverRunning && !timerRunning) {
+      setTimerRunning(true);
+      setTimerEndsAt(serverEndsAt);
+      return;
+    }
+
+    // client running but server stopped → stop it
+    if (!serverRunning && timerRunning) {
+      setTimerRunning(false);
+      setTimerEndsAt(null);
+      return;
+    }
+
+    // both running → keep end time in sync (important!)
+    if (serverRunning && timerRunning) {
+      if (serverEndsAt !== timerEndsAt) {
+        setTimerEndsAt(serverEndsAt);
+      }
+    }
+  }, [loaderData?.timerRunning, loaderData?.timerEndsAt]);
+
+
+  // Local countdown derived from endsAt
+  useEffect(() => {
+    if (!timerRunning || !timerEndsAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const tick = () => {
+      const diff = Math.max(0, Math.floor((new Date(timerEndsAt).getTime() - Date.now()) / 1000));
+
+      setTimeLeft(diff);
+      if (diff === 0) {
+        setTimerRunning(false);
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [timerRunning, timerEndsAt]);
 
 
   // Creates a new column with a default title
@@ -147,7 +208,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
     setColumns([...columns, newCol].sort((a, b) => a.col_order - b.col_order));
     sendAction({
-      board_id: loaderData.id,
+      board_id: boardId,
       type: "addColumn",
       payload: {
         id: newCol.id,
@@ -166,7 +227,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       )
     );
     sendAction({
-      board_id: loaderData.id,
+      board_id: boardId,
       type: "updateColumnTitle",
       payload: { id, newTitle }
     });
@@ -176,7 +237,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const deleteColumn = (id: string) => {
     setColumns((cols) => cols.filter((c) => c.id !== id));
     sendAction({
-      board_id: loaderData.id,
+      board_id: boardId,
       type: "deleteColumn",
       payload: { id }
     });
@@ -215,7 +276,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       )
     );
     sendAction({
-      board_id: loaderData.id,
+      board_id: boardId,
       type: "updateNote",
       payload: { columnId, noteId, newText, likes, created }
     });
@@ -232,7 +293,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
     if (text) {
       sendAction({
-        board_id: loaderData.id,
+        board_id: boardId,
         type: "deleteNote",
         payload: { columnId, noteId }
       });
@@ -263,20 +324,72 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         )
       );
       sendAction({
-        board_id: loaderData.id,
+        board_id: boardId,
         type: "moveNote",
         payload: { fromcolumnId, tocolumnId, noteId },
       });
     }
   };
 
+  // starts a timer for the given number of minutes
+  const startTimer = (minutes: number) => {
+    // prevent duplicate timers
+    if (timerRunning || fetcher.state !== "idle") return;
+
+    // optimistic update
+    const endsAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+    setTimerRunning(true);
+    setTimerEndsAt(endsAt);
+
+    // no DB actions on example board
+    if (boardId === "example-board") return;
+
+    fetcher.submit(
+      {
+        type: "startTimer",
+        payload: JSON.stringify({ minutes }),
+      },
+      {
+        method: "post",
+      }
+    );
+  };
+
+  // stops an active timer
+  const stopTimer = () => {
+    if (!timerRunning || fetcher.state !== "idle") return;
+
+    // optimistic update
+    setTimerRunning(false);
+    setTimerEndsAt(null);
+
+    // no DB actions on example board
+    if (boardId === "example-board") return;
+
+    fetcher.submit(
+      {
+        type: "stopTimer",
+        payload: JSON.stringify({}),
+      },
+      {
+        method: "post",
+      }
+    );
+  };
+
+
+
   return (
     <BoardContext.Provider
       value={{
         columns,
-        id: loaderData.id,
+        id: boardId,
         title: loaderData.title,
         next_col_order: loaderData.next_col_order,
+        offline,
+        timerRunning,
+        timerEndsAt,
+        timeLeft,
         addColumn,
         updateColumnTitle,
         deleteColumn,
@@ -284,7 +397,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         updateNote,
         deleteNote,
         moveNote,
-        offline,
+        startTimer,
+        stopTimer
       }}
     >
       {children}
