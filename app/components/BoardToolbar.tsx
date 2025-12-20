@@ -2,7 +2,7 @@ import TimerButton from "./TimerButton";
 import Button from "./Button";
 import { useBoard } from "./BoardContext";
 import { PlusIcon } from "~/images/icons";
-import TimerDisplay from "./TimerDIsplay";
+import TimerDisplay from "./TimerDisplay";
 
 export default function BoardToolbar({ title }: { title: string }) {
   const { addColumn } = useBoard();

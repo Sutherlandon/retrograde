@@ -332,12 +332,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   };
 
   // starts a timer for the given number of minutes
-  const startTimer = (minutes: number) => {
+  const startTimer = (seconds: number) => {
     // prevent duplicate timers
     if (timerRunning || fetcher.state !== "idle") return;
 
     // optimistic update
-    const endsAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+    const endsAt = new Date(Date.now() + seconds * 1000).toISOString();
     setTimerRunning(true);
     setTimerEndsAt(endsAt);
 
@@ -347,7 +347,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     fetcher.submit(
       {
         type: "startTimer",
-        payload: JSON.stringify({ minutes }),
+        payload: JSON.stringify({ seconds }),
       },
       {
         method: "post",

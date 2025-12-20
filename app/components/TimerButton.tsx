@@ -40,7 +40,7 @@ const TimerControl = () => {
     }
 
     setError(null);
-    startTimer(totalSeconds / 60);
+    startTimer(totalSeconds);
     setShowOptions(false);
   };
 

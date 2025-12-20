@@ -116,13 +116,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return moveNoteServer(payload.fromcolumnId, payload.tocolumnId, payload.noteId);
 
       case "startTimer":
-        const minutes = payload.minutes;
+        const seconds = payload.seconds;
 
-        if (typeof minutes !== "number" || minutes <= 0) {
+        if (typeof seconds !== "number" || seconds <= 0) {
           throw new Response("Invalid timer duration", { status: 400 });
         }
 
-        return startTimerServer(board_id, minutes * 60);
+        return startTimerServer(board_id, seconds);
 
       case "stopTimer":
         return stopTimerServer(board_id);
