@@ -64,7 +64,7 @@ export async function initializeDatabase() {
 
      -- 4 Move timers to the backend so it can sync across clients 
       ALTER TABLE boards
-      ADD COLUMN IF NOT EXISTS timer_ends_at TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS timer_ends_at TIMESTAMP WITH TIME ZONE NULL,
       ADD COLUMN IF NOT EXISTS timer_duration_seconds INTEGER NULL,
       ADD COLUMN IF NOT EXISTS timer_running BOOLEAN NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS timer_started_at TIMESTAMP NULL;
