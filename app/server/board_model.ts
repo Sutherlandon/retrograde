@@ -155,7 +155,7 @@ export async function startTimerServer(
     }
 
     const now = new Date();
-    const endsAt = new Date(now.getTime() + durationSeconds * 1000);
+    const endsAt = new Date(now.getTime() + durationSeconds * 1000).toISOString();
 
     await client.query(`
       UPDATE boards
