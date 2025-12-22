@@ -117,11 +117,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       case "startTimer":
         const seconds = payload.seconds;
-
         if (typeof seconds !== "number" || seconds <= 0) {
           throw new Response("Invalid timer duration", { status: 400 });
         }
-
         return startTimerServer(board_id, seconds);
 
       case "stopTimer":
