@@ -20,7 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
 
         {/* <!-- Favicon --> */}
-        <link rel="icon" href="/icons/retrograde_logo.svg" type="image/svg+xml" />
+        {/* <link rel="icon" href="/icons/retrograde_logo.svg" type="image/svg+xml" /> */}
         <link rel="alternate icon" href="/icons/retrograde_logo-32.png" sizes="32x32" type="image/png" />
         <link rel="alternate icon" href="/icons/retrograde_logo-16.png" sizes="16x16" type="image/png" />
 
@@ -62,6 +62,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
+        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
       </head>
       <body>
         <ThemeInitializer />

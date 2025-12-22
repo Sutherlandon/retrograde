@@ -7,6 +7,7 @@ import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, ExternalLinkIcon, Boo
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
+import CloudflareTurnstile from "~/components/CloudflareTurnstile";
 
 export const meta = () => {
   return [
@@ -36,10 +37,9 @@ export const meta = () => {
 };
 
 export async function action({ request }: ActionFunctionArgs) {
-  const data = await request.formData();
-  const title = data.get("title")?.toString().trim();
-  const no_jerks = data.get("no_jerks");
-
+  const formData = await request.formData();
+  const title = formData.get("title")?.toString().trim();
+  const no_jerks = formData.get("no_jerks");
   const errors: Record<string, string> = {};
 
   // validate the form data
@@ -52,8 +52,41 @@ export async function action({ request }: ActionFunctionArgs) {
     errors.no_jerks = "You must agree to the kindness checkbox.";
   }
 
+  // return any validation errors
   if (Object.keys(errors).length > 0) {
-    return { errors, status: 400 };
+    return Response.json({ errors }, { status: 400 });
+  }
+
+  // begin Cloudflare Turnstile verification (Captcha)
+  const token = formData.get("cf-turnstile-response");
+
+  if (!token) {
+    return Response.json(
+      { errors: { captcha: "Captcha failed" } },
+      { status: 400 }
+    );
+  }
+
+  const verifyRes = await fetch(
+    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        secret: process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+        response: token,
+        remoteip: request.headers.get("CF-Connecting-IP"),
+      }),
+    }
+  );
+
+  const verifyData = await verifyRes.json();
+
+  if (!verifyData.success) {
+    return Response.json(
+      { errors: { captcha: "Captcha verification failed" } },
+      { status: 400 }
+    );
   }
 
   // generate a unique board ID
@@ -95,7 +128,7 @@ export default function Home() {
             </div>
           </div>
           <div id='create-form' className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%]">
-            <h2 className="text-2xl font-bold mb-4">Create a New Board</h2>
+            <h2 className="text-2xl font-bold mb-4">Create a Free Board</h2>
             <Form method="post" className="mb-4">
               <div className="mb-4">
                 <label htmlFor='title' className="text-lg font-bold text-left block mb-2">Title</label>
@@ -122,6 +155,7 @@ export default function Home() {
                   </a>
                 </div>
               </div>
+              <CloudflareTurnstile actionData={actionData} />
               <div className="mb-4">
                 <button
                   type="submit"
@@ -129,7 +163,7 @@ export default function Home() {
                   value="addColumn"
                   className="px-4 py-2 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded hover:from-green-800 hover:to-blue-800 hover:cursor-pointer flex items-center justify-center m-auto"
                 >
-                  Create Board <RocketIcon size="md" className="ml-2" />
+                  Launch <RocketIcon size="md" className="ml-2" />
                 </button>
               </div>
             </Form>
