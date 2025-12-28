@@ -56,10 +56,16 @@ export async function createBoard(id: string, title: string): Promise<void> {
     [id, title]
   );
 
-  // Add default first column
-  await pool.query(
-    `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, 'Column 1', 1)`,
-    [nanoid(), id]
+  // Add 3 columns by default
+  await Promise.allSettled(
+    [
+      'What went well?',
+      'What can we do better?',
+      'Action Items'
+    ].map((colTitle, index) => pool.query(
+      `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
+      [nanoid(), id, colTitle, index + 1]
+    ))
   );
 }
 

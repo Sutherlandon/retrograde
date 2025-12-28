@@ -1,4 +1,4 @@
-import { Form, redirect, useActionData, type ActionFunctionArgs } from "react-router";
+import { Form, redirect, useActionData, Link, type ActionFunctionArgs } from "react-router";
 import { nanoid } from "nanoid";
 
 import Header from "~/components/Header";
@@ -148,11 +148,11 @@ export default function Home() {
                   </p>
                 )}
                 <div className='mx-auto w-fit'>
-                  <a href='/Retrograde_Terms_of_Service.pdf' target='_blank' className="text-sm text-blue-400 underline">
+                  <Link to='/terms-of-service' target='_blank' className="text-sm text-blue-400 underline">
                     Terms of Service
-                  </a> & <a href='/Retrograde_Privacy_Policy.pdf' target='_blank' className="text-sm text-blue-400 underline">
+                  </Link> & <Link to='/privacy-policy' target='_blank' className="text-sm text-blue-400 underline">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </div>
               </div>
               <CloudflareTurnstile actionData={actionData} />

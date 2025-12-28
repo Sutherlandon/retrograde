@@ -26,7 +26,7 @@ export default function Header({ home }: { home?: boolean }) {
         className="flex justify-between items-center hover:cursor-pointer"
       >
         <Logo size="2xl" className='mr-2' />
-        <h1 className="text-2xl font-bold">Retrograde</h1>
+        <div className="text-2xl font-bold">Retrograde</div>
       </a>
       <div className="flex-grow" />
       {feature('--accounts') &&
