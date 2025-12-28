@@ -9,7 +9,7 @@ export default function BoardToolbar({ title }: { title: string }) {
 
   return (
     <div className="flex justify-between items-center mb-4 py-4 gap-4">
-      <h1 className="text-4xl font-bold">{title}</h1>
+      <h1 style={{ marginBottom: 0 }}>{title}</h1>
       <div className="flex-grow text-center">
         <TimerDisplay />
       </div>
