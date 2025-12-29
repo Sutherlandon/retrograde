@@ -29,6 +29,11 @@ export default function Header({ home }: { home?: boolean }) {
         <div className="text-2xl font-bold">Retrograde</div>
       </a>
       <div className="flex-grow" />
+      <nav className="flex gap-4 mr-4">
+        <a href="/about" className="hover:underline">
+          About Us
+        </a>
+      </nav>
       {feature('--accounts') &&
         <Button
           as='a'

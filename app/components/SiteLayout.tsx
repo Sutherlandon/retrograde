@@ -1,7 +1,8 @@
 /**
  * Layout for the website pages.
  */
-import Header from "~/components/Header";
+import Header from "./Header";
+import Footer from "./Footer";
 
 export default function SiteLayout({
   children,
@@ -9,9 +10,12 @@ export default function SiteLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className='text-gray-100 h-screen'>
+    <div className='text-gray-100 min-h-screen flex flex-col'>
       <Header home />
-      {children}
+      <main className="flex-grow">{/* Main content area */}
+        {children}
+      </main>
+      <Footer />
     </div>
   );
 }

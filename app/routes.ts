@@ -6,4 +6,5 @@ export default [
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/terms-of-service", "routes/terms-of-service.tsx"),
   route("/privacy-policy", "routes/privacy-policy.tsx"),
+  route("/about", "routes/about.tsx"),
 ] satisfies RouteConfig;

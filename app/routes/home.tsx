@@ -8,6 +8,7 @@ import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
 import CloudflareTurnstile from "~/components/CloudflareTurnstile";
+import SiteLayout from "~/components/SiteLayout";
 
 export const meta = () => {
   return [
@@ -103,8 +104,7 @@ export default function Home() {
   const actionData = useActionData<{ errors?: Record<string, string> }>();
 
   return (
-    <div className='text-gray-100 h-screen'>
-      <Header home />
+    <SiteLayout>
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit text-center">
           Mission Control for Retrospectives
@@ -127,7 +127,7 @@ export default function Home() {
               />
             </div>
           </div>
-          <div id='create-form' className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%]">
+          <div id='create-form' className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%] border border-gray-700">
             <h2 className="text-2xl font-bold mb-4">Create a Free Board</h2>
             <Form method="post" className="mb-4">
               <div className="mb-4">
@@ -231,19 +231,8 @@ export default function Home() {
               }}
             /> */}
           </div>
-        </section >
-        <section className="mx-auto text-center flex gap-2 items-center justify-center text-black">
-          <span>Made with </span><RocketIcon size="xl" /><span>at <a
-            href="https://sutherlandon.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline"
-          >
-            Sutherlandon, LLC
-          </a>
-          </span>
         </section>
-      </div >
-    </div>
+      </div>
+    </SiteLayout>
   );
 }
