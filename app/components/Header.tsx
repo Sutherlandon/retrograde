@@ -31,7 +31,10 @@ export default function Header({ home }: { home?: boolean }) {
       <div className="flex-grow" />
       <nav className="flex gap-4 mr-4">
         <a href="/about" className="hover:underline">
-          About Us
+          About
+        </a>
+        <a href="/contact" className="hover:underline">
+          Contact
         </a>
       </nav>
       {feature('--accounts') &&
