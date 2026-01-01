@@ -141,18 +141,18 @@ export default function Home() {
               </div>
               <div className="mb-4 text-left">
                 <input type="checkbox" id="no_jerks" name="no_jerks" className="mr-2" />
-                <label htmlFor="no_jerks">I will treat other's the way I want to be treated.</label>
+                <label htmlFor="no_jerks">
+                  I agree to the <Link to='/terms-of-service' target='_blank' className="text-sm text-blue-400 underline">
+                    Terms of Service
+                  </Link> & <Link to='/privacy-policy' target='_blank' className="text-sm text-blue-400 underline">
+                    Privacy Policy
+                  </Link>, and to treat others the way I want to be treated.</label>
                 {actionData?.errors?.no_jerks && (
                   <p className="text-red-500 text-sm mt-1 text-left">
                     {actionData.errors.no_jerks}
                   </p>
                 )}
                 <div className='mx-auto w-fit'>
-                  <Link to='/terms-of-service' target='_blank' className="text-sm text-blue-400 underline">
-                    Terms of Service
-                  </Link> & <Link to='/privacy-policy' target='_blank' className="text-sm text-blue-400 underline">
-                    Privacy Policy
-                  </Link>
                 </div>
               </div>
               <CloudflareTurnstile actionData={actionData} />
@@ -171,7 +171,7 @@ export default function Home() {
         </section>
         <section className="text-center mb-20">
           <h2 className="text-2xl px-5 mb-10 max-w-[800px] mx-auto ">
-            Empower each crew member to share insights - turning retros into real
+            Empower each crew member to share insights - turning meetings into real
             conversations that move your mission forward.
           </h2>
           <div className="bg-gray-900 p-4 rounded max-w-[900px] mx-auto shadow-md">
@@ -184,13 +184,13 @@ export default function Home() {
         </section>
         <section className="text-center mb-10">
           <h2 className="text-3xl px-5 mb-10 max-w-[800px] mx-auto font-bold">
-            Hosted Anywhere
+            Your Data - Anywhere You Like
           </h2>
           <div className="flex flex-col md:flex-row gap-6 justify-center max-w-[900px] mx-auto mb-20">
             <Card
               Icon={CloudIcon}
-              title='Saas Solution'
-              text='Let us handle the infrastructure. Our cloud-hosted solution ensures your boards are always accessible, secure, and scalable without any hassle on your part.'
+              title='Start Free'
+              text='Create a board instantly and use Retrograde as-is.  No setup, no commitment—just jump in and organize your work right now.'
               buttonProps={{
                 text: 'Create your first board',
                 icon: <StartIcon />,
@@ -207,21 +207,9 @@ export default function Home() {
               }}
             />
             <Card
-              Icon={AstronautIcon}
-              title="Self-Hosting"
-              text="Want to self-host? Deploy the app on your own servers for full control, and our team can help you get started or customize your setup as needed."
-              buttonProps={{
-                as: 'a',
-                href: 'mailto:support@retrograde.sh?subject=Self-Hosting%20Inquiry',
-                text: 'Contact Us',
-                icon: <EmailIcon />,
-                iconPosition: 'right',
-              }}
-            />
-            {/* <Card
-              Icon={AstronautIcon}
-              title="Consulting"
-              text="Need help getting started or customizing your setup? Our team of experts is here to assist you with tailored solutions that fit your team's unique needs."
+              Icon={ServerIcon}
+              title="Self-Hosted"
+              text="Purchase the current version of Retrograde and deploy it on your own infrastructure. Full control, internal ownership, and the freedom to integrate it your way."
               buttonProps={{
                 as: 'a',
                 href: '/contact',
@@ -229,7 +217,19 @@ export default function Home() {
                 icon: <EmailIcon />,
                 iconPosition: 'right',
               }}
-            /> */}
+            />
+            <Card
+              Icon={AstronautIcon}
+              title="Guided Install"
+              text="Bring us in to handle deployment on your chosen infrastructure.  Get Retrograde installed, configured, and supported by the experts."
+              buttonProps={{
+                as: 'a',
+                href: '/contact',
+                text: 'Contact Us',
+                icon: <EmailIcon />,
+                iconPosition: 'right',
+              }}
+            />
           </div>
         </section>
       </div>
