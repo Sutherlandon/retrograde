@@ -51,31 +51,33 @@ export default function ContactPage() {
 
         <p>The best way to reach us is by email:</p>
 
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 flex-wrap mb-6">
           <div className="text-2xl rounded-lg rounded px-4 py-2 bg-slate-950">
             hi@retrograde.sh
           </div>
 
-          <Button
-            aria-label="Copy email address to clipboard"
-            text="Email"
-            as="a"
-            href={`mailto:${email}`}
-            variant="outline"
-          />
+          <div className="flex items-center gap-3">
+            <Button
+              aria-label="Copy email address to clipboard"
+              text="Email"
+              as="a"
+              href={`mailto:${email}`}
+              variant="outline"
+            />
 
-          <Button
-            onClick={handleCopy}
-            aria-label="Copy email address to clipboard"
-            variant="outline"
-            text="Copy"
-          />
+            <Button
+              onClick={handleCopy}
+              aria-label="Copy email address to clipboard"
+              variant="outline"
+              text="Copy"
+            />
 
-          {copied && (
-            <span className="text-sm font-medium text-green-600">
-              Copied to clipboard!
-            </span>
-          )}
+            {copied && (
+              <span className="text-sm font-medium text-green-600">
+                Copied to clipboard!
+              </span>
+            )}
+          </div>
         </div>
 
         <p>
