@@ -8,6 +8,7 @@ export default [
   route("/about", "routes/about.tsx"),
   route("/contact", "routes/contact.tsx"),
   route("/healthcheck", "routes/healthcheck.tsx"),
+  route("/sitemap.xml", "routes/sitemap.ts"),
 
   /* App Routes */
   route("/board/:id", "routes/board.tsx"),

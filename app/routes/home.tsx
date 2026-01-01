@@ -34,6 +34,7 @@ export const meta = () => {
       name: "twitter:description",
       content: "Reflect, align, and launch your next sprint with clarity and momentum.",
     },
+    { tagName: "link", rel: "canonical", href: "https://retrograde.sh" },
   ];
 };
 
@@ -107,13 +108,13 @@ export default function Home() {
     <SiteLayout>
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit text-center">
-          Mission Control for Retrospectives
+          Agile Retrospective & Idea Boards for Productive Teams
         </h1>
         <section className="flex gap-6 flex-wrap mb-20 max-w-[1200px] mx-auto">
           <div className="md:max-w-[45%] min-w-[350px] text-center mx-auto mb-6 flex flex-col justify-center">
             <section className="text-2xl text-gray-300 mb-10">
-              Reflect, align, and launch your next sprint with clarity and momentum using Retrograde,
-              the agile retrospective and idea board for productive teams.
+              Collaborative brainstorming built for the modern workspace. Align your distributed teams, capture every insight,
+              and propel your next sprint forward with our streamlined mission control.
             </section>
             <div className="mb-10">
               <Button
