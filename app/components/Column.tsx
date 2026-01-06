@@ -69,12 +69,11 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
           <p className="mb-4">This column still contains notes. You should move or delete them before deleting the column.</p>
           <div className="flex gap-2">
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => setWarningMode(false)}
               text="Okay"
             />
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
+              color="danger"
               onClick={() => {
                 setWarningMode(false);
                 setDeleteMode(true);
@@ -88,12 +87,12 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
           <p className="mb-4">Are you sure you want to delete this column?</p>
           <div className="flex gap-2">
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
+              color="danger"
               onClick={() => { deleteColumn(column.id); setDeleteMode(false); }}
               text="Delete"
             />
             <Button
-              className="bg-gray-600 hover:bg-gray-700 text-white"
+              color="muted"
               onClick={() => setDeleteMode(false)}
               text="Abort!"
             />

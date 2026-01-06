@@ -62,6 +62,7 @@ export default function TermsOfService() {
         </p>
 
         <h2>3. Acceptable Use</h2>
+        <p>You may not use the service for the following activites:</p>
         <ul>
           <li>Disrupt or interfere with the service</li>
           <li>Attempt unauthorized access to systems or data</li>

@@ -73,12 +73,12 @@ export default function Note({
           <p className="mb-4">Are you sure you want to delete this note?</p>
           <div className="flex gap-2">
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white"
+              color="danger"
               onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
               text="Delete"
             />
             <Button
-              className="bg-gray-600 hover:bg-gray-700 text-white"
+              color="muted"
               onClick={() => setDeleteMode(false)}
               text="Abort!"
             />

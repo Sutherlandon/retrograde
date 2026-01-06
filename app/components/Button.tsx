@@ -24,7 +24,7 @@ export interface ButtonProps {
   as?: "button" | "a";
   onClick?: () => void;
   className?: string
-  color?: "primary" | "secondary";
+  color?: "primary" | "secondary" | "danger" | "muted";
   href?: string;
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
@@ -52,6 +52,8 @@ export default function Button({
       "solid": `text-white shadow-md/20 ${{
         "primary": "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-800",
         "secondary": "bg-green-500 hover:bg-blue-600 dark:bg-green-600 dark:hover:bg-green-800",
+        "danger": "bg-red-600 hover:bg-red-700",
+        "muted": "bg-gray-500 hover:bg-gray-600",
       }[props.color ?? "primary"]}`,
       "outline": "bg-transparent border border-green-500 text-green-500 hover:bg-green-800 hover:text-white",
       "text": "bg-transparent border-transparent hover:bg-[rgba(0,0,0,0.1)]",
