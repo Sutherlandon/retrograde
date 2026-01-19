@@ -11,5 +11,11 @@ export default [
   route("/sitemap.xml", "routes/sitemap.ts"),
 
   /* App Routes */
-  route("/board/:id", "routes/board.tsx"),
+  route("/app", "components/AppLayout.tsx", [
+    route("board/:id", "routes/board.tsx"),
+  ]),
+
+  // legacy route for backward compatibility
+  route("/board/:id", "routes/board-legacy.tsx"),
+
 ] satisfies RouteConfig;

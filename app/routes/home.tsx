@@ -1,9 +1,8 @@
 import { Form, redirect, useActionData, Link, type ActionFunctionArgs } from "react-router";
 import { nanoid } from "nanoid";
 
-import Header from "~/components/Header";
 import { createBoard } from "~/server/board_model";
-import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, ExternalLinkIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
+import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
@@ -98,7 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
   await createBoard(board_id, title!);
 
   // redirect to the new board
-  return redirect(`/board/${board_id}`);
+  return redirect(`/app/board/${board_id}`);
 }
 
 export default function Home() {
@@ -119,7 +118,7 @@ export default function Home() {
             <div className="mb-10">
               <Button
                 as='a'
-                href="/board/example-board"
+                href="/app/board/example-board"
                 text="Try the tutorial"
                 className="mx-auto  px-4 py-2"
                 style={{ width: 'fit-content' }}
