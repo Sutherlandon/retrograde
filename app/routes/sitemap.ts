@@ -10,11 +10,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // These are pages that always exist
   const staticPages = [
     { path: "/", priority: "1.0", changefreq: "daily" },
-    { path: "/board/example-board", priority: "0.9", changefreq: "monthly" },
     { path: "/about", priority: "0.8", changefreq: "monthly" },
     { path: "/contact", priority: "0.8", changefreq: "monthly" },
     { path: "/terms-of-service", priority: "0.6", changefreq: "monthly" },
     { path: "/privacy-policy", priority: "0.6", changefreq: "monthly" },
+    { path: "/app/board/example-board", priority: "0.9", changefreq: "monthly" },
   ];
 
   // 2. Fetch dynamic content (Example: Publicly viewable boards)

@@ -1,7 +1,6 @@
 // routes/board.tsx
-import { type ActionFunctionArgs, type ClientLoaderFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/components/BoardContext";
-import Header from "~/components/Header";
 import Board from "~/components/Board";
 import {
   getBoardServer,
@@ -137,7 +136,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function BoardRoute() {
   return (
     <BoardProvider>
-      <Header />
       <Board />
     </BoardProvider>
   );
