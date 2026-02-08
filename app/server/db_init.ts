@@ -16,6 +16,8 @@ export async function initializeDatabase() {
     console.log("Creating tables...");
 
     // Create tables if they don’t exist
+    await client.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS boards (
         id TEXT PRIMARY KEY,
@@ -43,31 +45,61 @@ export async function initializeDatabase() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+        -- Stable external identifier from IdP
+        external_id VARCHAR(255) NOT NULL,
+
+        name VARCHAR(255),
+        preferred_username VARCHAR(255),
+        given_name VARCHAR(255),
+        family_name VARCHAR(255),
+
+        email VARCHAR(255),
+        email_verified BOOLEAN,
+
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+        UNIQUE (external_id)
+      );
+    `);
+
     console.log("Done");
     console.log("Starting migrations...");
 
-    // Migration for updating existing tables if needed
+    // Migration queries for updating existing tables if needed
+    // 1 Add the text column if it doesn't exist
     await client.query(`
-      -- 1 Add the column if it doesn't exist
       ALTER TABLE notes
       ADD COLUMN IF NOT EXISTS created TEXT;
+    `);
 
-      -- 2 Populate existing rows with the default value "1"
+    // 2 Populate existing rows with the default value "1"
+    await client.query(`
       UPDATE notes
       SET created = '1'
       WHERE created IS NULL;
+    `);
 
-      -- 3 Set the column to NOT NULL and default to "1" for future inserts
+    // 3 Set the column to NOT NULL and default to "1" for future inserts
+    await client.query(`
       ALTER TABLE notes
       ALTER COLUMN created SET DEFAULT '1',
       ALTER COLUMN created SET NOT NULL;
+    `);
 
-     -- 4 Move timers to the backend so it can sync across clients 
+    // 4 Move timers to the backend so it can sync across clients 
+    await client.query(`
       ALTER TABLE boards
       ADD COLUMN IF NOT EXISTS timer_ends_at TIMESTAMP WITH TIME ZONE NULL,
       ADD COLUMN IF NOT EXISTS timer_duration_seconds INTEGER NULL,
       ADD COLUMN IF NOT EXISTS timer_running BOOLEAN NOT NULL DEFAULT false,
-      ADD COLUMN IF NOT EXISTS timer_started_at TIMESTAMP NULL;
+      ADD COLUMN IF NOT EXISTS timer_started_at TIMESTAMP NULL,
+      ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
     `);
 
     console.log("Done");

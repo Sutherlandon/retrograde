@@ -18,7 +18,7 @@ export function ThemeToggle() {
   )
 }
 
-export default function Header({ home }: { home?: boolean }) {
+export default function Header({ home, user }: { home?: boolean, user: { id: string, username: string } }) {
   return (
     <header className={`flex items-center px-4 py-3 ${home ? 'bg-black' : 'bg-gradient-to-b from-sky-400 to-white dark:from-black dark:to-gray-900'}`}>
       <a
@@ -37,17 +37,10 @@ export default function Header({ home }: { home?: boolean }) {
           Contact
         </a>
       </nav>
-      {feature('--accounts') &&
-        <Button
-          as='a'
-          href="/signup"
-          text="Sign in"
-          color='secondary'
-          icon={<UserIcon />}
-          variant='outline'
-          className='py-2 px-4'
-        />
-      }
+      <div className="flex items-center gap-2 ml-8 border border-gray-300 rounded-lg px-4 py-2">
+        <UserIcon size='lg' />
+        <div className="ml-2">{user.username}</div>
+      </div>
       {!home && <ThemeToggle />}
     </header>
   );

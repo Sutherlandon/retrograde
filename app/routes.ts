@@ -15,6 +15,10 @@ export default [
     route("board/:id", "routes/board.tsx"),
   ]),
 
+  /* Api Routes */
+  route("auth/login", "routes/auth/login.ts"),
+  route("auth/callback", "routes/auth/callback.ts"),
+
   // legacy route for backward compatibility
   route("/board/:id", "routes/board-legacy.tsx"),
 

@@ -1,5 +1,7 @@
 import { nanoid } from "nanoid";
 import { pool } from "./db_config";
+import "./db_init"; // init the db, migrations, etc.
+
 import type { BoardState } from "./board.types";
 
 // ---------- QUERIES ----------
