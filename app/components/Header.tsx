@@ -1,7 +1,7 @@
 import Button from './Button';
 import { feature } from '~/features';
 import { Logo, MoonIcon, SunIcon, UserIcon } from '~/images/icons';
-import { useTheme } from '~/useTheme';
+import { useTheme } from '~/hooks/useTheme';
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, toggleTheme } = useTheme()
@@ -18,7 +18,15 @@ export function ThemeToggle() {
   )
 }
 
-export default function Header({ home, user }: { home?: boolean, user: { id: string, username: string } }) {
+interface HeaderProps {
+  home?: boolean;
+  user?: {
+    id: string;
+    username: string;
+  };
+}
+
+export default function Header({ home, user }: HeaderProps) {
   return (
     <header className={`flex items-center px-4 py-3 ${home ? 'bg-black' : 'bg-gradient-to-b from-sky-400 to-white dark:from-black dark:to-gray-900'}`}>
       <a
@@ -37,11 +45,11 @@ export default function Header({ home, user }: { home?: boolean, user: { id: str
           Contact
         </a>
       </nav>
+      {!home && <ThemeToggle />}
       <div className="flex items-center gap-2 ml-8 border border-gray-300 rounded-lg px-4 py-2">
         <UserIcon size='lg' />
-        <div className="ml-2">{user.username}</div>
+        <div className="ml-2">{user?.username || "Login"}</div>
       </div>
-      {!home && <ThemeToggle />}
     </header>
   );
 }

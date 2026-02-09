@@ -1,6 +1,6 @@
 // routes/board.tsx
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
-import { BoardProvider } from "~/components/BoardContext";
+import { BoardProvider } from "~/context/BoardContext";
 import Board from "~/components/Board";
 import {
   getBoardServer,
@@ -13,9 +13,10 @@ import {
   moveNoteServer,
   startTimerServer,
   stopTimerServer,
-} from "../server/board_model";
+} from "~/server/board_model";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
+import AppLayout from "~/components/AppLayout";
 
 let force_fail = false; // for testing offline mode
 

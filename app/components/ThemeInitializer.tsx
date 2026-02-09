@@ -1,4 +1,4 @@
-import { useTheme } from "../useTheme";
+import { useTheme } from "../hooks/useTheme";
 
 export default function ThemeInitializer() {
   useTheme();

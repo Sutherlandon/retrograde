@@ -1,6 +1,6 @@
 import TimerButton from "./TimerButton";
 import Button from "./Button";
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 import { PlusIcon } from "~/images/icons";
 import TimerDisplay from "./TimerDisplay";
 

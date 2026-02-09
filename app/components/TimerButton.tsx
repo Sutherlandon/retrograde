@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import Button from "./Button";
 import { StopIcon, TimerIcon } from "~/images/icons";
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
