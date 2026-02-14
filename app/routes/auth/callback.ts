@@ -2,7 +2,7 @@ import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
 import { pool } from "~/server/db_config";
 
-export async function loader({ request }) {
+export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -12,7 +12,18 @@ export async function loader({ request }) {
   }
 
   const session = await getSession(request.headers.get("Cookie"));
+  const sessionState = session.get("oauth_state");
 
+  // If we've already completed OAuth, just redirect safely
+  if (!sessionState) {
+    return redirect("/", {
+      headers: {
+        "Set-Cookie": await commitSession(session),
+      },
+    });
+  }
+
+  // validate that the state matches what we set in the session to prevent CSRF
   if (session.get("oauth_state") !== state) {
     throw new Response("Invalid OAuth state", { status: 400 });
   }
@@ -79,7 +90,8 @@ export async function loader({ request }) {
     client.release();
   }
 
-  return redirect("/", {
+  const stateJson = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"));
+  return redirect(stateJson.returnTo, {
     headers: {
       "Set-Cookie": await commitSession(session),
     },

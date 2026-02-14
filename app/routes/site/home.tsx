@@ -125,6 +125,7 @@ export default function Home() {
                 style={{ width: 'fit-content' }}
                 icon={<BookIcon />}
                 variant="outline"
+                color="secondary"
               />
             </div>
           </div>

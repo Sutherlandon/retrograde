@@ -2,11 +2,18 @@ import { redirect } from "react-router";
 import crypto from "crypto";
 import { getSession, commitSession } from "../../session.server";
 
-export async function loader({ request }) {
+export async function loader({ request }: { request: Request }) {
+  const url = new URL(request.url);
   const session = await getSession(request.headers.get("Cookie"));
+  const returnTo = url.searchParams.get("returnTo");
 
-  const state = crypto.randomBytes(16).toString("hex");
+  const state = Buffer.from(JSON.stringify({
+    returnTo,
+    nonce: crypto.randomUUID()
+  })).toString("base64url");
+
   session.set("oauth_state", state);
+  const setCookieHeader = await commitSession(session);
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -20,8 +27,9 @@ export async function loader({ request }) {
     `${process.env.OAUTH_AUTHORIZATION_URL}?${params}`,
     {
       headers: {
-        "Set-Cookie": await commitSession(session),
+        "Set-Cookie": setCookieHeader,
       },
     }
   );
 }
+

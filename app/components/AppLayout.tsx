@@ -16,7 +16,7 @@ export default function AppLayout() {
 
   return (
     <UserProvider user={user}>
-      <div className='text-gray-100 min-h-screen flex flex-col'>
+      <div className='min-h-screen flex flex-col'>
         <Header user={user} />
         <Outlet />
       </div>

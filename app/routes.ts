@@ -16,8 +16,8 @@ export default [
   ]),
 
   /* Api Routes */
-  route("auth/login", "routes/auth/login.ts"),
-  route("auth/callback", "routes/auth/callback.ts"),
+  route("/auth/login", "routes/auth/login.ts"),
+  route("/auth/callback", "routes/auth/callback.ts"),
 
   // legacy route for backward compatibility
   route("/board/:id", "routes/app/board-legacy.tsx"),

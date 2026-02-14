@@ -19,9 +19,7 @@ export function useTheme() {
 
   // Initial load + localStorage
   useEffect(() => {
-    const stored =
-      (localStorage.getItem(STORAGE_KEY) as Theme) ||
-      "system";
+    const stored = (localStorage.getItem(STORAGE_KEY) as Theme) || "system";
     setThemeState(stored);
 
     const resolved = stored === "system" ? getSystemTheme() : stored;
