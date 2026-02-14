@@ -78,7 +78,7 @@ export async function loader({ request }: { request: Request }) {
         profile.sub,
         profile.email,
         profile.name,
-        profile.preferred_username,
+        profile.nickname || profile.preferred_username,
         profile.given_name,
         profile.family_name,
         profile.email_verified,
