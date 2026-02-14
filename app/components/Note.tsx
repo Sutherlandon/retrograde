@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 import type { Note } from "~/server/board.types";
 import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
 import Button from "./Button";

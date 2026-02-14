@@ -1,4 +1,4 @@
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 
 const formatTime = (seconds: number) => {
   const m = Math.floor(seconds / 60);

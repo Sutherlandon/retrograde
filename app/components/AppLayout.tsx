@@ -1,14 +1,25 @@
 /**
  * Layout for the app pages.
  */
+import { useLoaderData, Outlet } from "react-router";
+import { requireUser } from "~/hooks/useAuth";
+import { UserProvider } from "~/context/userContext";
 import Header from "./Header";
-import { Outlet } from "react-router";
+
+export async function loader({ request }: { request: Request }) {
+  const user = await requireUser(request);
+  return { user };
+}
 
 export default function AppLayout() {
+  const { user } = useLoaderData();
+
   return (
-    <div className='text-gray-100 min-h-screen flex flex-col'>
-      <Header />
-      <Outlet />
-    </div>
+    <UserProvider user={user}>
+      <div className='min-h-screen flex flex-col'>
+        <Header user={user} />
+        <Outlet />
+      </div>
+    </UserProvider>
   );
 }

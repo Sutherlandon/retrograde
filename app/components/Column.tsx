@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 import type { Column } from "~/server/board.types";
 import Note from "./Note";
 import Button from "./Button";

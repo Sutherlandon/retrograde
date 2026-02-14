@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useBoard } from "./BoardContext";
+import { useBoard } from "../context/BoardContext";
 import BoardToolbar from "./BoardToolbar";
 import Column from "./Column";
 import TimerEndModal from "./TimerEndModal";

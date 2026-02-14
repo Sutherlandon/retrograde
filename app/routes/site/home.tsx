@@ -8,7 +8,7 @@ import Button from "~/components/Button";
 import Card from '~/components/Card';
 import CloudflareTurnstile from "~/components/CloudflareTurnstile";
 import SiteLayout from "~/components/SiteLayout";
-import { requireUser } from "~/hooks/useAuth";
+import { useUser } from "~/context/userContext";
 
 export const meta = () => {
   return [
@@ -37,11 +37,6 @@ export const meta = () => {
     { tagName: "link", rel: "canonical", href: "https://retrograde.sh" },
   ];
 };
-
-export async function loader({ request }) {
-  const user = await requireUser(request);
-  return user;
-}
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
@@ -108,10 +103,9 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Home() {
   const actionData = useActionData<{ errors?: Record<string, string> }>();
-  const user = useLoaderData();
 
   return (
-    <SiteLayout user={user}>
+    <SiteLayout>
       <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit text-center">
           Agile Retrospective & Idea Boards for Productive Teams
@@ -131,6 +125,7 @@ export default function Home() {
                 style={{ width: 'fit-content' }}
                 icon={<BookIcon />}
                 variant="outline"
+                color="secondary"
               />
             </div>
           </div>

@@ -5,9 +5,10 @@ import { pool } from "~/server/db_config";
 export async function requireUser(request: Request) {
   const session = await getSession(request.headers.get("Cookie"));
   const userId = session.get("userId");
+  const pathname = new URL(request.url).pathname;
 
   if (!userId) {
-    throw redirect("/auth/login");
+    throw redirect("/auth/login?returnTo=" + encodeURIComponent(pathname));
   }
 
   // Fetch user from database if needed, e.g.:

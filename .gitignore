@@ -5,3 +5,6 @@
 /.react-router/
 /build/
 .env
+
+/app/config/*
+!/app/config/siteConfig.ts
