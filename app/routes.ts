@@ -9,10 +9,12 @@ export default [
   route("/contact", "routes/site/contact.tsx"),
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/sitemap.xml", "routes/sitemap.ts"),
+  route("/login", "routes/site/login.tsx"),
 
   /* App Routes */
   route("/app", "components/AppLayout.tsx", [
     route("board/:id", "routes/app/board.tsx"),
+    route("dashboard", "routes/app/dashboard.tsx"),
   ]),
 
   /* Api Routes */
