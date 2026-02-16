@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import { pool } from "./db_config";
 import "./db_init"; // init the db, migrations, etc.
 
@@ -52,24 +51,57 @@ export async function getBoardServer(id: string): Promise<BoardState | null> {
 }
 
 // Create a new board
-export async function createBoard(id: string, title: string): Promise<void> {
-  await pool.query(
-    `INSERT INTO boards (id, title) VALUES ($1, $2)`,
-    [id, title]
-  );
+export async function createBoard(
+  title: string = 'Untitled',
+  userId: string
+): Promise<string> {
+  const client = await pool.connect();
+  const id = crypto.randomUUID();
 
-  // Add 3 columns by default
-  await Promise.allSettled(
-    [
-      'What went well?',
-      'What can we do better?',
-      'Action Items'
-    ].map((colTitle, index) => pool.query(
-      `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
-      [nanoid(), id, colTitle, index + 1]
-    ))
-  );
+  try {
+    await client.query("BEGIN");
+
+    // Create board
+    await client.query(
+      `
+      INSERT INTO boards (id, title, created_by)
+      VALUES ($1, $2, $3)
+      `,
+      [id, title, userId]
+    );
+
+    // Add membership as owner
+    await client.query(
+      `
+      INSERT INTO board_members (board_id, user_id, role)
+      VALUES ($1, $2, 'owner')
+      `,
+      [id, userId]
+    );
+
+    // Add 3 columns by default
+    await Promise.allSettled(
+      [
+        'What went well?',
+        'What can we do better?',
+        'Action Items'
+      ].map((colTitle, index) => client.query(
+        `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
+        [crypto.randomUUID(), id, colTitle, index + 1]
+      ))
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return id;
 }
+
 
 // Add a column
 export async function addColumnServer(boardId: string, id: string, title: string, col_order: number): Promise<void> {
