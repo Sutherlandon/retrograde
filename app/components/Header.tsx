@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import Button from './Button';
-import { Logo, UserIcon } from '~/images/icons';
+import { Logo } from '~/images/icons';
 import { siteConfig } from '~/config/siteConfig';
-import ThemeToggle from './ThemeToggle';
 import AccountHub from './AccountHub';
 
 interface HeaderProps {
@@ -17,6 +15,7 @@ export default function Header({ home = false, user }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const siteLogo = siteConfig.logoLight && siteConfig.logoDark;
 
   // Close on outside click
   useEffect(() => {
@@ -67,9 +66,11 @@ export default function Header({ home = false, user }: HeaderProps) {
       {/* Logo */}
       <a href="/" className="flex items-center">
         <Logo size="2xl" className="mr-2" />
-        <div className="text-2xl font-bold hidden sm:block">Retrograde</div>
+        <div className={`text-2xl font-bold ${siteLogo ? "hidden sm:block" : ""}`}>
+          Retrograde
+        </div>
 
-        {siteConfig.logoLight && siteConfig.logoDark && (
+        {siteLogo && (
           <div className="ml-4 border-l-2 border-gray-900 dark:border-gray-100 px-4 py-1">
             <img
               src={siteConfig.logoLight}

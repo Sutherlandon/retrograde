@@ -118,7 +118,7 @@ export async function initializeDatabase() {
     // 5 Add created_by to boards for ownership and permissions
     await client.query(`
       ALTER TABLE boards
-      ADD COLUMN created_by uuid REFERENCES users(id) ON DELETE SET NULL;
+      ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(id) ON DELETE SET NULL;
    `);
 
     console.log("Done");

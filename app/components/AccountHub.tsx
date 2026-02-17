@@ -55,9 +55,9 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
         <Button
           ref={buttonRef}
           onClick={() => setOpen(!open)}
-          variant='solid'
+          variant='outline'
           color='secondary'
-          text={user?.username || "Log In"}
+          text={user?.username}
           icon={<UserIcon size="md" />}
           className="px-4 py-2"
           aria-expanded={open}
