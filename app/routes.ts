@@ -13,8 +13,9 @@ export default [
 
   /* App Routes */
   route("/app", "components/AppLayout.tsx", [
-    route("board/:id", "routes/app/board.tsx"),
     route("dashboard", "routes/app/dashboard.tsx"),
+    route("board/claim", "routes/app/board.claim.ts"),
+    route("board/:id", "routes/app/board.tsx"),
   ]),
 
   /* Api Routes */
@@ -22,6 +23,6 @@ export default [
   route("/auth/callback", "routes/auth/callback.ts"),
 
   // legacy route for backward compatibility
-  route("/board/:id", "routes/app/board-legacy.tsx"),
+  route("/board/:id", "routes/app/board.legacy.tsx"),
 
 ] satisfies RouteConfig;

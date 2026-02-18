@@ -92,7 +92,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // create the board in the database
-  const board_id = await createBoard(title!, "anonymous");
+  const board_id = await createBoard(title!);
 
   // redirect to the new board
   return redirect(`/app/board/${board_id}`);

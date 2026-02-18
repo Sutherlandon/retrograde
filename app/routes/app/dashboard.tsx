@@ -4,6 +4,7 @@ import { pool } from "~/server/db_config";
 import { createBoard } from "~/server/board_model";
 import { PlusIcon } from "~/images/icons";
 import Button from "~/components/Button";
+import { ClaimButton } from "~/components/ClaimButton";
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireUser(request);
@@ -20,7 +21,7 @@ export async function loader({ request }: { request: Request }) {
 
   const boards = await pool.query(
     `
-    SELECT b.*, bm.*
+    SELECT b.*, bm.role
     FROM boards b
     JOIN board_members bm ON bm.board_id = b.id
     WHERE bm.user_id = $1
@@ -60,8 +61,8 @@ export default function AppDashboard() {
 
   return (
     <div className="p-8 mx-auto w-full sm:w-[80%]">
+      <h1 className="text-3xl font-semibold">Your Boards</h1>
       <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
-        <h1 className="text-3xl font-semibold">Your Boards</h1>
         <div className="flex items-center gap-4">
           <div>
             Sort By
@@ -76,17 +77,17 @@ export default function AppDashboard() {
             <option value="title">Title (A–Z)</option>
           </select>
         </div>
-
+        <div className="flex-grow" />
         <Form method="post">
           <Button
             type="submit"
             text="Create New Board"
-            className="px-4 py-2"
             icon={<PlusIcon />}
             variant="solid"
             color="primary"
           />
         </Form>
+        <ClaimButton />
       </div>
 
       <div className="flex justify-end mb-4">

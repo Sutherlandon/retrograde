@@ -53,7 +53,7 @@ export async function getBoardServer(id: string): Promise<BoardState | null> {
 // Create a new board
 export async function createBoard(
   title: string = 'Untitled',
-  userId: string
+  userId: string | null = null,
 ): Promise<string> {
   const client = await pool.connect();
   const id = crypto.randomUUID();
@@ -71,13 +71,15 @@ export async function createBoard(
     );
 
     // Add membership as owner
-    await client.query(
-      `
-      INSERT INTO board_members (board_id, user_id, role)
-      VALUES ($1, $2, 'owner')
-      `,
-      [id, userId]
-    );
+    if (userId) {
+      await client.query(
+        `
+        INSERT INTO board_members (board_id, user_id, role)
+        VALUES ($1, $2, 'owner')
+        `,
+        [id, userId]
+      );
+    }
 
     // Add 3 columns by default
     await Promise.allSettled(
