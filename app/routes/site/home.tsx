@@ -91,11 +91,8 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  // generate a unique board ID
-  const board_id = nanoid();
-
   // create the board in the database
-  await createBoard(board_id, title!);
+  const board_id = await createBoard(title!);
 
   // redirect to the new board
   return redirect(`/app/board/${board_id}`);

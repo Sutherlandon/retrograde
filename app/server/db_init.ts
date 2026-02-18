@@ -67,6 +67,19 @@ export async function initializeDatabase() {
       );
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS board_members (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        board_id text NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role text NOT NULL DEFAULT 'owner',
+        created_at timestamp without time zone NOT NULL DEFAULT now(),
+        UNIQUE(board_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_board_members_user_id ON board_members(user_id);
+      CREATE INDEX IF NOT EXISTS idx_board_members_board_id ON board_members(board_id);
+    `);
+
     console.log("Done");
     console.log("Starting migrations...");
 
@@ -101,6 +114,12 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
     `);
+
+    // 5 Add created_by to boards for ownership and permissions
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(id) ON DELETE SET NULL;
+   `);
 
     console.log("Done");
     console.log("Inserting dev data...");

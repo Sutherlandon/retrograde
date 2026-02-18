@@ -61,10 +61,16 @@ export default function Button({
         "danger": "border-red-600 text-red-600 hover:bg-red-700",
         "muted": "border-gray-500 text-gray-500 hover:bg-gray-600",
       }[props.color ?? "primary"]}`,
-      "text": "bg-transparent border-transparent hover:bg-[rgba(0,0,0,0.1)]",
+      "text": `${{
+        "none": "bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-gray-700",
+        "primary": "bg-transparent border-transparent text-blue-500 hover:bg-gray-300",
+        "secondary": "bg-transparent border-transparent text-green-500 hover:bg-gray-300",
+        "danger": "bg-transparent border-transparent text-red-600 hover:bg-gray-300",
+        "muted": "bg-transparent border-transparent text-gray-500 hover:bg-gray-600",
+      }[props.color ?? "none"]}`,
     }[props.variant ?? "solid"]
     } ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:cursor-pointer'
-    } flex items-center justify-center gap-2 py-1 px-2 rounded text-nowrap text-sm`
+    } flex items-center justify-center gap-2 py-2 px-4 rounded text-nowrap text-sm`
 
   const inner = <ButtonInner icon={icon} iconPosition={iconPosition} text={text} />
 

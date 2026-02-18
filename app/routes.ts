@@ -9,9 +9,12 @@ export default [
   route("/contact", "routes/site/contact.tsx"),
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/sitemap.xml", "routes/sitemap.ts"),
+  route("/login", "routes/site/login.tsx"),
 
   /* App Routes */
   route("/app", "components/AppLayout.tsx", [
+    route("dashboard", "routes/app/dashboard.tsx"),
+    route("board/claim", "routes/app/board.claim.ts"),
     route("board/:id", "routes/app/board.tsx"),
   ]),
 
@@ -20,6 +23,6 @@ export default [
   route("/auth/callback", "routes/auth/callback.ts"),
 
   // legacy route for backward compatibility
-  route("/board/:id", "routes/app/board-legacy.tsx"),
+  route("/board/:id", "routes/app/board.legacy.tsx"),
 
 ] satisfies RouteConfig;

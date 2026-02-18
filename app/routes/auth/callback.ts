@@ -54,8 +54,6 @@ export async function loader({ request }: { request: Request }) {
 
   const profile = await profileRes.json();
 
-  console.log("User profile:", profile);
-
   // 3. Upsert user
   const client = await pool.connect();
   try {

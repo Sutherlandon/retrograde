@@ -6,5 +6,5 @@ import { redirect } from "react-router";
  */
 export async function loader({ request }: { request: Request }) {
   await requireUser(request);
-  throw redirect(`/}`);
+  throw redirect(`/app/dashboard`);
 }
