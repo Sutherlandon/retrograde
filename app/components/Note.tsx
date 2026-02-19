@@ -109,18 +109,23 @@ export default function Note({
                 onClick={handleLike}
                 onDoubleClick={(e: Event) => e.stopPropagation()}
                 variant="text"
-                className="px-1"
+                size='sm'
+                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
               />
               <div className='grow' />
               <Button
                 icon={<EditIcon size="sm" />}
                 onClick={() => setIsEditing(true)}
                 variant="text"
+                size='sm'
+                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
               />
               <Button
                 icon={<TrashIcon size="sm" />}
                 onClick={() => setDeleteMode(true)}
                 variant="text"
+                size='sm'
+                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
               />
             </div>
           </div>

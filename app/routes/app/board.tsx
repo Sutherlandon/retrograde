@@ -16,7 +16,6 @@ import {
 } from "~/server/board_model";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
-import AppLayout from "~/components/AppLayout";
 
 let force_fail = false; // for testing offline mode
 
