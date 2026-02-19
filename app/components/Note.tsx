@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
 import type { Note } from "~/server/board.types";
@@ -14,11 +14,13 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote } = useBoard();
+  const { updateNote, deleteNote, likeNote } = useBoard();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
   const [likes, setLikes] = useState(note.likes);
   const [deleteMode, setDeleteMode] = useState(false);
+
+  const pendingLikes = useRef(0);
 
   // sync local state when note prop changes
   useEffect(() => {
@@ -26,26 +28,37 @@ export default function Note({
     setLikes(note.likes);
   }, [note.text, note.likes]);
 
-  // repeated like clicks within 300ms will only trigger one update
-  const submitLikes = useMemo(
-    () => debounce((newLikes: number) => {
-      updateNote(columnId, note.id, text, newLikes, note.created);
+  const flushLikes = useMemo(
+    () => debounce(async () => {
+      const delta = pendingLikes.current;
+      pendingLikes.current = 0;
+      try {
+        await likeNote(note.id, delta);
+      } catch {
+        setLikes(prev => prev - delta); // rollback
+      }
     }, 1000),
-    [updateNote, columnId, note.id, text, note.created]
+    [columnId, note.id]
   );
 
+  const handleLike = () => {
+    pendingLikes.current += 1;
+    setLikes(prev => prev + 1);
+    flushLikes();
+  };
+
   // cleanup likes debounce on unmount
-  useEffect(() => {
-    return () => {
-      submitLikes.cancel();
-    };
-  }, [submitLikes]);
+  // useEffect(() => {
+  //   return () => {
+  //     submitLikes.cancel();
+  //   };
+  // }, [submitLikes]);
 
   // handle like button click
-  const handleLike = () => {
-    setLikes(likes + 1);
-    submitLikes(likes + 1);
-  };
+  // const handleLike = () => {
+  //   setLikes(likes + 1);
+  //   submitLikes(likes + 1);
+  // };
 
   // save note (on blur or enter)
   const saveNote = () => {

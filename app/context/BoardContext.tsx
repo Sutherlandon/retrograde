@@ -17,6 +17,7 @@ const defaultBoard: Board = {
   updateColumnTitle: () => { },
   deleteColumn: () => { },
   updateNote: () => { },
+  likeNote: () => { },
   deleteNote: () => { },
   moveNote: () => { },
   startTimer: () => { },
@@ -286,6 +287,14 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const likeNote = (noteId: string, delta: number) => {
+    sendAction({
+      board_id: boardId,
+      type: "likeNote",
+      payload: { noteId, delta }
+    });
+  }
+
   // deletes a note after confirmation if it has text
   const deleteNote = (columnId: string, noteId: string, text?: string) => {
     setColumns((cols) =>
@@ -399,6 +408,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         deleteColumn,
         addNote,
         updateNote,
+        likeNote,
         deleteNote,
         moveNote,
         startTimer,

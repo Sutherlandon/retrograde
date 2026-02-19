@@ -9,6 +9,7 @@ import {
   deleteColumnServer,
   addNoteServer,
   updateNoteServer,
+  likeNoteServer,
   deleteNoteServer,
   moveNoteServer,
   startTimerServer,
@@ -107,6 +108,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       case "updateNote":
         return updateNoteServer(payload.columnId, payload.noteId, payload.newText, payload.likes, payload.created);
+
+      case "likeNote":
+        return likeNoteServer(payload.noteId, payload.delta);
 
       case "deleteNote":
         return deleteNoteServer(payload.columnId, payload.noteId);
