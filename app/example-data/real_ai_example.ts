@@ -1,9 +1,12 @@
-import { type Board } from "~/server/board.types";
+import { type BoardDTO } from "~/server/board.types";
 
-export const exampleBoardRealWorld: Board = {
+export const exampleBoardRealWorld: BoardDTO = {
   id: "example-board-real-world",
   title: "Team Retrospective - Sprint 24",
-  next_col_order: 3,
+  readonly: true,
+  timerRunning: false,
+  timerStartedAt: null,
+  timerEndsAt: null,
   columns: [
     {
       id: "col-1",
@@ -91,11 +94,4 @@ export const exampleBoardRealWorld: Board = {
       ],
     },
   ],
-  addNote: () => { },
-  addColumn: () => { },
-  updateColumnTitle: () => { },
-  deleteColumn: () => { },
-  updateNote: () => { },
-  deleteNote: () => { },
-  moveNote: () => { },
 };
