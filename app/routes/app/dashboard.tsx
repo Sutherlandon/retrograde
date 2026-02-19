@@ -90,21 +90,26 @@ export default function AppDashboard() {
         <ClaimButton />
       </div>
 
-      <div className="flex justify-end mb-4">
-      </div>
+      <div className="flex justify-end mb-4"></div>
 
       {boards.length === 0 ? (
         <div className="text-center py-20 border rounded-lg">
           <h2 className="text-xl font-medium mb-4">
-            You haven’t created any boards yet.
+            You don't have any boards yet
           </h2>
-
-          <a
-            href="/app/boards/new"
-            className="bg-black text-white px-4 py-2 rounded-md"
-          >
-            Create your first board
-          </a>
+          <div className="flex items-center justify-center gap-4">
+            <Form method="post">
+              <Button
+                type="submit"
+                text="Create New Board"
+                icon={<PlusIcon />}
+                variant="solid"
+                color="primary"
+              />
+            </Form>
+            <div className="mx-2">or</div>
+            <ClaimButton />
+          </div>
         </div>
       ) : (
         <table className="table-auto w-full">

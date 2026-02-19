@@ -36,7 +36,11 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const { revalidate } = useRevalidator();
   const boardId = loaderData.id;
 
-  const sendAction = ({ type, board_id, payload }: { type: string, board_id: string, payload: any }) => {
+  const sendAction = ({
+    type, board_id, payload
+  }: {
+    type: string, board_id: string, payload: any
+  }) => {
     // no DB actions on example board
     if (board_id === "example-board")
       return;
@@ -45,7 +49,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       { type, payload: JSON.stringify(payload) },
       {
         method: "post",
-        action: `/board/${board_id}`
+        action: `/app/board/${board_id}`
       }
     );
   }
