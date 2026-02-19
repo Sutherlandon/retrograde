@@ -155,6 +155,14 @@ export async function updateNoteServer(columnId: string, noteId: string, newText
   );
 }
 
+// Like a note (increment likes)
+export async function likeNoteServer(noteId: string, delta: number): Promise<void> {
+  await pool.query(
+    `UPDATE notes SET likes = likes + $1 WHERE id = $2`,
+    [delta, noteId]
+  );
+}
+
 // Delete a note
 export async function deleteNoteServer(columnId: string, noteId: string): Promise<void> {
   await pool.query(

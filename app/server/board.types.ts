@@ -34,6 +34,7 @@ export interface BoardModifier {
   deleteColumn: (id: string) => void;
   addNote: (columnId: string, text?: string) => void;
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
+  likeNote: (noteId: string, delta: number) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromcolumnId: string, tocolumnId: string, noteId: string) => void;
   startTimer: (minutes: number) => void;
