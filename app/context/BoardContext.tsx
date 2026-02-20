@@ -66,6 +66,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const boardId = loaderData.id;
   const isReadOnly = loaderData.readonly;
 
+  const [title, setTitle] = useState(loaderData.title);
+
   // Separate fetchers per concern — each gets its own pending/error state
   const columnFetcher = useFetcher();
   const noteFetcher = useFetcher();
@@ -84,6 +86,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setColumns((prev) => mergeColumns(loaderData.columns as Column[], prev));
   }, [loaderData.columns]);
+
+  useEffect(() => {
+    setTitle(loaderData.title);
+  }, [loaderData.title]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -164,6 +170,19 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [timerRunning, timerEndsAt]);
+
+  // ---------------------------------------------------------------------------
+  // Board actions
+  // ---------------------------------------------------------------------------
+
+  const updateTitle = (newTitle: string) => {
+    if (isReadOnly) return;
+    setTitle(newTitle);
+    columnFetcher.submit(
+      { title: newTitle },
+      { method: "PATCH", action: `/app/board/${boardId}/title` }
+    );
+  };
 
   // ---------------------------------------------------------------------------
   // Column actions
@@ -342,7 +361,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   const value: Board = {
     id: boardId,
-    title: loaderData.title,
+    title,
+    updateTitle,
     readonly: isReadOnly,
     columns,
     nextColOrder: deriveNextColOrder(columns),
