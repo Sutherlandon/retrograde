@@ -18,6 +18,7 @@ export default [
     route("board/:id", "routes/app/board.tsx"),
 
     // Resource routes — actions only, no UI, no layout wrapping
+    route("board/:id/title", "routes/app/board.title.ts"),
     route("board/:id/columns", "routes/app/board.columns.ts"),
     route("board/:id/notes", "routes/app/board.notes.ts"),
     route("board/:id/timer", "routes/app/board.timer.ts"),

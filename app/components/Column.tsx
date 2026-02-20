@@ -105,7 +105,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               <input
                 type="text"
                 ref={titleInputRef}
-                className="flex-1 font-bold px-2 py-1 border rounded"
+                className="font-bold px-2 py-1 border rounded"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={saveTitle}
@@ -114,12 +114,13 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               />
             ) : (
               <span
-                className="font-bold cursor-text flex-1"
+                className="font-bold cursor-text hover:bg-slate-200 dark:hover:bg-slate-950 p-1 rounded"
                 onClick={() => setEditingTitle(true)}
               >
                 {column.title}
               </span>
             )}
+            <div className="flex-1"></div>
             <Button
               icon={<PlusIcon />}
               onClick={() => addNote(column.id)}

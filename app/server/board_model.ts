@@ -222,3 +222,8 @@ export async function stopTimerServer(boardId: string): Promise<void> {
     [boardId]
   );
 }
+
+export async function updateBoardTitleServer(boardId: string, newTitle: string) {
+  await pool.query(`UPDATE boards SET title = $1 WHERE id = $2`, [newTitle, boardId]);
+  return getBoardServer(boardId);
+}

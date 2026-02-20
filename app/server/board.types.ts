@@ -65,6 +65,7 @@ export interface BoardClientState {
 // ---------------------------------------------------------------------------
 
 export interface BoardActions {
+  updateTitle: (newTitle: string) => void;
   addColumn: () => void;
   updateColumnTitle: (id: string, newTitle: string) => void;
   deleteColumn: (id: string) => void;
