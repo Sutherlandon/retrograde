@@ -2,8 +2,8 @@
 // Each mutation submits to its own resource route.
 // No more string-dispatch bus. No more JSON.stringify(payload).
 
-import { createContext, useContext, useState, useEffect } from "react";
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { useFetcher, useLoaderData } from "react-router";
 import { nanoid } from "nanoid";
 import type { Board, BoardDTO, Column, Note } from "~/server/board.types";
 
@@ -61,7 +61,6 @@ function mergeColumns(serverCols: Column[], prevCols: Column[]): Column[] {
 
 export function BoardProvider({ children }: { children: React.ReactNode }) {
   const loaderData = useLoaderData() as BoardDTO;
-  const { revalidate } = useRevalidator();
 
   const boardId = loaderData.id;
   const isReadOnly = loaderData.readonly;
@@ -119,33 +118,50 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [noteFetcher.data]);
 
   // ---------------------------------------------------------------------------
-  // Polling for multi-user sync
+  // Polling for multi-user sync — plain fetch() bypasses RR7's turbostream
+  // pipeline entirely, so network errors never reach the ErrorBoundary.
   // ---------------------------------------------------------------------------
+
+  const isFetching = useRef(false);
 
   useEffect(() => {
     if (isReadOnly) return;
 
-    let cancelled = false;
+    const interval = setInterval(async () => {
+      if (isFetching.current) return;
+      isFetching.current = true;
 
-    async function poll() {
       try {
-        await revalidate();
-        if (!cancelled) setOffline(false);
-      } catch (err) {
-        if (err instanceof TypeError && err.message.includes("Failed to fetch")) {
-          if (!cancelled) setOffline(true);
-          return;
-        }
-        throw err;
-      }
-    }
+        const res = await fetch(`/app/board/${boardId}/poll`, {
+          headers: { Accept: "application/json" },
+        });
 
-    const interval = setInterval(poll, 3000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [revalidate, isReadOnly]);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data: BoardDTO = await res.json();
+        setOffline(false);
+        setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+        setTitle(data.title);
+
+        if (data.timerRunning && !timerRunning) {
+          setTimerRunning(true);
+          setTimerEndsAt(data.timerEndsAt);
+        } else if (!data.timerRunning && timerRunning) {
+          setTimerRunning(false);
+          setTimerEndsAt(null);
+        } else if (data.timerRunning && timerRunning && data.timerEndsAt !== timerEndsAt) {
+          setTimerEndsAt(data.timerEndsAt);
+        }
+      } catch (err) {
+        console.error("[poll] failed:", err);
+        setOffline(true);
+      } finally {
+        isFetching.current = false;
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [boardId, isReadOnly, timerRunning, timerEndsAt]);
 
   // ---------------------------------------------------------------------------
   // Timer countdown
