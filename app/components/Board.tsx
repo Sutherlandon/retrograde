@@ -31,8 +31,8 @@ export default function Board() {
       <BoardToolbar title={title} />
       <div className="flex flex-wrap gap-4">
         {offline && (
-          <div className="w-full p-2 mb-4 text-center bg-red-200 text-red-800 rounded">
-            You are currently offline. Changes will be synced when you reconnect.
+          <div className="w-full p-2 mb-4 text-center bg-red-500 dark:bg-red-700 text-white rounded">
+            You are currently offline. Changes you make will be lost when you reconnect. Reconnecting...
           </div>
         )}
         {columns.map((col, index) => (

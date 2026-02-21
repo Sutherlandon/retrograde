@@ -22,6 +22,7 @@ export default [
     route("board/:id/columns", "routes/app/board.columns.ts"),
     route("board/:id/notes", "routes/app/board.notes.ts"),
     route("board/:id/timer", "routes/app/board.timer.ts"),
+    route("board/:id/poll", "routes/app/board.poll.ts"),
   ]),
 
   /* Api Routes */
