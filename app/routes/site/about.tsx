@@ -49,6 +49,15 @@ export default function AboutPage() {
             sutherlandon.com
           </a>.
         </p>
+
+        <h2>Release Notes</h2>
+        <p>
+          If you want to see what we've been up to, <a
+            href="https://github.com/Sutherlandon/retrograde/releases" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 underline">
+            check out the release notes here.
+          </a>
+        </p>
+
       </section>
     </SiteLayout>
   );

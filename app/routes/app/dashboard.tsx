@@ -5,6 +5,8 @@ import { createBoard } from "~/server/board_model";
 import { PlusIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { ClaimButton } from "~/components/ClaimButton";
+import { WelcomeBanner } from "~/components/WelcomeBanner";
+import pkg from "~/../package.json";
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireUser(request);
@@ -60,8 +62,14 @@ export default function AppDashboard() {
   }
 
   return (
-    <div className="p-8 mx-auto w-full sm:w-[80%]">
-      <h1 className="text-3xl font-semibold">Your Boards</h1>
+    <div className="px-8 mx-auto w-full sm:w-[80%]">
+      <h1 className="text-3xl font-semibold">Dashboard</h1>
+      <WelcomeBanner
+        id={`${pkg.version}-welcome`}
+        title="Welcome to your Retrograde dashboard!"
+        message="This is where you can create new boards, view all the boards you have access to, and claim anonymous boards you may have already created.  We've also fixed some bugs and made various improvements."
+        link="https://github.com/Sutherlandon/retrograde/releases/tag/v1.2.0"
+      />
       <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
         <div className="flex items-center gap-4">
           <div>
