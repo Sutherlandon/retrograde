@@ -1,6 +1,4 @@
 import { Form, redirect, useActionData, Link, type ActionFunctionArgs, useLoaderData } from "react-router";
-import { nanoid } from "nanoid";
-
 import { createBoard } from "~/server/board_model";
 import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
@@ -8,7 +6,7 @@ import Button from "~/components/Button";
 import Card from '~/components/Card';
 import CloudflareTurnstile from "~/components/CloudflareTurnstile";
 import SiteLayout from "~/components/SiteLayout";
-import { useUser } from "~/context/userContext";
+import { siteConfig } from "~/config/siteConfig";
 
 export const meta = () => {
   return [
@@ -37,6 +35,12 @@ export const meta = () => {
     { tagName: "link", rel: "canonical", href: "https://retrograde.sh" },
   ];
 };
+
+export async function loader() {
+  if (siteConfig.dashboardHome) {
+    return redirect('/app/dashboard');
+  }
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
