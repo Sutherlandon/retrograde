@@ -55,7 +55,7 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
         <Button
           ref={buttonRef}
           onClick={() => setOpen(!open)}
-          variant={resolvedTheme === 'dark' ? 'outline' : 'solid'}
+          // variant={resolvedTheme === 'dark' ? 'outline' : 'solid'}
           color='secondary'
           text={user?.username}
           icon={<UserIcon size="md" />}
@@ -77,7 +77,7 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
 
       {/* Dropdown */}
       <div
-        className={`absolute right-0 mt-2 w-60 bg-white dark:bg-gray-900 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 transition-all duration-200 origin-top-right ${open
+        className={`absolute right-0 mt-2 w-60 bg-white dark:bg-gray-900 shadow-lg rounded-lg border border-green-500 transition-all duration-200 origin-top-right ${open
           ? 'opacity-100 scale-100'
           : 'opacity-0 scale-95 pointer-events-none'
           }`}

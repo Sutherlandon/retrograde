@@ -55,7 +55,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   return (
     <div
       className={`${isDragOver ? "bg-slate-200 dark:bg-slate-600" : "dark:bg-slate-800"
-        } ${deleteMode ? "border-red-600" : "border-slate-400 dark:border-slate-700"
+        } ${deleteMode ? "border-2 border-red-500" : "border-slate-400 dark:border-slate-700"
         } min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors border-1 shadow-md/20`}
       onDragOver={(e) => {
         e.preventDefault();
@@ -70,10 +70,11 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
           <div className="flex gap-2">
             <Button
               onClick={() => setWarningMode(false)}
-              text="Okay"
+              text="Keep the Column"
             />
             <Button
               color="danger"
+              variant="outline"
               onClick={() => {
                 setWarningMode(false);
                 setDeleteMode(true);
@@ -89,10 +90,10 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
             <Button
               color="danger"
               onClick={() => { deleteColumn(column.id); setDeleteMode(false); }}
-              text="Delete"
+              text="Nuke the Column!"
             />
             <Button
-              color="muted"
+              color="secondary"
               onClick={() => setDeleteMode(false)}
               text="Abort!"
             />
@@ -126,12 +127,14 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               onClick={() => addNote(column.id)}
               className="hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500"
               variant="text"
+              size="sm"
             />
             <Button
               icon={<TrashIcon />}
               onClick={() => handleDelete()}
               className="ml-1 hover:bg-red-300 dark:hover:bg-slate-900 dark:hover:text-red-500"
               variant="text"
+              size="sm"
             />
           </div>
           <div className='flex gap-2 flex-wrap'>

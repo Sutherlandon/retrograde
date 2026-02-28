@@ -81,40 +81,41 @@ export default function Note({
         );
       }}
     >
-      {deleteMode ? (
-        <div className={`flex flex-col items-center justify-center h-full`}>
-          <p className="mb-4">Are you sure you want to delete this note?</p>
-          <div className="flex gap-2">
-            <Button
-              color="danger"
-              onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
-              text="Delete"
-            />
-            <Button
-              color="muted"
-              onClick={() => setDeleteMode(false)}
-              text="Abort!"
-            />
+      {isEditing ? (
+        <textarea
+          className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={saveNote}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
+          autoFocus
+        />
+      ) : (
+        <div
+          className="flex flex-col gap-2 justify-between h-full"
+          onDoubleClick={() => setIsEditing(true)}
+        >
+          <div className="flex-1 whitespace-pre-wrap">
+            {note.text}
           </div>
-        </div>
-      ) :
-        isEditing ? (
-          <textarea
-            className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={saveNote}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
-            autoFocus
-          />
-        ) : (
-          <div
-            className="flex flex-col gap-2 justify-between h-full"
-            onDoubleClick={() => setIsEditing(true)}
-          >
-            <div className="flex-1 whitespace-pre-wrap">
-              {note.text}
+          {deleteMode ? (
+            <div className="flex gap-2 w-full">
+              <Button
+                color="danger"
+                onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
+                text="Delete"
+                size="sm"
+                className="w-full"
+              />
+              <Button
+                color="secondary"
+                onClick={() => setDeleteMode(false)}
+                text="Keep"
+                size="sm"
+                className="w-full"
+              />
             </div>
+          ) : (
             <div className='flex justify-start items-center'>
               <Button
                 text={likes.toString()}
@@ -141,8 +142,9 @@ export default function Note({
                 className="dark:hover:bg-[rgba(0,0,0,0.1)]"
               />
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      )}
     </div>
   );
 }

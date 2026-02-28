@@ -3,7 +3,6 @@
  */
 import Header from "./Header";
 import Footer from "./Footer";
-import { useUser } from "~/context/userContext";
 
 export default function SiteLayout({
   children,
@@ -12,7 +11,7 @@ export default function SiteLayout({
 }) {
   return (
     <div className='min-h-screen flex flex-col'>
-      <Header home />
+      <Header />
       <main className="flex-grow">
         {children}
       </main>

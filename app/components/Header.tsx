@@ -1,21 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLocation } from "react-router";
 import { Logo } from '~/images/icons';
 import { siteConfig } from '~/config/siteConfig';
 import AccountHub from './AccountHub';
 
 interface HeaderProps {
-  home?: boolean;
   user?: {
     id: string;
     username: string;
   };
 }
 
-export default function Header({ home = false, user }: HeaderProps) {
+export default function Header({ user }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const siteLogo = siteConfig.logoLight && siteConfig.logoDark;
+
+  const location = useLocation();
+  const home = location.pathname === "/";
 
   // Close on outside click
   useEffect(() => {
