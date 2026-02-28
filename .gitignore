@@ -4,7 +4,9 @@
 # React Router
 /.react-router/
 /build/
+/dist/
 .env
+.env*
 
-/app/config/*
-!/app/config/siteConfig.ts
+/app/config/site-logo-dark.svg
+/app/config/site-logo-light.svg

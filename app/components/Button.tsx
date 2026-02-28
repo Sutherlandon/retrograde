@@ -60,7 +60,7 @@ export default function Button({
       {
         "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-800": color === "primary" || !color,
         "bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-800": color === "secondary",
-        "bg-red-600 hover:bg-red-700": color === "danger",
+        "bg-red-500 hover:bg-red-600": color === "danger",
         "bg-gray-500 hover:bg-gray-600": color === "muted",
       },
     ],
@@ -71,7 +71,7 @@ export default function Button({
       {
         "border-blue-500 text-blue-500 hover:bg-blue-800": color === "primary" || !color,
         "border-green-500 text-green-500 hover:bg-green-800": color === "secondary",
-        "border-red-600 text-red-600 hover:bg-red-700": color === "danger",
+        "border-red-500 text-red-500 hover:bg-red-600": color === "danger",
         "border-gray-500 text-gray-500 hover:bg-gray-600": color === "muted",
       },
     ],
@@ -83,7 +83,7 @@ export default function Button({
         "hover:bg-gray-100 dark:hover:bg-gray-700": !color,
         "text-blue-500 hover:bg-gray-300": color === "primary",
         "text-green-500 hover:bg-gray-300": color === "secondary",
-        "text-red-600 hover:bg-gray-300": color === "danger",
+        "text-red-500 hover:bg-gray-300": color === "danger",
         "text-gray-500 hover:bg-gray-600": color === "muted",
       },
     ],
