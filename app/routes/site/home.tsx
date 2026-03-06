@@ -1,4 +1,4 @@
-import { Form, redirect, useActionData, Link, type ActionFunctionArgs, useLoaderData } from "react-router";
+import { Form, redirect, useActionData, Link, type ActionFunctionArgs } from "react-router";
 import { createBoard } from "~/server/board_model";
 import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
@@ -25,7 +25,7 @@ export const meta = () => {
     },
     { property: "og:type", content: "website" },
     { property: "og:url", content: "https://retrograde.sh/" },
-    { property: "og:image", content: "https://retrorade.sh/retrograde-snapshot.png" },
+    { property: "og:image", content: "https://retrograde.sh/retrograde-snapshot.png" },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: "Retrograde – Mission Control for Retrospectives" },
     {

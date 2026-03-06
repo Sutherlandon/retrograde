@@ -38,7 +38,7 @@ export default function Note({
         setLikes(prev => prev - delta); // rollback
       }
     }, 1000),
-    [columnId, note.id]
+    [columnId, note.id, likeNote]
   );
 
   const handleLike = () => {
@@ -46,19 +46,6 @@ export default function Note({
     setLikes(prev => prev + 1);
     flushLikes();
   };
-
-  // cleanup likes debounce on unmount
-  // useEffect(() => {
-  //   return () => {
-  //     submitLikes.cancel();
-  //   };
-  // }, [submitLikes]);
-
-  // handle like button click
-  // const handleLike = () => {
-  //   setLikes(likes + 1);
-  //   submitLikes(likes + 1);
-  // };
 
   // save note (on blur or enter)
   const saveNote = () => {

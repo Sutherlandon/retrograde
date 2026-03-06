@@ -28,6 +28,24 @@ function deriveNextColOrder(columns: Column[]): number {
   return Math.max(...columns.map((c) => c.col_order)) + 1;
 }
 
+function syncTimerState(
+  data: { timerRunning: boolean; timerEndsAt: string | null },
+  currentRunning: boolean,
+  currentEndsAt: string | null,
+  setTimerRunning: (v: boolean) => void,
+  setTimerEndsAt: (v: string | null) => void
+) {
+  if (data.timerRunning && !currentRunning) {
+    setTimerRunning(true);
+    setTimerEndsAt(data.timerEndsAt);
+  } else if (!data.timerRunning && currentRunning) {
+    setTimerRunning(false);
+    setTimerEndsAt(null);
+  } else if (data.timerRunning && currentRunning && data.timerEndsAt !== currentEndsAt) {
+    setTimerEndsAt(data.timerEndsAt);
+  }
+}
+
 /**
  * Merge server columns into local state.
  * Preserves unsaved in-flight notes (is_new) and locally-edited text.
@@ -94,15 +112,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
   // new Date(timerEndsAt) is unambiguous — no timezone offset accumulation.
   useEffect(() => {
-    if (loaderData.timerRunning && !timerRunning) {
-      setTimerRunning(true);
-      setTimerEndsAt(loaderData.timerEndsAt);
-    } else if (!loaderData.timerRunning && timerRunning) {
-      setTimerRunning(false);
-      setTimerEndsAt(null);
-    } else if (loaderData.timerRunning && timerRunning && loaderData.timerEndsAt !== timerEndsAt) {
-      setTimerEndsAt(loaderData.timerEndsAt);
-    }
+    syncTimerState(loaderData, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
   }, [loaderData.timerRunning, loaderData.timerEndsAt]);
 
   // ---------------------------------------------------------------------------
@@ -143,15 +153,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setColumns((prev) => mergeColumns(data.columns as Column[], prev));
         setTitle(data.title);
 
-        if (data.timerRunning && !timerRunning) {
-          setTimerRunning(true);
-          setTimerEndsAt(data.timerEndsAt);
-        } else if (!data.timerRunning && timerRunning) {
-          setTimerRunning(false);
-          setTimerEndsAt(null);
-        } else if (data.timerRunning && timerRunning && data.timerEndsAt !== timerEndsAt) {
-          setTimerEndsAt(data.timerEndsAt);
-        }
+        syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
       } catch (err) {
         console.error("[poll] failed:", err);
         setOffline(true);
@@ -207,7 +209,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const addColumn = () => {
     if (isReadOnly) return;
     if (columns.length >= 12) {
-      confirm("You have reached the maximum of 12 columns.");
+      alert("You have reached the maximum of 12 columns.");
       return;
     }
 
