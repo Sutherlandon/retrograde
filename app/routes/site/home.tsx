@@ -63,36 +63,40 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ errors }, { status: 400 });
   }
 
-  // begin Cloudflare Turnstile verification (Captcha)
-  const token = formData.get("cf-turnstile-response");
-
-  if (!token) {
-    return Response.json(
-      { errors: { captcha: "Captcha failed" } },
-      { status: 400 }
-    );
+  // Honeypot: bots fill hidden fields, humans don't. Silently redirect to
+  // avoid tipping off bots that they were caught.
+  const honeypot = formData.get("website")?.toString();
+  if (honeypot) {
+    return redirect(`/app/board/example-board`);
   }
 
-  const verifyRes = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        secret: process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY,
-        response: token,
-        remoteip: request.headers.get("CF-Connecting-IP"),
-      }),
-    }
-  );
+  // Cloudflare Turnstile verification — skipped gracefully if the script was
+  // blocked by an ad blocker (token will be absent). The honeypot above
+  // provides lightweight protection in that case.
+  const token = formData.get("cf-turnstile-response");
 
-  const verifyData = await verifyRes.json();
-
-  if (!verifyData.success) {
-    return Response.json(
-      { errors: { captcha: "Captcha verification failed" } },
-      { status: 400 }
+  if (token) {
+    const verifyRes = await fetch(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          secret: process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY,
+          response: token,
+          remoteip: request.headers.get("CF-Connecting-IP"),
+        }),
+      }
     );
+
+    const verifyData = await verifyRes.json();
+
+    if (!verifyData.success) {
+      return Response.json(
+        { errors: { captcha: "Captcha verification failed" } },
+        { status: 400 }
+      );
+    }
   }
 
   // create the board in the database
@@ -133,6 +137,10 @@ export default function Home() {
           <div id='create-form' className="p-10 bg-slate-800 rounded shadow-md max-w-md mx-auto text-gray-100 text-center min-w-[350px] md:max-w-[45%] border border-gray-700">
             <h2 className="text-2xl font-bold mb-4">Create a Free Board</h2>
             <Form method="post" className="mb-4">
+              <div aria-hidden="true" style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>
+                <label htmlFor="website">Website</label>
+                <input type="text" id="website" name="website" autoComplete="off" tabIndex={-1} />
+              </div>
               <div className="mb-4">
                 <label htmlFor='title' className="text-lg font-bold text-left block mb-2">Title</label>
                 <input type='text' id='title' name='title' placeholder="Board Title" className="p-2 w-full border rounded" />
