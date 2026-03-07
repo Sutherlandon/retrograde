@@ -19,7 +19,7 @@ export default function SiteLayout() {
   return (
     <UserProvider user={user}>
       <div className='min-h-screen flex flex-col'>
-        <Header home user={user} />
+        <Header user={user} />
         <main className="flex-grow">
           <Outlet />
         </main>
