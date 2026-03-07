@@ -50,7 +50,7 @@ export default function Button({
 }: ButtonProps) {
   const classNames = cn(
     // Base styles
-    "flex items-center justify-center gap-2 rounded text-nowrap text-sm",
+    "flex items-center justify-center gap-2 rounded text-nowrap text-sm w-fit",
     size === "sm" ? "px-2 py-1" : "px-4 py-2",
     disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer",
 
@@ -78,13 +78,12 @@ export default function Button({
 
     // Text variant
     variant === "text" && [
-      "bg-transparent border-transparent",
+      "bg-transparent border-transparent hover:bg-gray-300 dark:hover:bg-gray-700",
       {
-        "hover:bg-gray-100 dark:hover:bg-gray-700": !color,
-        "text-blue-500 hover:bg-gray-300": color === "primary",
-        "text-green-500 hover:bg-gray-300": color === "secondary",
-        "text-red-500 hover:bg-gray-300": color === "danger",
-        "text-gray-500 hover:bg-gray-600": color === "muted",
+        "text-blue-500": color === "primary",
+        "text-green-500": color === "secondary",
+        "text-red-600": color === "danger",
+        "text-gray-500": color === "muted",
       },
     ],
 
@@ -96,7 +95,7 @@ export default function Button({
 
   if (as === "a") {
     return (
-      <a className={cn(classNames, "w-fit")} href={href} {...props}>
+      <a className={cn(classNames)} href={href} {...props}>
         {inner}
       </a>
     );

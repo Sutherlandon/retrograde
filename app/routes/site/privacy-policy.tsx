@@ -1,6 +1,4 @@
 import type { MetaFunction } from "react-router";
-import SiteLayout from "~/components/SiteLayout";
-
 export const meta: MetaFunction = () => {
   return [
     { title: "Privacy Policy | Retrograde" },
@@ -22,8 +20,7 @@ export const meta: MetaFunction = () => {
 
 export default function PrivacyPolicy() {
   return (
-    <SiteLayout>
-      <main className="prose prose-neutral max-w-3xl mx-auto px-4 py-12">
+    <main className="prose prose-neutral max-w-3xl mx-auto px-4 py-12">
         <h1>Privacy Policy</h1>
         <p className="text-sm text-muted-foreground">
           Last updated: 01/01/2026
@@ -100,7 +97,6 @@ export default function PrivacyPolicy() {
           Email us at{" "}
           <a href="mailto:support@retrograde.sh">support@retrograde.sh</a>.
         </p>
-      </main>
-    </SiteLayout>
+    </main>
   );
 }

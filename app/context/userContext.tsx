@@ -11,7 +11,7 @@ export function UserProvider({
   user,
   children,
 }: {
-  user: User;
+  user: User | null;
   children: React.ReactNode;
 }) {
   return (
@@ -19,6 +19,10 @@ export function UserProvider({
       {children}
     </UserContext.Provider>
   );
+}
+
+export function useOptionalUser() {
+  return useContext(UserContext);
 }
 
 export function useUser() {

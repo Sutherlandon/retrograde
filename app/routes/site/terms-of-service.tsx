@@ -1,6 +1,4 @@
 import type { MetaFunction } from "react-router";
-import SiteLayout from "~/components/SiteLayout";
-
 export const meta: MetaFunction = () => {
   return [
     { title: "Terms of Service | Retrograde" },
@@ -22,8 +20,7 @@ export const meta: MetaFunction = () => {
 
 export default function TermsOfService() {
   return (
-    <SiteLayout>
-      <main className="prose prose-neutral max-w-3xl mx-auto px-4 py-12">
+    <main className="prose prose-neutral max-w-3xl mx-auto px-4 py-12">
         <h1>Terms of Service</h1>
         <p className="text-sm text-muted-foreground">
           Last updated: 01/01/2026
@@ -104,7 +101,6 @@ export default function TermsOfService() {
           Questions? Email{" "}
           <a href="mailto:support@retrograde.sh">support@retrograde.sh</a>.
         </p>
-      </main>
-    </SiteLayout>
+    </main>
   );
 }

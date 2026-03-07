@@ -1,5 +1,3 @@
-import SiteLayout from "~/components/SiteLayout";
-
 export const metadata = () => ({
   title: "About Retrograde | Secure, Self-Hosted Retrospectives",
   description:
@@ -8,8 +6,7 @@ export const metadata = () => ({
 
 export default function AboutPage() {
   return (
-    <SiteLayout>
-      <section className="prose prose-neutral max-w-3xl mx-auto p-4">
+    <section className="prose prose-neutral max-w-3xl mx-auto p-4">
         <h1>About Retrograde</h1>
         <p>
           Retrograde began with a very specific requirement: we needed a
@@ -58,7 +55,6 @@ export default function AboutPage() {
           </a>
         </p>
 
-      </section>
-    </SiteLayout>
+    </section>
   );
 }

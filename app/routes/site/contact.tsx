@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { MetaFunction } from "react-router";
-import SiteLayout from "~/components/SiteLayout";
 import Button from "~/components/Button";
 
 
@@ -35,8 +34,7 @@ export default function ContactPage() {
   };
 
   return (
-    <SiteLayout>
-      <main className="mx-auto max-w-3xl px-6 py-16">
+    <main className="mx-auto max-w-3xl px-6 py-16">
         <h1>Get in touch</h1>
         <p>
           We’d love to hear from you. Whether you have feedback, a question,
@@ -84,7 +82,6 @@ export default function ContactPage() {
           We’re based in Northern New Mexico and work with individuals and teams
           everywhere.
         </p>
-      </main>
-    </SiteLayout>
+    </main>
   );
 }

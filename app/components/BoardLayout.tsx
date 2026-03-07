@@ -1,29 +1,25 @@
 /**
- * Layout for the website pages — authentication is optional.
- * If a user is logged in, their profile is shown in the header.
+ * Layout for board pages — authentication is optional.
+ * Anonymous users can view and interact with boards.
  */
 import { useLoaderData, Outlet } from "react-router";
 import { getOptionalUser } from "~/hooks/useAuth";
 import { UserProvider } from "~/context/userContext";
 import Header from "./Header";
-import Footer from "./Footer";
 
 export async function loader({ request }: { request: Request }) {
   const user = await getOptionalUser(request);
   return { user };
 }
 
-export default function SiteLayout() {
+export default function BoardLayout() {
   const { user } = useLoaderData();
 
   return (
     <UserProvider user={user}>
       <div className='min-h-screen flex flex-col'>
         <Header user={user} />
-        <main className="flex-grow">
-          <Outlet />
-        </main>
-        <Footer />
+        <Outlet />
       </div>
     </UserProvider>
   );
