@@ -96,7 +96,7 @@ export default function Header({ home = false, user }: HeaderProps) {
         <a href="/contact" className="hover:underline">
           Contact
         </a>
-        <AccountHub user={user} home={home} />
+        <AccountHub user={user} />
       </nav>
 
       {/* Hamburger */}
@@ -142,7 +142,7 @@ export default function Header({ home = false, user }: HeaderProps) {
           }`}
         role="menu"
       >
-        <AccountHub user={user} home={home} closeMenu={closeMenu} />
+        <AccountHub user={user} closeMenu={closeMenu} />
         <a href="/about" className="hover:underline" onClick={closeMenu}>
           About
         </a>

@@ -8,11 +8,10 @@ interface AccountHubProps {
     id: string;
     username: string;
   };
-  home: boolean;
   closeMenu?: () => void;
 }
 
-export default function AccountHub({ user, home = false, closeMenu }: AccountHubProps) {
+export default function AccountHub({ user, closeMenu }: AccountHubProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -51,7 +50,7 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
 
   return (
     <div className="relative z-1" ref={containerRef}>
-      {user && !home ? (
+      {user ? (
         <Button
           ref={buttonRef}
           onClick={() => setOpen(!open)}
@@ -83,18 +82,17 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
           }`}
         role="menu"
       >
-        <div className="p-4 flex flex-col gap-4">
+        <div className="py-4 px-2 flex flex-col gap-2">
           {/* Dashboard Link */}
-          <a
-            href="/app/dashboard"
-            className="hover:underline"
+          <Button
+            as="a"
+            href="/auth/logout"
+            variant="text"
+            text="Dashboard"
+            className="w-full justify-start"
             onClick={() => setOpen(false)}
-          >
-            Dashboard
-          </a>
-
-          {/* Theme Section */}
-          <div className="inline-flex justify-between items-center w-full">
+          />
+          <div className="inline-flex justify-between items-center w-full px-4 py-2">
             <div className="text-sm font-semibold mr-1">
               Theme
             </div>
@@ -117,6 +115,17 @@ export default function AccountHub({ user, home = false, closeMenu }: AccountHub
               title="System Default"
             />
           </div>
+
+          {/* Log Out */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+          <Button
+            as="a"
+            href="/auth/logout"
+            variant="text"
+            color="danger"
+            text="Logout"
+            className="w-full justify-start"
+          />
         </div>
       </div>
     </div>
