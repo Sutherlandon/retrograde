@@ -5,7 +5,6 @@ import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
 import CloudflareTurnstile from "~/components/CloudflareTurnstile";
-import SiteLayout from "~/components/SiteLayout";
 import { siteConfig } from "~/config/siteConfig";
 
 export const meta = () => {
@@ -110,8 +109,7 @@ export default function Home() {
   const actionData = useActionData<{ errors?: Record<string, string> }>();
 
   return (
-    <SiteLayout>
-      <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
+    <div className='min-w-[390px] p-5 md:p-10 bg-gradient-to-b from-black to-sky-400 min-h-[calc(100vh-56px)]'>
         <h1 className="text-4xl font-bold mb-20 mx-auto w-fit text-center">
           Agile Retrospective & Idea Boards for Productive Teams
         </h1>
@@ -244,6 +242,5 @@ export default function Home() {
           </div>
         </section>
       </div>
-    </SiteLayout>
   );
 }

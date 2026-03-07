@@ -2,6 +2,25 @@ import { redirect } from "react-router";
 import { getSession } from "~/session.server";
 import { pool } from "~/server/db_config";
 
+export async function getOptionalUser(request: Request) {
+  const session = await getSession(request.headers.get("Cookie"));
+  const userId = session.get("userId");
+
+  if (!userId) {
+    return null;
+  }
+
+  const userRows = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
+  const user = userRows.rows[0];
+
+  if (!user) {
+    return null;
+  }
+
+  const { id, preferred_username: username } = user;
+  return { id, username };
+}
+
 export async function requireUser(request: Request) {
   const session = await getSession(request.headers.get("Cookie"));
   const userId = session.get("userId");
