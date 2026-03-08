@@ -23,6 +23,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Welcome to Retrograde! This is an example board. Your changes won't be saved — refresh to reset.",
           likes: 2,
           is_new: false,
+          note_order: 0,
           created: "1760074762199",
         },
         {
@@ -31,6 +32,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Try adding a new note by clicking the + button in the column header.",
           likes: 0,
           is_new: false,
+          note_order: 1,
           created: "1760074762200",
         },
         {
@@ -39,6 +41,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Edit notes by double-clicking the text or clicking the pencil icon.",
           likes: 0,
           is_new: false,
+          note_order: 2,
           created: "1760074762201",
         },
         {
@@ -47,6 +50,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Like notes with the thumbs-up icon. Try deleting this note with the trash can.",
           likes: 0,
           is_new: false,
+          note_order: 3,
           created: "1760074762202",
         },
         {
@@ -55,6 +59,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Now try dragging and dropping notes between columns!",
           likes: 0,
           is_new: false,
+          note_order: 4,
           created: "1760074762203",
         },
       ],
@@ -70,6 +75,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Add a new column with the '+ Column' button at the top right.",
           likes: 0,
           is_new: false,
+          note_order: 0,
           created: "1760074762204",
         },
         {
@@ -78,6 +84,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Change a column title by clicking on it.",
           likes: 0,
           is_new: false,
+          note_order: 1,
           created: "1760074762205",
         },
         {
@@ -86,6 +93,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Delete this column using the trash can in the column header.",
           likes: 0,
           is_new: false,
+          note_order: 2,
           created: "1760074762206",
         },
       ],
@@ -101,6 +109,7 @@ export const exampleBoardTutorial: BoardDTO = {
           text: "Try the timer feature in the header. Start a 3 minute timer, then stop it.",
           likes: 0,
           is_new: false,
+          note_order: 0,
           created: "1760074762207",
         },
       ],

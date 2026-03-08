@@ -253,6 +253,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   const addNote = (columnId: string) => {
     if (isReadOnly) return;
+    const col = columns.find((c) => c.id === columnId);
     const newNote: Note = {
       id: nanoid(),
       text: "",
@@ -260,6 +261,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       is_new: true,
       column_id: columnId,
       created: Date.now().toString(),
+      note_order: col ? col.notes.length : 0,
     };
     // Local-only until the user saves content. updateNote upserts to the server,
     // so empty notes never appear on other clients.
@@ -344,6 +346,45 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const reorderNote = (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => {
+    if (isReadOnly) return;
+
+    let movedNote: Note | undefined;
+    let orderedNoteIds: string[] | undefined;
+
+    setColumns((prev) => {
+      // Remove note from source column
+      const withRemoved = prev.map((c) => {
+        if (c.id !== fromColumnId) return c;
+        movedNote = c.notes.find((n) => n.id === noteId);
+        return { ...c, notes: c.notes.filter((n) => n.id !== noteId) };
+      });
+
+      if (!movedNote) return prev;
+
+      // Insert note at newIndex in target column
+      return withRemoved.map((c) => {
+        if (c.id !== toColumnId) return c;
+        const notes = [...c.notes];
+        notes.splice(newIndex, 0, movedNote!);
+        const reordered = notes.map((n, i) => ({ ...n, note_order: i }));
+        orderedNoteIds = reordered.map((n) => n.id);
+        return { ...c, notes: reordered };
+      });
+    });
+
+    if (orderedNoteIds) {
+      noteFetcher.submit(
+        {
+          intent: "reorder",
+          toColumnId,
+          orderedNoteIds: JSON.stringify(orderedNoteIds),
+        },
+        { method: "PATCH", action: `/app/board/${boardId}/notes` }
+      );
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Timer actions
   // ---------------------------------------------------------------------------
@@ -396,6 +437,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     likeNote,
     deleteNote,
     moveNote,
+    reorderNote,
     startTimer,
     stopTimer,
   };
