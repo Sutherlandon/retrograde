@@ -41,7 +41,8 @@ export async function initializeDatabase() {
         text TEXT NOT NULL,
         likes INTEGER NOT NULL DEFAULT 0,
         is_new BOOLEAN NOT NULL DEFAULT FALSE,
-        created TEXT NOT NULL
+        created TEXT NOT NULL,
+        note_order INTEGER NOT NULL DEFAULT 0
       );
     `);
 
@@ -120,6 +121,24 @@ export async function initializeDatabase() {
       ALTER TABLE boards
       ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES users(id) ON DELETE SET NULL;
    `);
+
+    // 6 Add note_order for drag-and-drop reordering within columns
+    await client.query(`
+      ALTER TABLE notes
+      ADD COLUMN IF NOT EXISTS note_order INTEGER;
+    `);
+
+    await client.query(`
+      UPDATE notes
+      SET note_order = 0
+      WHERE note_order IS NULL;
+    `);
+
+    await client.query(`
+      ALTER TABLE notes
+      ALTER COLUMN note_order SET DEFAULT 0,
+      ALTER COLUMN note_order SET NOT NULL;
+    `);
 
     console.log("Done");
     console.log("Inserting dev data...");

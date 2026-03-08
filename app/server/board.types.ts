@@ -14,6 +14,7 @@ export interface NoteDTO {
   likes: number;
   is_new: boolean;
   created: string;
+  note_order: number;
 }
 
 export interface ColumnDTO {
@@ -74,6 +75,7 @@ export interface BoardActions {
   likeNote: (noteId: string, delta: number) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
+  reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
   startTimer: (seconds: number) => void;
   stopTimer: () => void;
 }

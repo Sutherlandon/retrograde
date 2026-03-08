@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { useBoard } from "../context/BoardContext";
 import type { Column } from "~/server/board.types";
 import Note from "./Note";
@@ -6,13 +8,15 @@ import Button from "./Button";
 import { PlusIcon, TrashIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
-  const { updateColumnTitle, deleteColumn, addNote, moveNote } = useBoard();
+  const { updateColumnTitle, deleteColumn, addNote } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [deleteMode, setDeleteMode] = useState(false);
   const [warningMode, setWarningMode] = useState(false);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
+
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const noteIds = column.notes.map((n) => n.id);
 
   useEffect(() => {
     setTitle(column.title);
@@ -31,19 +35,6 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
     setEditingTitle(false);
   };
 
-  const handleDrop = (e: any) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    try {
-      const { noteId, fromcolumnId } = JSON.parse(
-        e.dataTransfer.getData("application/json")
-      );
-      moveNote(fromcolumnId, column.id, noteId);
-    } catch {
-      // ignore invalid drops
-    }
-  };
-
   const handleDelete = () => {
     if (column.notes.length === 0) {
       setDeleteMode(true);
@@ -54,15 +45,10 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
 
   return (
     <div
-      className={`${isDragOver ? "bg-slate-200 dark:bg-slate-600" : "dark:bg-slate-800"
+      ref={setNodeRef}
+      className={`${isOver ? "bg-slate-200 dark:bg-slate-600" : "dark:bg-slate-800"
         } ${deleteMode ? "border-2 border-red-500" : "border-slate-400 dark:border-slate-700"
         } min-w-[350px] w-full md:max-w-1/2 min-h-[150px] rounded-md p-3 flex-1 transition-colors border-1 shadow-md/20`}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragOver(true);
-      }}
-      onDragLeave={() => setIsDragOver(false)}
-      onDrop={handleDrop}
     >
       {warningMode ? (
         <div className={`flex flex-col items-center justify-center h-full`}>
@@ -137,11 +123,13 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               size="sm"
             />
           </div>
-          <div className='flex gap-2 flex-wrap'>
-            {column.notes.map((note) => (
-              <Note key={note.id} note={note} columnId={column.id} noteColor={noteColor} />
-            ))}
-          </div>
+          <SortableContext items={noteIds} strategy={rectSortingStrategy}>
+            <div className='flex gap-2 flex-wrap'>
+              {column.notes.map((note) => (
+                <Note key={note.id} note={note} columnId={column.id} noteColor={noteColor} />
+              ))}
+            </div>
+          </SortableContext>
         </>
       )}
     </div >
