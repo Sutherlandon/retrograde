@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
 import type { Note } from "~/server/board.types";
@@ -21,6 +23,23 @@ export default function Note({
   const [deleteMode, setDeleteMode] = useState(false);
 
   const pendingLikes = useRef(0);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: note.id,
+    disabled: isEditing,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? undefined : transition,
+  };
 
   // sync local state when note prop changes
   useEffect(() => {
@@ -57,16 +76,23 @@ export default function Note({
     setIsEditing(false);
   };
 
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="rounded-md border-2 border-dashed border-slate-400 dark:border-slate-500 w-[47%] max-w-[15rem] min-h-[6rem] mb-2"
+      />
+    );
+  }
+
   return (
     <div
-      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-md/20 cursor-grab text-xs w-[47%] max-w-[15rem] min-h-[6rem]`}
-      draggable={!isEditing}
-      onDragStart={(e) => {
-        e.dataTransfer.setData(
-          "application/json",
-          JSON.stringify({ noteId: note.id, fromcolumnId: columnId })
-        );
-      }}
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-md/20 cursor-grab text-xs w-[47%] max-w-[15rem] min-h-[6rem] touch-none`}
     >
       {isEditing ? (
         <textarea

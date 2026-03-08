@@ -30,13 +30,14 @@ export async function getBoardServer(id: string): Promise<BoardDTO | null> {
               (
                 SELECT json_agg(
                   json_build_object(
-                    'id',      n.id,
-                    'text',    n.text,
-                    'likes',   n.likes,
-                    'is_new',  n.is_new,
-                    'created', n.created
+                    'id',         n.id,
+                    'text',       n.text,
+                    'likes',      n.likes,
+                    'is_new',     n.is_new,
+                    'created',    n.created,
+                    'note_order', n.note_order
                   )
-                  ORDER BY n.created
+                  ORDER BY n.note_order, n.created
                 )
                 FROM notes n
                 WHERE n.column_id = c.id
@@ -144,8 +145,8 @@ export async function upsertNoteServer(
 ) {
   await pool.query(
     `
-    INSERT INTO notes (id, column_id, text, likes, is_new, created)
-    VALUES ($1, $2, $3, $4, false, $5)
+    INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order)
+    VALUES ($1, $2, $3, $4, false, $5, COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0))
     ON CONFLICT (id) DO UPDATE
     SET
       text   = EXCLUDED.text,
@@ -177,6 +178,30 @@ export async function moveNoteServer(
   noteId: string
 ) {
   await pool.query(`UPDATE notes SET column_id = $1 WHERE id = $2`, [toColumnId, noteId]);
+  return getBoardServer(boardId);
+}
+
+export async function reorderNotesServer(
+  boardId: string,
+  toColumnId: string,
+  orderedNoteIds: string[]
+) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (let i = 0; i < orderedNoteIds.length; i++) {
+      await client.query(
+        `UPDATE notes SET column_id = $1, note_order = $2 WHERE id = $3`,
+        [toColumnId, i, orderedNoteIds[i]]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
   return getBoardServer(boardId);
 }
 

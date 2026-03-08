@@ -19,6 +19,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "The deployment process went smoothly with zero rollback issues.",
           likes: 3,
           is_new: false,
+          note_order: 0,
           created: "1760074763001",
         },
         {
@@ -27,6 +28,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "Cross-team communication was much better this sprint thanks to the daily syncs.",
           likes: 4,
           is_new: false,
+          note_order: 1,
           created: "1760074763002",
         },
         {
@@ -35,6 +37,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "We closed 95% of planned tickets and still had time for code reviews.",
           likes: 2,
           is_new: false,
+          note_order: 2,
           created: "1760074763003",
         },
       ],
@@ -50,6 +53,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "Some tickets lacked clear acceptance criteria, causing rework late in the sprint.",
           likes: 5,
           is_new: false,
+          note_order: 0,
           created: "1760074763004",
         },
         {
@@ -58,6 +62,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "QA got several stories at the same time near the end of the sprint — need to balance workload earlier.",
           likes: 3,
           is_new: false,
+          note_order: 1,
           created: "1760074763005",
         },
       ],
@@ -73,6 +78,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "Add acceptance criteria review to sprint planning checklist.",
           likes: 2,
           is_new: false,
+          note_order: 0,
           created: "1760074763007",
         },
         {
@@ -81,6 +87,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "Start QA earlier by splitting stories into smaller, testable pieces mid-sprint.",
           likes: 4,
           is_new: false,
+          note_order: 1,
           created: "1760074763008",
         },
         {
@@ -89,6 +96,7 @@ export const exampleBoardRealWorld: BoardDTO = {
           text: "Rotate daily standup facilitator to help keep meetings concise.",
           likes: 3,
           is_new: false,
+          note_order: 2,
           created: "1760074763009",
         },
       ],

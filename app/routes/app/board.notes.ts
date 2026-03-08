@@ -9,6 +9,7 @@ import {
   likeNoteServer,
   deleteNoteServer,
   moveNoteServer,
+  reorderNotesServer,
 } from "~/server/board_model";
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -29,6 +30,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
           throw new Response("Missing move fields", { status: 422 });
         }
         return moveNoteServer(boardId, fromColumnId, toColumnId, noteId);
+      }
+
+      if (intent === "reorder") {
+        const toColumnId = data.get("toColumnId") as string;
+        const orderedNoteIdsJson = data.get("orderedNoteIds") as string;
+        if (!toColumnId || !orderedNoteIdsJson) {
+          throw new Response("Missing reorder fields", { status: 422 });
+        }
+        const orderedNoteIds: string[] = JSON.parse(orderedNoteIdsJson);
+        return reorderNotesServer(boardId, toColumnId, orderedNoteIds);
       }
 
       if (intent === "like") {
