@@ -86,7 +86,7 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
           {/* Dashboard Link */}
           <Button
             as="a"
-            href="/auth/logout"
+            href="/app/dashboard"
             variant="text"
             text="Dashboard"
             className="w-full justify-start"
