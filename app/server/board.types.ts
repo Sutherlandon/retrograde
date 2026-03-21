@@ -76,6 +76,7 @@ export interface BoardActions {
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
+  moveNoteLocally: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
   startTimer: (seconds: number) => void;
   stopTimer: () => void;
 }

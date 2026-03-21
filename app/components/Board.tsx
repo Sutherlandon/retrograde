@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   KeyboardSensor,
   useSensor,
@@ -10,6 +10,7 @@ import {
   rectIntersection,
   type DragStartEvent,
   type DragEndEvent,
+  type DragOverEvent,
 } from "@dnd-kit/core";
 import { useBoard } from "../context/BoardContext";
 import BoardToolbar from "./BoardToolbar";
@@ -26,16 +27,17 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally } = useBoard();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
+  const originColumnId = useRef<string | null>(null);
   const [activeNoteData, setActiveNoteData] = useState<{ text: string; color: string } | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
     useSensor(KeyboardSensor)
   );
 
@@ -60,63 +62,90 @@ export default function Board() {
       const colIndex = columns.findIndex((c) => c.id === col.id);
       setActiveDragId(active.id as string);
       setActiveColumnId(col.id);
+      originColumnId.current = col.id;
       setActiveNoteData(note ? { text: note.text, color: noteColors[colIndex % noteColors.length] } : null);
     }
   }, [columns, findColumnForNote]);
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragOver = useCallback((event: DragOverEvent) => {
     const { active, over } = event;
-    setActiveDragId(null);
-    setActiveColumnId(null);
-    setActiveNoteData(null);
-
-    if (!over || !activeColumnId) return;
+    if (!over || !activeDragId) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Determine target column and index
-    let toColumnId: string;
-    let newIndex: number;
+    // Find current column of the dragged note
+    const fromCol = findColumnForNote(activeId);
+    if (!fromCol) return;
 
-    // Check if dropped over a column droppable
+    // Determine target column: either directly over a column, or over a note in a column
     const overColumn = columns.find((c) => c.id === overId);
+    const overNoteCol = overColumn ? null : findColumnForNote(overId);
+    const toCol = overColumn || overNoteCol;
+    if (!toCol || toCol.id === fromCol.id) return;
+
+    // Determine insertion index
+    let newIndex: number;
     if (overColumn) {
-      // Dropped on an empty column or the column itself
-      toColumnId = overColumn.id;
+      // Hovering over the column itself (empty area) — append to end
       newIndex = overColumn.notes.length;
-      // If moving within same column to the end, account for removal
-      if (activeColumnId === toColumnId) {
-        newIndex = overColumn.notes.filter((n) => n.id !== activeId).length;
-      }
     } else {
-      // Dropped over another note
-      const targetCol = findColumnForNote(overId);
-      if (!targetCol) return;
-      toColumnId = targetCol.id;
-      const overIndex = targetCol.notes.findIndex((n) => n.id === overId);
-      if (activeColumnId === toColumnId) {
-        // Same column reorder
-        const activeIndex = targetCol.notes.findIndex((n) => n.id === activeId);
+      // Hovering over a specific note — insert at that position
+      newIndex = toCol.notes.findIndex((n) => n.id === overId);
+      if (newIndex < 0) newIndex = toCol.notes.length;
+    }
+
+    // Move the note locally (no server call) so the SortableContext updates
+    moveNoteLocally(fromCol.id, toCol.id, activeId, newIndex);
+    setActiveColumnId(toCol.id);
+  }, [activeDragId, columns, findColumnForNote, moveNoteLocally]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    const fromColumnId = originColumnId.current;
+    setActiveDragId(null);
+    setActiveColumnId(null);
+    originColumnId.current = null;
+    setActiveNoteData(null);
+
+    if (!over || !fromColumnId) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    // Find which column the note is currently in (may have been moved by onDragOver)
+    const currentCol = findColumnForNote(activeId);
+    if (!currentCol) return;
+
+    const toColumnId = currentCol.id;
+
+    if (fromColumnId === toColumnId) {
+      // Same-column reorder: determine the target index from what we're over
+      let newIndex: number;
+
+      const overColumn = columns.find((c) => c.id === overId);
+      if (overColumn) {
+        newIndex = overColumn.notes.filter((n) => n.id !== activeId).length;
+      } else {
+        const overIndex = currentCol.notes.findIndex((n) => n.id === overId);
+        const activeIndex = currentCol.notes.findIndex((n) => n.id === activeId);
         newIndex = overIndex;
         if (activeIndex < overIndex) {
-          // dragging down — place after the over item
           newIndex = overIndex;
         }
-      } else {
-        // Cross-column: insert at the over note's position
-        newIndex = overIndex;
       }
-    }
 
-    if (activeColumnId === toColumnId) {
-      const col = columns.find((c) => c.id === toColumnId);
-      const currentIndex = col?.notes.findIndex((n) => n.id === activeId);
+      const currentIndex = currentCol.notes.findIndex((n) => n.id === activeId);
       if (currentIndex === newIndex) return; // no change
-    }
 
-    reorderNote(activeColumnId, toColumnId, activeId, newIndex);
-  }, [activeColumnId, columns, findColumnForNote, reorderNote]);
+      reorderNote(fromColumnId, toColumnId, activeId, newIndex);
+    } else {
+      // Cross-column: note is already in the right position from onDragOver.
+      // Persist the current order of the target column to the server.
+      const noteIndex = currentCol.notes.findIndex((n) => n.id === activeId);
+      reorderNote(toColumnId, toColumnId, activeId, noteIndex);
+    }
+  }, [columns, findColumnForNote, reorderNote]);
 
   return (
     <main className="p-4">
@@ -125,6 +154,7 @@ export default function Board() {
         sensors={sensors}
         collisionDetection={rectIntersection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <div className="flex flex-wrap gap-4">
