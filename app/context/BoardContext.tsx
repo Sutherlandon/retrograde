@@ -346,6 +346,32 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  // Move a note between columns in local state only (no server call).
+  // Used during drag to show the placeholder in the target column.
+  const moveNoteLocally = (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => {
+    if (isReadOnly) return;
+
+    setColumns((prev) => {
+      const sourceCol = prev.find((c) => c.id === fromColumnId);
+      const movedNote = sourceCol?.notes.find((n) => n.id === noteId);
+      if (!movedNote) return prev;
+
+      // Remove from source
+      const withRemoved = prev.map((c) => {
+        if (c.id !== fromColumnId) return c;
+        return { ...c, notes: c.notes.filter((n) => n.id !== noteId) };
+      });
+
+      // Insert into target
+      return withRemoved.map((c) => {
+        if (c.id !== toColumnId) return c;
+        const notes = [...c.notes];
+        notes.splice(newIndex, 0, movedNote);
+        return { ...c, notes: notes.map((n, i) => ({ ...n, note_order: i })) };
+      });
+    });
+  };
+
   const reorderNote = (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => {
     if (isReadOnly) return;
 
@@ -438,6 +464,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     deleteNote,
     moveNote,
     reorderNote,
+    moveNoteLocally,
     startTimer,
     stopTimer,
   };

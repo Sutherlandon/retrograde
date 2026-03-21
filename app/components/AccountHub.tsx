@@ -54,7 +54,6 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
         <Button
           ref={buttonRef}
           onClick={() => setOpen(!open)}
-          // variant={resolvedTheme === 'dark' ? 'outline' : 'solid'}
           color='secondary'
           text={user?.username}
           icon={<UserIcon size="md" />}
