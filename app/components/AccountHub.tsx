@@ -64,7 +64,7 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
       ) : (
         <Button
           as="a"
-          href="/login"
+          href="/auth/login"
           variant='solid'
           color='secondary'
           text={"Log In"}

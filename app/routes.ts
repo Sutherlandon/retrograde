@@ -13,9 +13,7 @@ export default [
   /* Non-layout routes */
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/sitemap.xml", "routes/sitemap.ts"),
-  route("/login", "routes/site/login.tsx"),
-
-  /* App Routes — require authentication */
+/* App Routes — require authentication */
   route("/app", "components/AppLayout.tsx", [
     route("dashboard", "routes/app/dashboard.tsx"),
     route("board/claim", "routes/app/board.claim.ts"),

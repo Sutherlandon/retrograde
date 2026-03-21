@@ -89,7 +89,9 @@ export async function loader({ request }: { request: Request }) {
   }
 
   const stateJson = JSON.parse(Buffer.from(state, "base64url").toString("utf-8"));
-  return redirect(stateJson.returnTo, {
+  const returnTo = stateJson.returnTo || "/app/dashboard";
+
+  return redirect(returnTo, {
     headers: {
       "Set-Cookie": await commitSession(session),
     },
