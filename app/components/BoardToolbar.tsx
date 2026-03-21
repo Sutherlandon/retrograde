@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import TimerButton from "./TimerButton";
+import ExportButton from "./ExportButton";
 import Button from "./Button";
 import { useBoard } from "~/context/BoardContext";
 import { EditIcon, PlusIcon } from "~/images/icons";
@@ -62,6 +63,7 @@ export default function BoardToolbar({ title }: { title: string }) {
         <TimerDisplay />
       </div>
       <TimerButton />
+      <ExportButton />
       <Button
         icon={<PlusIcon />}
         text="Column"
