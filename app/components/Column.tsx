@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-import Markdown from "react-markdown";
 import { useBoard } from "../context/BoardContext";
 import type { Column } from "~/server/board.types";
 import Note from "./Note";
