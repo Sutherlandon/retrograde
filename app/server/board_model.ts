@@ -290,13 +290,13 @@ export async function duplicateBoardServer(
 
     // Copy columns (without notes)
     const cols = await client.query(
-      `SELECT title, col_order FROM columns WHERE board_id = $1 ORDER BY col_order`,
+      `SELECT title, col_order, prompt FROM columns WHERE board_id = $1 ORDER BY col_order`,
       [boardId]
     );
     for (const col of cols.rows) {
       await client.query(
-        `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
-        [crypto.randomUUID(), newId, col.title, col.col_order]
+        `INSERT INTO columns (id, board_id, title, col_order, prompt) VALUES ($1, $2, $3, $4, $5)`,
+        [crypto.randomUUID(), newId, col.title, col.col_order, col.prompt]
       );
     }
 

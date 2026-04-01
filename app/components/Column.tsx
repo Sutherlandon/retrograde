@@ -190,25 +190,32 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               <textarea
                 ref={promptRef}
                 className="w-full px-2 py-1 border rounded text-sm resize-none"
-                rows={3}
+                rows={6}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                onBlur={savePrompt}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    savePrompt();
-                  }
-                }}
-                placeholder="Enter prompt text (supports markdown)..."
+                placeholder="Enter additional prompt text..."
               />
+              <div className="flex gap-2">
+                <Button
+                  onClick={savePrompt}
+                  color="primary"
+                  className="mt-1"
+                  size="sm"
+                  text="Save Prompt"
+                />
+                <Button
+                  onClick={() => setEditingPrompt(false)}
+                  color="muted"
+                  variant="outline"
+                  className="mt-1 mr-2"
+                  size="sm"
+                  text="Abort"
+                />
+              </div>
             </div>
           ) : column.prompt ? (
-            <div
-              className="mb-3 pb-2 border-b border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 cursor-text whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none"
-              onClick={() => setEditingPrompt(true)}
-            >
-              <Markdown>{column.prompt}</Markdown>
+            <div className="mb-6 p-2 border-b border-t border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-400 cursor-text whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
+              {column.prompt}
             </div>
           ) : null}
 
