@@ -33,6 +33,12 @@ export function exportToMarkdown(title: string, columns: Column[]): string {
 
   for (const col of columns) {
     lines.push(`## ${col.title}`);
+    if (col.prompt) {
+      lines.push("### Prompt");
+      lines.push(col.prompt);
+      lines.push("");
+      lines.push("### Notes");
+    }
     for (const note of col.notes) {
       lines.push(`- ${note.text} (${note.likes})`);
     }

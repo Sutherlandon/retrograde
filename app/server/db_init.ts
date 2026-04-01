@@ -140,6 +140,12 @@ export async function initializeDatabase() {
       ALTER COLUMN note_order SET NOT NULL;
     `);
 
+    // 7 Add prompt text to columns
+    await client.query(`
+      ALTER TABLE columns
+      ADD COLUMN IF NOT EXISTS prompt TEXT NOT NULL DEFAULT '';
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

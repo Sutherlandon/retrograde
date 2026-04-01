@@ -25,6 +25,7 @@ export async function getBoardServer(id: string): Promise<BoardDTO | null> {
           json_build_object(
             'id',        c.id,
             'title',     c.title,
+            'prompt',    c.prompt,
             'col_order', c.col_order,
             'notes', COALESCE(
               (
@@ -127,6 +128,15 @@ export async function updateColumnTitleServer(
   newTitle: string
 ) {
   await pool.query(`UPDATE columns SET title = $1 WHERE id = $2`, [newTitle, columnId]);
+  return getBoardServer(boardId);
+}
+
+export async function updateColumnPromptServer(
+  boardId: string,
+  columnId: string,
+  prompt: string
+) {
+  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2`, [prompt, columnId]);
   return getBoardServer(boardId);
 }
 
@@ -280,13 +290,13 @@ export async function duplicateBoardServer(
 
     // Copy columns (without notes)
     const cols = await client.query(
-      `SELECT title, col_order FROM columns WHERE board_id = $1 ORDER BY col_order`,
+      `SELECT title, col_order, prompt FROM columns WHERE board_id = $1 ORDER BY col_order`,
       [boardId]
     );
     for (const col of cols.rows) {
       await client.query(
-        `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
-        [crypto.randomUUID(), newId, col.title, col.col_order]
+        `INSERT INTO columns (id, board_id, title, col_order, prompt) VALUES ($1, $2, $3, $4, $5)`,
+        [crypto.randomUUID(), newId, col.title, col.col_order, col.prompt]
       );
     }
 

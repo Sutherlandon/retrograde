@@ -56,7 +56,7 @@ export default function BoardToolbar({ title }: { title: string }) {
           className={"inline-flex gap-2 items-baseline cursor-text hover:bg-slate-200 dark:hover:bg-slate-950 p-2 my-4 border border-transparent rounded-md"}
           title="Click to edit title"
         >
-          {localTitle} <EditIcon size='xs' />
+          {localTitle}
         </h1>
       )}
       <div className="flex-grow text-center">

@@ -15,6 +15,7 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-1",
       title: "Welcome!",
+      prompt: "",
       col_order: 0,
       notes: [
         {
@@ -67,6 +68,7 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-2",
       title: "What to try next",
+      prompt: "",
       col_order: 1,
       notes: [
         {
@@ -90,7 +92,16 @@ export const exampleBoardTutorial: BoardDTO = {
         {
           id: "note-8",
           column_id: "col-2",
-          text: "Delete this column using the trash can in the column header.",
+          text: "The title should be short. Add some additional prompt text by clicking the elipsis (...) in the column header and selecting \"Add Prompt Text\". You edit prompt text the same way.",
+          likes: 0,
+          is_new: false,
+          note_order: 1,
+          created: "1760074762205",
+        },
+        {
+          id: "note-9",
+          column_id: "col-2",
+          text: "Delete this column using the \"Delete Column\" button in the elipsis menu.",
           likes: 0,
           is_new: false,
           note_order: 2,
@@ -101,12 +112,22 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-3",
       title: "A Few More Things",
+      prompt: "",
       col_order: 2,
       notes: [
         {
-          id: "note-9",
+          id: "note-10",
           column_id: "col-3",
           text: "Try the timer feature in the header. Start a 3 minute timer, then stop it.",
+          likes: 0,
+          is_new: false,
+          note_order: 0,
+          created: "1760074762207",
+        },
+        {
+          id: "note-11",
+          column_id: "col-3",
+          text: "Export your board with the export button in the header. Try both CSV and Markdown formats.",
           likes: 0,
           is_new: false,
           note_order: 0,

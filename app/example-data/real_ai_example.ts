@@ -11,6 +11,7 @@ export const exampleBoardRealWorld: BoardDTO = {
     {
       id: "col-1",
       title: "What Went Well",
+      prompt: "",
       col_order: 0,
       notes: [
         {
@@ -45,6 +46,7 @@ export const exampleBoardRealWorld: BoardDTO = {
     {
       id: "col-2",
       title: "What Can Be Improved",
+      prompt: "",
       col_order: 1,
       notes: [
         {
@@ -70,6 +72,7 @@ export const exampleBoardRealWorld: BoardDTO = {
     {
       id: "col-3",
       title: "Action Items",
+      prompt: "",
       col_order: 2,
       notes: [
         {

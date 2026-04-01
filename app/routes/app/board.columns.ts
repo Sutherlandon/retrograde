@@ -8,6 +8,7 @@ import { type ActionFunctionArgs } from "react-router";
 import {
   addColumnServer,
   updateColumnTitleServer,
+  updateColumnPromptServer,
   deleteColumnServer,
 } from "~/server/board_model";
 
@@ -30,10 +31,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     case "PATCH": {
       const columnId = data.get("columnId") as string;
-      const newTitle = data.get("title") as string;
-      if (!columnId || !newTitle) {
-        throw new Response("Missing columnId or title", { status: 422 });
+      if (!columnId) throw new Response("Missing columnId", { status: 422 });
+
+      const intent = data.get("intent") as string;
+      if (intent === "updatePrompt") {
+        const prompt = data.get("prompt") as string ?? "";
+        return updateColumnPromptServer(boardId, columnId, prompt);
       }
+
+      const newTitle = data.get("title") as string;
+      if (!newTitle) throw new Response("Missing title", { status: 422 });
       return updateColumnTitleServer(boardId, columnId, newTitle);
     }
 
