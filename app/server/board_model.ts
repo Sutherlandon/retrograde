@@ -248,6 +248,100 @@ export async function stopTimerServer(boardId: string): Promise<void> {
   );
 }
 
+export async function duplicateBoardServer(
+  boardId: string,
+  userId: string
+): Promise<string> {
+  const client = await pool.connect();
+  const newId = crypto.randomUUID();
+
+  try {
+    await client.query("BEGIN");
+
+    // Get the original board title
+    const boardRes = await client.query(
+      `SELECT title FROM boards WHERE id = $1`,
+      [boardId]
+    );
+    if (boardRes.rowCount === 0) throw new Error("Board not found");
+    const newTitle = `${boardRes.rows[0].title} (copy)`;
+
+    // Create the new board
+    await client.query(
+      `INSERT INTO boards (id, title, created_by) VALUES ($1, $2, $3)`,
+      [newId, newTitle, userId]
+    );
+
+    // Add the user as owner
+    await client.query(
+      `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')`,
+      [newId, userId]
+    );
+
+    // Copy columns (without notes)
+    const cols = await client.query(
+      `SELECT title, col_order FROM columns WHERE board_id = $1 ORDER BY col_order`,
+      [boardId]
+    );
+    for (const col of cols.rows) {
+      await client.query(
+        `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
+        [crypto.randomUUID(), newId, col.title, col.col_order]
+      );
+    }
+
+    await client.query("COMMIT");
+    return newId;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteBoardServer(
+  boardId: string,
+  userId: string
+): Promise<void> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // Verify the user is the owner
+    const memberRes = await client.query(
+      `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
+      [boardId, userId]
+    );
+    if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
+      throw new Error("Only the board owner can delete a board");
+    }
+
+    // Delete notes for all columns in this board
+    await client.query(
+      `DELETE FROM notes WHERE column_id IN (SELECT id FROM columns WHERE board_id = $1)`,
+      [boardId]
+    );
+
+    // Delete columns
+    await client.query(`DELETE FROM columns WHERE board_id = $1`, [boardId]);
+
+    // Delete board members
+    await client.query(`DELETE FROM board_members WHERE board_id = $1`, [boardId]);
+
+    // Delete the board
+    await client.query(`DELETE FROM boards WHERE id = $1`, [boardId]);
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function updateBoardTitleServer(boardId: string, newTitle: string) {
   await pool.query(`UPDATE boards SET title = $1 WHERE id = $2`, [newTitle, boardId]);
   return getBoardServer(boardId);
