@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs, useNavigate } from "react-router";
 import { requireUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
-import { createBoard } from "~/server/board_model";
+import { createBoard, duplicateBoardServer, deleteBoardServer } from "~/server/board_model";
 import { PlusIcon, CheckIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
 import pkg from "~/../package.json";
 import { NewButton } from "~/components/NewButton";
 import { ClaimModal } from "~/components/ClaimModal";
+import { BoardActionsMenu } from "~/components/BoardActionsMenu";
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireUser(request);
@@ -42,14 +43,26 @@ export async function loader({ request }: { request: Request }) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireUser(request);
-
   const formData = await request.formData();
+  const intent = formData.get("intent")?.toString();
+
+  if (intent === "duplicate") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    const newBoardId = await duplicateBoardServer(boardId, user.id);
+    return redirect(`/app/board/${newBoardId}`);
+  }
+
+  if (intent === "delete") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    await deleteBoardServer(boardId, user.id);
+    return redirect("/app/dashboard");
+  }
+
+  // Default: create board
   const title = formData.get("title")?.toString().trim() || "Untitled";
-
-  // create the board in the database
   const board_id = await createBoard(title, user.id);
-
-  // redirect to the new board
   return redirect(`/app/board/${board_id}`);
 }
 
@@ -131,6 +144,7 @@ export default function AppDashboard() {
                       {field}
                     </th>
                   ))}
+                  <th className="border-b-2 px-4 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -153,6 +167,13 @@ export default function AppDashboard() {
                     </td>
                     <td className="border-b dark:border-gray-600 px-4 py-4">
                       {new Date(board.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border-b dark:border-gray-600 px-4 py-2 text-right">
+                      <BoardActionsMenu
+                        boardId={board.id}
+                        boardTitle={board.title}
+                        isOwner={board.role === "owner"}
+                      />
                     </td>
                   </tr>
                 ))}
