@@ -20,6 +20,7 @@ export interface NoteDTO {
 export interface ColumnDTO {
   id: string;
   title: string;
+  prompt: string;
   col_order: number;
   notes: NoteDTO[];
 }
@@ -69,6 +70,7 @@ export interface BoardActions {
   updateTitle: (newTitle: string) => void;
   addColumn: () => void;
   updateColumnTitle: (id: string, newTitle: string) => void;
+  updateColumnPrompt: (id: string, prompt: string) => void;
   deleteColumn: (id: string) => void;
   addNote: (columnId: string) => void;
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;

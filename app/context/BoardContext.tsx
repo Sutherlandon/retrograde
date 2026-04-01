@@ -217,6 +217,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     const newCol: Column = {
       id: nanoid(),
       title: `Column ${nextOrder}`,
+      prompt: "",
       col_order: nextOrder,
       notes: [],
     };
@@ -234,6 +235,15 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
     columnFetcher.submit(
       { columnId: id, title: newTitle },
+      { method: "PATCH", action: `/app/board/${boardId}/columns` }
+    );
+  };
+
+  const updateColumnPrompt = (id: string, prompt: string) => {
+    if (isReadOnly) return;
+    setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, prompt } : c)));
+    columnFetcher.submit(
+      { intent: "updatePrompt", columnId: id, prompt },
       { method: "PATCH", action: `/app/board/${boardId}/columns` }
     );
   };
@@ -457,6 +467,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     timeLeft,
     addColumn,
     updateColumnTitle,
+    updateColumnPrompt,
     deleteColumn,
     addNote,
     updateNote,

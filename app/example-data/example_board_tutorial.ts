@@ -15,6 +15,7 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-1",
       title: "Welcome!",
+      prompt: "",
       col_order: 0,
       notes: [
         {
@@ -67,6 +68,7 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-2",
       title: "What to try next",
+      prompt: "",
       col_order: 1,
       notes: [
         {
@@ -101,6 +103,7 @@ export const exampleBoardTutorial: BoardDTO = {
     {
       id: "col-3",
       title: "A Few More Things",
+      prompt: "",
       col_order: 2,
       notes: [
         {

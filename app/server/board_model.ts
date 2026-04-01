@@ -25,6 +25,7 @@ export async function getBoardServer(id: string): Promise<BoardDTO | null> {
           json_build_object(
             'id',        c.id,
             'title',     c.title,
+            'prompt',    c.prompt,
             'col_order', c.col_order,
             'notes', COALESCE(
               (
@@ -127,6 +128,15 @@ export async function updateColumnTitleServer(
   newTitle: string
 ) {
   await pool.query(`UPDATE columns SET title = $1 WHERE id = $2`, [newTitle, columnId]);
+  return getBoardServer(boardId);
+}
+
+export async function updateColumnPromptServer(
+  boardId: string,
+  columnId: string,
+  prompt: string
+) {
+  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2`, [prompt, columnId]);
   return getBoardServer(boardId);
 }
 

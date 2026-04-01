@@ -6,6 +6,7 @@ function makeColumn(title: string, notes: { text: string; likes: number }[]): Co
   return {
     id: `col-${title}`,
     title,
+    prompt: "",
     col_order: 0,
     notes: notes.map((n, i) => ({
       id: `note-${i}`,

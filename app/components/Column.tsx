@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
+import Markdown from "react-markdown";
 import { useBoard } from "../context/BoardContext";
 import type { Column } from "~/server/board.types";
 import Note from "./Note";
 import Button from "./Button";
-import { PlusIcon, TrashIcon } from "~/images/icons";
+import { PlusIcon, EllipsisIcon, TrashIcon, EditIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
-  const { updateColumnTitle, deleteColumn, addNote } = useBoard();
+  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [deleteMode, setDeleteMode] = useState(false);
   const [warningMode, setWarningMode] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState(false);
+  const [prompt, setPrompt] = useState(column.prompt ?? "");
   const titleInputRef = React.useRef<HTMLInputElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const noteIds = column.notes.map((n) => n.id);
@@ -21,6 +27,10 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   useEffect(() => {
     setTitle(column.title);
   }, [column.title]);
+
+  useEffect(() => {
+    setPrompt(column.prompt ?? "");
+  }, [column.prompt]);
 
   // Focus and select the title input when entering editing mode
   useEffect(() => {
@@ -30,17 +40,46 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
     }
   }, [editingTitle]);
 
+  // Focus prompt textarea when entering editing mode
+  useEffect(() => {
+    if (editingPrompt && promptRef.current) {
+      promptRef.current.focus();
+    }
+  }, [editingPrompt]);
+
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
+
   const saveTitle = () => {
     updateColumnTitle(column.id, title.trim() || "Untitled");
     setEditingTitle(false);
   };
 
+  const savePrompt = () => {
+    updateColumnPrompt(column.id, prompt);
+    setEditingPrompt(false);
+  };
+
   const handleDelete = () => {
+    setMenuOpen(false);
     if (column.notes.length === 0) {
       setDeleteMode(true);
     } else {
       setWarningMode(true);
     }
+  };
+
+  const handleAddPrompt = () => {
+    setMenuOpen(false);
+    setEditingPrompt(true);
   };
 
   return (
@@ -115,14 +154,64 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               variant="text"
               size="sm"
             />
-            <Button
-              icon={<TrashIcon />}
-              onClick={() => handleDelete()}
-              className="ml-1 hover:bg-red-300 dark:hover:bg-slate-900 dark:hover:text-red-500"
-              variant="text"
-              size="sm"
-            />
+            <div className="relative ml-1" ref={menuRef}>
+              <Button
+                icon={<EllipsisIcon />}
+                onClick={() => setMenuOpen((o) => !o)}
+                className="hover:bg-gray-300 dark:hover:bg-slate-900"
+                variant="text"
+                size="sm"
+              />
+              {menuOpen && (
+                <div className="absolute right-0 mt-1 w-52 rounded-md border bg-white dark:bg-gray-800 border-blue-500 shadow-lg z-50 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={handleAddPrompt}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  >
+                    <span className="text-gray-500 dark:text-gray-400"><EditIcon size="sm" /></span>
+                    {column.prompt ? "Edit Prompt Text" : "Add Prompt Text"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                  >
+                    <span><TrashIcon size="sm" /></span>
+                    Delete Column
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+
+          {editingPrompt ? (
+            <div className="mb-3">
+              <textarea
+                ref={promptRef}
+                className="w-full px-2 py-1 border rounded text-sm resize-none"
+                rows={3}
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onBlur={savePrompt}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    savePrompt();
+                  }
+                }}
+                placeholder="Enter prompt text (supports markdown)..."
+              />
+            </div>
+          ) : column.prompt ? (
+            <div
+              className="mb-3 pb-2 border-b border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 cursor-text whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none"
+              onClick={() => setEditingPrompt(true)}
+            >
+              <Markdown>{column.prompt}</Markdown>
+            </div>
+          ) : null}
+
           <SortableContext items={noteIds} strategy={rectSortingStrategy}>
             <div className='flex gap-2 flex-wrap'>
               {column.notes.map((note) => (
