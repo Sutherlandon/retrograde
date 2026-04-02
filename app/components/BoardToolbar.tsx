@@ -8,7 +8,7 @@ import TimerDisplay from "./TimerDisplay";
 import { BoardSettingsModal } from "./BoardSettingsModal";
 
 export default function BoardToolbar({ title }: { title: string }) {
-  const { addColumn, updateTitle, isOwner, votingEnabled, votingAllowed, columns } = useBoard();
+  const { addColumn, updateTitle, isOwner, votingEnabled, votingAllowed, columns, notesLocked, boardLocked } = useBoard();
   const [editing, setEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title);
   const [showSettings, setShowSettings] = useState(false);
@@ -61,9 +61,9 @@ export default function BoardToolbar({ title }: { title: string }) {
           />
         ) : (
           <h1
-            onClick={() => setEditing(true)}
-            className={"inline-flex gap-2 items-baseline cursor-text hover:bg-slate-200 dark:hover:bg-slate-950 p-2 my-4 border border-transparent rounded-md"}
-            title="Click to edit title"
+            onClick={() => { if (!boardLocked) setEditing(true); }}
+            className={`inline-flex gap-2 items-baseline p-2 my-4 border border-transparent rounded-md ${boardLocked ? "" : "cursor-text hover:bg-slate-200 dark:hover:bg-slate-950"}`}
+            title={boardLocked ? "Board is locked" : "Click to edit title"}
           >
             {localTitle}
           </h1>
@@ -78,11 +78,13 @@ export default function BoardToolbar({ title }: { title: string }) {
         )}
         <TimerButton />
         <ExportButton />
-        <Button
-          icon={<PlusIcon />}
-          text="Column"
-          onClick={() => addColumn()}
-        />
+        {!notesLocked && !boardLocked && (
+          <Button
+            icon={<PlusIcon />}
+            text="Column"
+            onClick={() => addColumn()}
+          />
+        )}
         {isOwner && (
           <Button
             icon={<SettingsIcon />}

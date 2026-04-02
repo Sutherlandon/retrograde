@@ -27,6 +27,8 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'timerEndsAt',    to_char(b.timer_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'votingEnabled',  b.voting_enabled,
       'votingAllowed',  b.voting_allowed,
+      'notesLocked',   b.notes_locked,
+      'boardLocked',   b.board_locked,
       'columns', COALESCE(
         json_agg(
           json_build_object(
@@ -204,12 +206,16 @@ export async function voteNoteServer(boardId: string, noteId: string, userId: st
 
 export async function updateBoardSettingsServer(
   boardId: string,
-  votingEnabled: boolean,
-  votingAllowed: number
+  settings: {
+    votingEnabled: boolean;
+    votingAllowed: number;
+    notesLocked: boolean;
+    boardLocked: boolean;
+  }
 ) {
   await pool.query(
-    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2 WHERE id = $3`,
-    [votingEnabled, votingAllowed, boardId]
+    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, notes_locked = $3, board_locked = $4 WHERE id = $5`,
+    [settings.votingEnabled, settings.votingAllowed, settings.notesLocked, settings.boardLocked, boardId]
   );
   return getBoardServer(boardId);
 }

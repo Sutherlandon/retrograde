@@ -166,6 +166,13 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_note_votes_user_id ON note_votes(user_id);
     `);
 
+    // 10 Add lock columns to boards for note lock and full board lock
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS notes_locked BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS board_locked BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

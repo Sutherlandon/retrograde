@@ -8,7 +8,7 @@ import Button from "./Button";
 import { PlusIcon, EllipsisIcon, TrashIcon, EditIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
-  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote } = useBoard();
+  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [deleteMode, setDeleteMode] = useState(false);
@@ -139,20 +139,23 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               />
             ) : (
               <span
-                className="font-bold cursor-text hover:bg-slate-200 dark:hover:bg-slate-950 p-1 rounded"
-                onClick={() => setEditingTitle(true)}
+                className={`font-bold p-1 rounded ${notesLocked || boardLocked ? "" : "cursor-text hover:bg-slate-200 dark:hover:bg-slate-950"}`}
+                onClick={() => { if (!notesLocked && !boardLocked) setEditingTitle(true); }}
               >
                 {column.title}
               </span>
             )}
             <div className="flex-1"></div>
-            <Button
-              icon={<PlusIcon />}
-              onClick={() => addNote(column.id)}
-              className="hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500"
-              variant="text"
-              size="sm"
-            />
+            {!notesLocked && !boardLocked && (
+              <Button
+                icon={<PlusIcon />}
+                onClick={() => addNote(column.id)}
+                className="hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500"
+                variant="text"
+                size="sm"
+              />
+            )}
+            {!notesLocked && !boardLocked && (
             <div className="relative ml-1" ref={menuRef}>
               <Button
                 icon={<EllipsisIcon />}
@@ -182,6 +185,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {editingPrompt ? (
