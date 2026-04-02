@@ -12,6 +12,8 @@ export interface NoteDTO {
   column_id: string;
   text: string;
   likes: number;
+  votes?: number;
+  user_voted?: boolean;
   is_new: boolean;
   created: string;
   note_order: number;
@@ -29,9 +31,12 @@ export interface BoardDTO {
   id: string;
   title: string;
   readonly: boolean;       // true for example boards — server sets this
+  isOwner?: boolean;       // true when the current user is the board owner
   timerRunning: boolean;
   timerStartedAt: string | null;
   timerEndsAt: string | null;
+  votingEnabled?: boolean;
+  votingAllowed?: number;
   columns: ColumnDTO[];
 }
 
@@ -50,6 +55,7 @@ export interface BoardClientState {
   id: string;
   title: string;
   readonly: boolean;
+  isOwner: boolean;
   columns: Column[];
   // Derived on client from columns — NOT from the server
   nextColOrder: number;
@@ -59,6 +65,9 @@ export interface BoardClientState {
   timeLeft: number | null;          // seconds remaining, ticked by interval
   // Network status
   offline: boolean;
+  // Voting
+  votingEnabled: boolean;
+  votingAllowed: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -75,6 +84,8 @@ export interface BoardActions {
   addNote: (columnId: string) => void;
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
+  voteNote: (noteId: string) => void;
+  updateBoardSettings: (votingEnabled: boolean, votingAllowed: number) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

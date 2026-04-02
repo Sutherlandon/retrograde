@@ -29,6 +29,7 @@ export default [
     route("notes", "routes/app/board.notes.ts"),
     route("timer", "routes/app/board.timer.ts"),
     route("poll", "routes/app/board.poll.ts"),
+    route("settings", "routes/app/board.settings.ts"),
   ]),
 
   /* Api Routes */

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MoonIcon, SunIcon, UserIcon, ComputerIcon } from '~/images/icons';
 import { useTheme } from '~/hooks/useTheme';
 import Button from './Button';
+import { siteConfig } from '~/config/siteConfig';
 
 interface AccountHubProps {
   user?: {
@@ -116,15 +117,19 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
           </div>
 
           {/* Log Out */}
-          <div className="border-t border-gray-200 dark:border-gray-700" />
-          <Button
-            as="a"
-            href="/auth/logout"
-            variant="text"
-            color="danger"
-            text="Logout"
-            className="w-full justify-start"
-          />
+          {!siteConfig.dashboardHome &&
+            <>
+              <div className="border-t border-gray-200 dark:border-gray-700" />
+              <Button
+                as="a"
+                href="/auth/logout"
+                variant="text"
+                color="danger"
+                text="Logout"
+                className="w-full justify-start"
+              />
+            </>
+          }
         </div>
       </div>
     </div>

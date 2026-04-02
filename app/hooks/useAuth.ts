@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { getSession } from "~/session.server";
 import { pool } from "~/server/db_config";
+import { siteConfig } from "~/config/siteConfig";
 
 export async function getOptionalUser(request: Request) {
   const session = await getSession(request.headers.get("Cookie"));
@@ -17,7 +18,9 @@ export async function getOptionalUser(request: Request) {
     return null;
   }
 
-  const { id, preferred_username: username } = user;
+  const id = user.id;
+  const username = user[siteConfig.usernameField];
+
   return { id, username };
 }
 

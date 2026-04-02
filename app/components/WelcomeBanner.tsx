@@ -6,7 +6,7 @@ export interface WelcomeMessage {
   id: string;
   title: string;
   message: string;
-  link: string;
+  link?: string;
 }
 
 const STORAGE_KEY = (id: string) => `welcome_dismissed:${id}`;
@@ -40,13 +40,15 @@ export function WelcomeBanner({ id, title, message, link }: WelcomeMessage) {
         <p>{message}</p>
       </div>
       <div className="flex justify-end items-center gap-2 w-full">
-        <Button
-          variant="solid"
-          color="primary"
-          onClick={() => window.open(link, "_blank")}
-          aria-label="release notes"
-          text="v1.2.1 Release Notes"
-        />
+        {link &&
+          <Button
+            variant="solid"
+            color="primary"
+            onClick={() => window.open(link, "_blank")}
+            aria-label="release notes"
+            text="Release Notes"
+          />
+        }
         <Button
           variant="solid"
           color="muted"

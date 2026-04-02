@@ -35,53 +35,53 @@ export default function ContactPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
-        <h1>Get in touch</h1>
-        <p>
-          We’d love to hear from you. Whether you have feedback, a question,
-          or just want to start a conversation, don’t hesitate to reach out.
-        </p>
+      <h1>Get in touch</h1>
+      <p>
+        We’d love to hear from you. Whether you have feedback, a question,
+        or just want to start a conversation, don’t hesitate to reach out.
+      </p>
 
-        <p>
-          We read every message and do our best to respond quickly and
-          thoughtfully. Clear communication and fast follow-ups are important
-          to us.
-        </p>
+      <p>
+        We read every message and do our best to respond quickly and
+        thoughtfully. Clear communication and fast follow-ups are important
+        to us.
+      </p>
 
-        <p>The best way to reach us is by email:</p>
+      <p>The best way to reach us is by email:</p>
 
-        <div className="flex items-center gap-3 flex-wrap mb-6">
-          <div className="text-2xl rounded-lg rounded px-4 py-2 bg-slate-950">
-            hi@retrograde.sh
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button
-              aria-label="Copy email address to clipboard"
-              text="Email"
-              as="a"
-              href={`mailto:${email}`}
-              variant="outline"
-            />
-
-            <Button
-              onClick={handleCopy}
-              aria-label="Copy email address to clipboard"
-              variant="outline"
-              text="Copy"
-            />
-
-            {copied && (
-              <span className="text-sm font-medium text-green-600">
-                Copied to clipboard!
-              </span>
-            )}
-          </div>
+      <div className="flex items-center gap-3 flex-wrap mb-6">
+        <div className="text-2xl rounded-lg rounded px-4 py-2 bg-slate-200 dark:bg-slate-950">
+          hi@retrograde.sh
         </div>
 
-        <p>
-          We’re based in Northern New Mexico and work with individuals and teams
-          everywhere.
-        </p>
+        <div className="flex items-center gap-3">
+          <Button
+            aria-label="Copy email address to clipboard"
+            text="Email"
+            as="a"
+            href={`mailto:${email}`}
+            variant="outline"
+          />
+
+          <Button
+            onClick={handleCopy}
+            aria-label="Copy email address to clipboard"
+            variant="outline"
+            text="Copy"
+          />
+
+          {copied && (
+            <span className="text-sm font-medium text-green-600">
+              Copied to clipboard!
+            </span>
+          )}
+        </div>
+      </div>
+
+      <p>
+        We’re based in Northern New Mexico and work with individuals and teams
+        everywhere.
+      </p>
     </main>
   );
 }

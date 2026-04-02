@@ -51,8 +51,11 @@ describe("duplicateBoardServer", () => {
 
     // BEGIN
     mockQuery.mockResolvedValueOnce({});
-    // SELECT title
-    mockQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ title: "Sprint 1" }] });
+    // SELECT title + voting settings
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Sprint 1", voting_enabled: true, voting_allowed: 3 }],
+    });
     // INSERT board
     mockQuery.mockResolvedValueOnce({});
     // INSERT board_member
@@ -82,6 +85,10 @@ describe("duplicateBoardServer", () => {
     expect(insertBoardCall[0]).toContain("INSERT INTO boards");
     expect(insertBoardCall[1][1]).toBe("Sprint 1 (copy)");
 
+    // Verify voting settings were copied
+    expect(insertBoardCall[1][3]).toBe(true);  // voting_enabled
+    expect(insertBoardCall[1][4]).toBe(3);     // voting_allowed
+
     // Verify owner membership
     const insertMemberCall = mockQuery.mock.calls[3];
     expect(insertMemberCall[0]).toContain("INSERT INTO board_members");
@@ -110,6 +117,80 @@ describe("duplicateBoardServer", () => {
 
     await expect(duplicateBoardServer("bad-id", "user-1")).rejects.toThrow("Board not found");
     expect(mockRelease).toHaveBeenCalled();
+  });
+});
+
+describe("updateBoardSettingsServer", () => {
+  it("enables voting with a specified allowed vote count", async () => {
+    const { updateBoardSettingsServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] }); // getBoardServer
+
+    await updateBoardSettingsServer("board-1", true, 3);
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE boards");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_enabled");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_allowed");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board-1"]);
+  });
+
+  it("disables voting", async () => {
+    const { updateBoardSettingsServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({});
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
+
+    await updateBoardSettingsServer("board-1", false, 5);
+
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board-1"]);
+  });
+});
+
+describe("clearBoardVotesServer", () => {
+  it("clears all likes and votes for every note on the board", async () => {
+    const { clearBoardVotesServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({}); // DELETE note_votes
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE notes SET likes = 0
+
+    await clearBoardVotesServer("board-1");
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("DELETE FROM note_votes");
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("UPDATE notes SET likes = 0");
+  });
+});
+
+describe("voteNoteServer", () => {
+  it("inserts a vote row when the user has not yet voted on the note", async () => {
+    const { voteNoteServer } = await import("./board_model");
+
+    // INSERT vote (ON CONFLICT DO NOTHING returns rowCount 1)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    // getBoardServer
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
+
+    await voteNoteServer("board-1", "note-1", "user-1");
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("INSERT INTO note_votes");
+    expect(mockPoolQuery.mock.calls[0][1]).toContain("note-1");
+    expect(mockPoolQuery.mock.calls[0][1]).toContain("user-1");
+  });
+
+  it("removes the vote row when the user has already voted on the note", async () => {
+    const { voteNoteServer } = await import("./board_model");
+
+    // INSERT returns rowCount 0 (conflict — vote already exists)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
+    // DELETE
+    mockPoolQuery.mockResolvedValueOnce({});
+    // getBoardServer
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
+
+    await voteNoteServer("board-1", "note-1", "user-1");
+
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("DELETE FROM note_votes");
+    expect(mockPoolQuery.mock.calls[1][1]).toEqual(["note-1", "user-1"]);
   });
 });
 

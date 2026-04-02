@@ -3,6 +3,7 @@
 
 export type SiteConfig = {
   dashboardHome: boolean;
+  usernameField: string;
   logoLight?: string;
   logoDark?: string;
   logoAlt?: string;
@@ -11,8 +12,11 @@ export type SiteConfig = {
 export const siteConfig: SiteConfig = {
   // This will make / redirect to the /app/dashboard instead of the default landing page.
   // Essntially making the dashboard the home page.  Good for when SSO will automatically
-  // log users in.
+  // log users in. This will disable the logout feature.
   dashboardHome: false,
+
+  // If you are using SSO, set the username field to whatever field in the OIDC token you want to use as the username.
+  usernameField: "preferred_username",
 
   // if you are going to provide logos, you must provide both light and dark 
   // versions for proper theming support. Import them at the top of this file 

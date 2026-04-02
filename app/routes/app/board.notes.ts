@@ -4,9 +4,11 @@
 // DELETE → delete note
 
 import { type ActionFunctionArgs } from "react-router";
+import { getOptionalUser } from "~/hooks/useAuth";
 import {
   upsertNoteServer,
   likeNoteServer,
+  voteNoteServer,
   deleteNoteServer,
   moveNoteServer,
   reorderNotesServer,
@@ -49,6 +51,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
           throw new Response("Missing like fields", { status: 422 });
         }
         return likeNoteServer(boardId, noteId, delta);
+      }
+
+      if (intent === "vote") {
+        const noteId = data.get("noteId") as string;
+        if (!noteId) throw new Response("Missing noteId", { status: 422 });
+        const user = await getOptionalUser(request);
+        if (!user) throw new Response("Unauthorized", { status: 401 });
+        return voteNoteServer(boardId, noteId, user.id);
       }
 
       // default PATCH: update note content

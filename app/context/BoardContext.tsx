@@ -89,12 +89,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const columnFetcher = useFetcher();
   const noteFetcher = useFetcher();
   const timerFetcher = useFetcher();
+  const settingsFetcher = useFetcher();
 
   const [columns, setColumns] = useState<Column[]>(loaderData.columns);
   const [timerRunning, setTimerRunning] = useState(loaderData.timerRunning);
   const [timerEndsAt, setTimerEndsAt] = useState<string | null>(loaderData.timerEndsAt);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [offline, setOffline] = useState(false);
+  const [votingEnabled, setVotingEnabled] = useState(loaderData.votingEnabled ?? false);
+  const [votingAllowed, setVotingAllowed] = useState(loaderData.votingAllowed ?? 5);
+  const isOwner = loaderData.isOwner ?? false;
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -107,6 +111,11 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setTitle(loaderData.title);
   }, [loaderData.title]);
+
+  useEffect(() => {
+    setVotingEnabled(loaderData.votingEnabled ?? false);
+    setVotingAllowed(loaderData.votingAllowed ?? 5);
+  }, [loaderData.votingEnabled, loaderData.votingAllowed]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -126,6 +135,15 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (noteFetcher.data) setColumns((noteFetcher.data as BoardDTO).columns as Column[]);
   }, [noteFetcher.data]);
+
+  useEffect(() => {
+    if (settingsFetcher.data) {
+      const data = settingsFetcher.data as BoardDTO;
+      setColumns(data.columns as Column[]);
+      setVotingEnabled(data.votingEnabled ?? false);
+      setVotingAllowed(data.votingAllowed ?? 5);
+    }
+  }, [settingsFetcher.data]);
 
   // ---------------------------------------------------------------------------
   // Polling for multi-user sync — plain fetch() bypasses RR7's turbostream
@@ -152,6 +170,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setOffline(false);
         setColumns((prev) => mergeColumns(data.columns as Column[], prev));
         setTitle(data.title);
+        setVotingEnabled(data.votingEnabled ?? false);
+        setVotingAllowed(data.votingAllowed ?? 5);
 
         syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
       } catch (err) {
@@ -421,6 +441,24 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const voteNote = (noteId: string) => {
+    if (isReadOnly) return;
+    noteFetcher.submit(
+      { intent: "vote", noteId },
+      { method: "PATCH", action: `/app/board/${boardId}/notes` }
+    );
+  };
+
+  const updateBoardSettings = (newVotingEnabled: boolean, newVotingAllowed: number) => {
+    if (isReadOnly) return;
+    setVotingEnabled(newVotingEnabled);
+    setVotingAllowed(newVotingAllowed);
+    settingsFetcher.submit(
+      { votingEnabled: String(newVotingEnabled), votingAllowed: newVotingAllowed },
+      { method: "PATCH", action: `/app/board/${boardId}/settings` }
+    );
+  };
+
   // ---------------------------------------------------------------------------
   // Timer actions
   // ---------------------------------------------------------------------------
@@ -459,12 +497,15 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     title,
     updateTitle,
     readonly: isReadOnly,
+    isOwner,
     columns,
     nextColOrder: deriveNextColOrder(columns),
     offline,
     timerRunning,
     timerEndsAt,
     timeLeft,
+    votingEnabled,
+    votingAllowed,
     addColumn,
     updateColumnTitle,
     updateColumnPrompt,
@@ -472,6 +513,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     addNote,
     updateNote,
     likeNote,
+    voteNote,
+    updateBoardSettings,
     deleteNote,
     moveNote,
     reorderNote,

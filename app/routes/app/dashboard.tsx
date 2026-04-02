@@ -81,10 +81,15 @@ export default function AppDashboard() {
     <div className="px-8 mx-auto w-full sm:w-[80%]">
       <h1 className="text-3xl font-semibold">Dashboard</h1>
       <WelcomeBanner
-        id={`${pkg.version}-welcome`}
+        id={`initial-welcome`}
         title="Welcome to your Retrograde dashboard!"
-        message="This is where you can create new boards, view all the boards you have access to, and claim anonymous boards you may have already created.  We've also fixed some bugs and made various improvements."
-        link="https://github.com/Sutherlandon/retrograde/releases/tag/v1.2.0"
+        message="This is where you can create new boards, view all the boards you have access to, and claim anonymous boards you may have already created. We will also make announcements here anytime we release a new version."
+      />
+      <WelcomeBanner
+        id={`${pkg.version}-release`}
+        title={`Version ${pkg.version} Released`}
+        message="This release includes several new features a voting system instead of just likes, the ability to duplicate boards, and more. Check out the release notes for all the details!"
+        link="https://github.com/Sutherlandon/retrograde/releases"
       />
 
       {boards.length === 0 ? (
