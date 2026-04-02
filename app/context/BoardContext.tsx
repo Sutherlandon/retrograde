@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { nanoid } from "nanoid";
-import type { Board, BoardDTO, Column, Note } from "~/server/board.types";
+import type { Attachment, Board, BoardDTO, Column, Note } from "~/server/board.types";
 
 // ---------------------------------------------------------------------------
 // Context setup
@@ -98,6 +98,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [offline, setOffline] = useState(false);
   const [votingEnabled, setVotingEnabled] = useState(loaderData.votingEnabled ?? false);
   const [votingAllowed, setVotingAllowed] = useState(loaderData.votingAllowed ?? 5);
+  const [attachments, setAttachments] = useState<Attachment[]>(loaderData.attachments ?? []);
+  const attachmentFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
 
   // ---------------------------------------------------------------------------
@@ -137,6 +139,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [noteFetcher.data]);
 
   useEffect(() => {
+    if (attachmentFetcher.data) {
+      setAttachments(attachmentFetcher.data as Attachment[]);
+    }
+  }, [attachmentFetcher.data]);
+
+  useEffect(() => {
     if (settingsFetcher.data) {
       const data = settingsFetcher.data as BoardDTO;
       setColumns(data.columns as Column[]);
@@ -172,6 +180,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setTitle(data.title);
         setVotingEnabled(data.votingEnabled ?? false);
         setVotingAllowed(data.votingAllowed ?? 5);
+        if (data.attachments) setAttachments(data.attachments);
 
         syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
       } catch (err) {
@@ -460,6 +469,35 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ---------------------------------------------------------------------------
+  // Attachment actions
+  // ---------------------------------------------------------------------------
+
+  const addLinkAttachment = (filename: string, link: string) => {
+    if (isReadOnly) return;
+    attachmentFetcher.submit(
+      { type: "link", filename, link },
+      { method: "POST", action: `/app/board/${boardId}/attachments` }
+    );
+  };
+
+  const addImageAttachment = (filename: string, imageData: string) => {
+    if (isReadOnly) return;
+    attachmentFetcher.submit(
+      { type: "image", filename, imageData },
+      { method: "POST", action: `/app/board/${boardId}/attachments` }
+    );
+  };
+
+  const deleteAttachment = (attachmentId: string) => {
+    if (isReadOnly) return;
+    setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    attachmentFetcher.submit(
+      { attachmentId },
+      { method: "DELETE", action: `/app/board/${boardId}/attachments` }
+    );
+  };
+
+  // ---------------------------------------------------------------------------
   // Timer actions
   // ---------------------------------------------------------------------------
 
@@ -519,6 +557,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     moveNote,
     reorderNote,
     moveNoteLocally,
+    attachments,
+    addLinkAttachment,
+    addImageAttachment,
+    deleteAttachment,
     startTimer,
     stopTimer,
   };

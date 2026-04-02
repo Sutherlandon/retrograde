@@ -16,6 +16,7 @@ import { useBoard } from "../context/BoardContext";
 import BoardToolbar from "./BoardToolbar";
 import Column from "./Column";
 import TimerEndModal from "./TimerEndModal";
+import { AttachmentsList } from "./AttachmentsList";
 
 const noteColors = [
   'bg-yellow-200',
@@ -175,6 +176,7 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
+      <AttachmentsList />
       <TimerEndModal
         isOpen={showTimerEndModal}
         onClose={() => setShowTimerEndModal(false)}
