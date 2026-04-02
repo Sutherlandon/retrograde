@@ -27,6 +27,16 @@ export interface ColumnDTO {
   notes: NoteDTO[];
 }
 
+export interface AttachmentDTO {
+  id: string;
+  board_id: string;
+  filename: string;
+  link: string | null;
+  type: "link" | "image";
+  image_data: string | null;
+  created_at: string;
+}
+
 export interface BoardDTO {
   id: string;
   title: string;
@@ -40,6 +50,7 @@ export interface BoardDTO {
   notesLocked?: boolean;
   boardLocked?: boolean;
   columns: ColumnDTO[];
+  attachments?: AttachmentDTO[];
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +59,7 @@ export interface BoardDTO {
 // ---------------------------------------------------------------------------
 
 export interface Note extends NoteDTO { }   // identical for now, alias for clarity
+export interface Attachment extends AttachmentDTO { }
 
 export interface Column extends ColumnDTO {
   notes: Note[];
@@ -65,6 +77,8 @@ export interface BoardClientState {
   timerRunning: boolean;
   timerEndsAt: string | null;
   timeLeft: number | null;          // seconds remaining, ticked by interval
+  // Attachments
+  attachments: Attachment[];
   // Network status
   offline: boolean;
   // Voting
@@ -97,6 +111,9 @@ export interface BoardActions {
   moveNoteLocally: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
   startTimer: (seconds: number) => void;
   stopTimer: () => void;
+  addLinkAttachment: (filename: string, link: string) => void;
+  addImageAttachment: (filename: string, imageData: string) => void;
+  deleteAttachment: (attachmentId: string) => void;
 }
 
 // ---------------------------------------------------------------------------

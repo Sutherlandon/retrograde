@@ -1,6 +1,7 @@
 // routes/app/board.poll.ts
 import { type LoaderFunctionArgs } from "react-router";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
+import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -18,6 +19,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       board.timerEndsAt = null;
     }
   }
+
+  board.attachments = await getAttachmentsServer(boardId);
 
   return Response.json(board);
 }

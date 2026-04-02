@@ -13,7 +13,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
   const clearFetcher = useFetcher();
 
   const [localEnabled, setLocalEnabled] = useState(votingEnabled);
-  const [localAllowed, setLocalAllowed] = useState(votingAllowed);
+  const [localAllowed, setLocalAllowed] = useState<number | string>(votingAllowed);
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
   const [showClearWarning, setShowClearWarning] = useState(false);
@@ -40,10 +40,13 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  // Resolve empty string to 1 for saving
+  const resolvedAllowed: number = localAllowed === "" ? 1 : localAllowed as number;
+
   // When the clear fetcher completes, save the new settings
   useEffect(() => {
     if (clearFetcher.data) {
-      updateBoardSettings({ votingEnabled: true, votingAllowed: localAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
+      updateBoardSettings({ votingEnabled: true, votingAllowed: resolvedAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
       onClose();
     }
   }, [clearFetcher.data]);
@@ -63,7 +66,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
       // User clicked save while warning is shown — they already saw it; confirm
       handleConfirmClear();
     } else {
-      updateBoardSettings({ votingEnabled: localEnabled, votingAllowed: localAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
+      updateBoardSettings({ votingEnabled: localEnabled, votingAllowed: resolvedAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
       onClose();
     }
   }
@@ -138,7 +141,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
                 min={1}
                 max={99}
                 value={localAllowed}
-                onChange={(e) => setLocalAllowed(Math.max(1, Number(e.target.value)))}
+                onChange={(e) => setLocalAllowed(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
                 className="w-16 text-center border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700"
               />
             </div>

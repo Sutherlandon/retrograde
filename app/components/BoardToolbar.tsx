@@ -3,15 +3,17 @@ import TimerButton from "./TimerButton";
 import ExportButton from "./ExportButton";
 import Button from "./Button";
 import { useBoard } from "~/context/BoardContext";
-import { EditIcon, PlusIcon, SettingsIcon } from "~/images/icons";
+import { EditIcon, PaperclipIcon, PlusIcon, SettingsIcon } from "~/images/icons";
 import TimerDisplay from "./TimerDisplay";
 import { BoardSettingsModal } from "./BoardSettingsModal";
+import { AttachmentModal } from "./AttachmentModal";
 
 export default function BoardToolbar({ title }: { title: string }) {
   const { addColumn, updateTitle, isOwner, votingEnabled, votingAllowed, columns, notesLocked, boardLocked } = useBoard();
   const [editing, setEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Keep local state in sync if server pushes a new title (multi-user)
@@ -87,6 +89,18 @@ export default function BoardToolbar({ title }: { title: string }) {
         )}
         {isOwner && (
           <Button
+            icon={<PaperclipIcon />}
+            text="Attach"
+            onClick={() => setShowAttachments(true)}
+          />
+        )}
+        <Button
+          icon={<PlusIcon />}
+          text="Column"
+          onClick={() => addColumn()}
+        />
+        {isOwner && (
+          <Button
             icon={<SettingsIcon />}
             onClick={() => setShowSettings(true)}
             variant="text"
@@ -96,6 +110,9 @@ export default function BoardToolbar({ title }: { title: string }) {
       </div>
       {showSettings && (
         <BoardSettingsModal onClose={() => setShowSettings(false)} />
+      )}
+      {showAttachments && (
+        <AttachmentModal onClose={() => setShowAttachments(false)} />
       )}
     </>
   );

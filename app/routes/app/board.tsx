@@ -6,6 +6,7 @@ import { type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/context/BoardContext";
 import Board from "~/components/Board";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
+import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
@@ -36,6 +37,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       board.timerEndsAt = null;
     }
   }
+
+  board.attachments = await getAttachmentsServer(board_id);
 
   return board;
 }

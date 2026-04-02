@@ -166,7 +166,21 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_note_votes_user_id ON note_votes(user_id);
     `);
 
-    // 10 Add lock columns to boards for note lock and full board lock
+    // 10 Create attachments table for board file links and uploaded images
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS attachments (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        link TEXT,
+        type TEXT NOT NULL DEFAULT 'link',
+        image_data TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_attachments_board_id ON attachments(board_id);
+    `);
+
+    // 11 Add lock columns to boards for note lock and full board lock
     await client.query(`
       ALTER TABLE boards
       ADD COLUMN IF NOT EXISTS notes_locked BOOLEAN NOT NULL DEFAULT FALSE,
