@@ -180,6 +180,13 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_attachments_board_id ON attachments(board_id);
     `);
 
+    // 11 Add lock columns to boards for note lock and full board lock
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS notes_locked BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS board_locked BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

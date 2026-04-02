@@ -28,7 +28,7 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked } = useBoard();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -36,9 +36,10 @@ export default function Board() {
   const originColumnId = useRef<string | null>(null);
   const [activeNoteData, setActiveNoteData] = useState<{ text: string; color: string } | null>(null);
 
+  const isDragDisabled = notesLocked || boardLocked;
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: isDragDisabled ? Infinity : 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: isDragDisabled ? 999999 : 250, tolerance: 5 } }),
     useSensor(KeyboardSensor)
   );
 
@@ -159,6 +160,11 @@ export default function Board() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex flex-wrap gap-4">
+          {boardLocked && (
+            <div className="w-full py-1 text-center text-sm text-gray-400 dark:text-gray-500">
+              This board has been locked by the owner.
+            </div>
+          )}
           {offline && (
             <div className="w-full p-2 mb-4 text-center bg-red-500 dark:bg-red-700 text-white rounded">
               You are currently offline. Changes you make will be lost when you reconnect. Reconnecting...

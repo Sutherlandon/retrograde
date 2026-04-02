@@ -9,11 +9,13 @@ interface BoardSettingsModalProps {
 }
 
 export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
-  const { id: boardId, votingEnabled, votingAllowed, updateBoardSettings } = useBoard();
+  const { id: boardId, votingEnabled, votingAllowed, notesLocked, boardLocked, updateBoardSettings } = useBoard();
   const clearFetcher = useFetcher();
 
   const [localEnabled, setLocalEnabled] = useState(votingEnabled);
-  const [localAllowed, setLocalAllowed] = useState(votingAllowed);
+  const [localAllowed, setLocalAllowed] = useState<number | string>(votingAllowed);
+  const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
+  const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
   const [showClearWarning, setShowClearWarning] = useState(false);
 
   const modalRef = useRef<HTMLDivElement>(null);
@@ -38,10 +40,13 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  // Resolve empty string to 1 for saving
+  const resolvedAllowed: number = localAllowed === "" ? 1 : localAllowed as number;
+
   // When the clear fetcher completes, save the new settings
   useEffect(() => {
     if (clearFetcher.data) {
-      updateBoardSettings(true, localAllowed);
+      updateBoardSettings({ votingEnabled: true, votingAllowed: resolvedAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
       onClose();
     }
   }, [clearFetcher.data]);
@@ -61,7 +66,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
       // User clicked save while warning is shown — they already saw it; confirm
       handleConfirmClear();
     } else {
-      updateBoardSettings(localEnabled, localAllowed);
+      updateBoardSettings({ votingEnabled: localEnabled, votingAllowed: resolvedAllowed, notesLocked: localNotesLocked, boardLocked: localBoardLocked });
       onClose();
     }
   }
@@ -136,11 +141,59 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
                 min={1}
                 max={99}
                 value={localAllowed}
-                onChange={(e) => setLocalAllowed(Math.max(1, Number(e.target.value)))}
+                onChange={(e) => setLocalAllowed(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
                 className="w-16 text-center border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700"
               />
             </div>
           )}
+
+          {/* Notes lock toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-sm">Lock Notes</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Prevent adding, editing, deleting, or moving notes. Likes and votes still work.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={localNotesLocked}
+              onClick={() => setLocalNotesLocked(!localNotesLocked)}
+              disabled={localBoardLocked}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none
+                ${localNotesLocked || localBoardLocked ? "bg-amber-500" : "bg-gray-300 dark:bg-gray-600"}
+                ${localBoardLocked ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform
+                  ${localNotesLocked || localBoardLocked ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </div>
+
+          {/* Full board lock toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-sm">Lock Board</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Permanently freeze the board. All modifications are disabled for everyone.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={localBoardLocked}
+              onClick={() => setLocalBoardLocked(!localBoardLocked)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none
+                ${localBoardLocked ? "bg-red-600" : "bg-gray-300 dark:bg-gray-600"}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition-transform
+                  ${localBoardLocked ? "translate-x-5" : "translate-x-0"}`}
+              />
+            </button>
+          </div>
 
           {/* Clear warning */}
           {showClearWarning && (

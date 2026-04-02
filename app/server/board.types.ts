@@ -47,6 +47,8 @@ export interface BoardDTO {
   timerEndsAt: string | null;
   votingEnabled?: boolean;
   votingAllowed?: number;
+  notesLocked?: boolean;
+  boardLocked?: boolean;
   columns: ColumnDTO[];
   attachments?: AttachmentDTO[];
 }
@@ -82,6 +84,9 @@ export interface BoardClientState {
   // Voting
   votingEnabled: boolean;
   votingAllowed: number;
+  // Locking
+  notesLocked: boolean;
+  boardLocked: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +104,7 @@ export interface BoardActions {
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string) => void;
-  updateBoardSettings: (votingEnabled: boolean, votingAllowed: number) => void;
+  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; notesLocked: boolean; boardLocked: boolean }) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

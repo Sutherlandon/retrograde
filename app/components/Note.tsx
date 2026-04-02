@@ -17,7 +17,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, columns } = useBoard();
+  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, columns, notesLocked, boardLocked } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -35,7 +35,7 @@ export default function Note({
     isDragging,
   } = useSortable({
     id: note.id,
-    disabled: isEditing,
+    disabled: isEditing || notesLocked || boardLocked,
   });
 
   const style = {
@@ -107,7 +107,7 @@ export default function Note({
       style={style}
       {...attributes}
       {...listeners}
-      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-md/20 cursor-grab text-xs w-[47%] max-w-[15rem] min-h-[6rem] touch-none`}
+      className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-md/20 text-xs w-[47%] max-w-[15rem] min-h-[6rem] ${notesLocked || boardLocked ? "cursor-default" : "cursor-grab touch-none"}`}
     >
       {isEditing ? (
         <textarea
@@ -121,7 +121,7 @@ export default function Note({
       ) : (
         <div
           className="flex flex-col gap-2 justify-between h-full"
-          onDoubleClick={() => setIsEditing(true)}
+          onDoubleClick={() => { if (!notesLocked && !boardLocked) setIsEditing(true); }}
         >
           <div className="flex-1 whitespace-pre-wrap">
             {note.text}
@@ -145,7 +145,14 @@ export default function Note({
             </div>
           ) : (
             <div className='flex justify-start items-center'>
-              {votingEnabled ? (
+              {boardLocked ? (
+                <span className="flex items-center gap-1 px-2 py-1 text-xs text-slate-900">
+                  {votingEnabled
+                    ? <><ThumbsUpIcon size="sm" /> {note.votes ?? 0}</>
+                    : <><ThumbsUpIcon size="sm" /> {likes}</>
+                  }
+                </span>
+              ) : votingEnabled ? (
                 <Button
                   text={(note.votes ?? 0).toString()}
                   icon={userVoted
@@ -179,20 +186,24 @@ export default function Note({
                 />
               )}
               <div className='grow' />
-              <Button
-                icon={<EditIcon size="sm" />}
-                onClick={() => setIsEditing(true)}
-                variant="text"
-                size='sm'
-                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
-              />
-              <Button
-                icon={<TrashIcon size="sm" />}
-                onClick={() => setDeleteMode(true)}
-                variant="text"
-                size='sm'
-                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
-              />
+              {!notesLocked && !boardLocked && (
+                <>
+                  <Button
+                    icon={<EditIcon size="sm" />}
+                    onClick={() => setIsEditing(true)}
+                    variant="text"
+                    size='sm'
+                    className="dark:hover:bg-[rgba(0,0,0,0.1)]"
+                  />
+                  <Button
+                    icon={<TrashIcon size="sm" />}
+                    onClick={() => setDeleteMode(true)}
+                    variant="text"
+                    size='sm'
+                    className="dark:hover:bg-[rgba(0,0,0,0.1)]"
+                  />
+                </>
+              )}
             </div>
           )}
         </div>

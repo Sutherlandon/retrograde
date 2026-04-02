@@ -37,10 +37,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const user = await requireOwner(request, boardId);
       const votingEnabled = data.get("votingEnabled") === "true";
       const votingAllowed = Number(data.get("votingAllowed"));
+      const notesLocked = data.get("notesLocked") === "true";
+      const boardLocked = data.get("boardLocked") === "true";
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
-      return updateBoardSettingsServer(boardId, votingEnabled, votingAllowed);
+      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, notesLocked, boardLocked });
     }
 
     case "POST": {
