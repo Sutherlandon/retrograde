@@ -146,6 +146,26 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS prompt TEXT NOT NULL DEFAULT '';
     `);
 
+    // 8 Add voting settings to boards
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS voting_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS voting_allowed INTEGER NOT NULL DEFAULT 5;
+    `);
+
+    // 9 Create note_votes table to track who voted on which note
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS note_votes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(note_id, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_note_votes_note_id ON note_votes(note_id);
+      CREATE INDEX IF NOT EXISTS idx_note_votes_user_id ON note_votes(user_id);
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

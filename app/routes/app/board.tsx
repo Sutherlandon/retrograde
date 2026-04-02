@@ -6,10 +6,11 @@ import { type LoaderFunctionArgs } from "react-router";
 import { BoardProvider } from "~/context/BoardContext";
 import Board from "~/components/Board";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
+import { getOptionalUser } from "~/hooks/useAuth";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id: board_id } = params;
 
   if (!board_id) {
@@ -20,7 +21,8 @@ export async function loader({ params }: LoaderFunctionArgs) {
   if (board_id === "example-board") return exampleBoardTutorial;
   if (board_id === "example-board-real-world") return exampleBoardRealWorld;
 
-  const board = await getBoardServer(board_id);
+  const user = await getOptionalUser(request);
+  const board = await getBoardServer(board_id, user?.id);
 
   if (!board) {
     throw new Response("Board Not Found", { status: 404 });

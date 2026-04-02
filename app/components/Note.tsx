@@ -3,8 +3,9 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
+import { useOptionalUser } from "~/context/userContext";
 import type { Note } from "~/server/board.types";
-import { EditIcon, ThumbsUpIcon, TrashIcon } from "~/images/icons";
+import { EditIcon, ThumbsUpIcon, ThumbsUpFilledIcon, TrashIcon } from "~/images/icons";
 import Button from "./Button";
 
 export default function Note({
@@ -16,7 +17,8 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote } = useBoard();
+  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, columns } = useBoard();
+  const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
   const [likes, setLikes] = useState(note.likes);
@@ -64,6 +66,19 @@ export default function Note({
     pendingLikes.current += 1;
     setLikes(prev => prev + 1);
     flushLikes();
+  };
+
+  // Count votes the user has already cast across the board
+  const votesUsed = columns.flatMap((c) => c.notes).filter((n) => n.user_voted).length;
+  const votesRemaining = votingAllowed - votesUsed;
+  const userVoted = note.user_voted ?? false;
+
+  // Vote is allowed if: user is logged in, they haven't maxed out votes, OR they're un-voting
+  const canVote = !!user && (userVoted || votesRemaining > 0);
+
+  const handleVote = () => {
+    if (!canVote) return;
+    voteNote(note.id);
   };
 
   // save note (on blur or enter)
@@ -130,15 +145,39 @@ export default function Note({
             </div>
           ) : (
             <div className='flex justify-start items-center'>
-              <Button
-                text={likes.toString()}
-                icon={<ThumbsUpIcon size="sm" />}
-                onClick={handleLike}
-                onDoubleClick={(e: Event) => e.stopPropagation()}
-                variant="text"
-                size='sm'
-                className="dark:hover:bg-[rgba(0,0,0,0.1)]"
-              />
+              {votingEnabled ? (
+                <Button
+                  text={(note.votes ?? 0).toString()}
+                  icon={userVoted
+                    ? <ThumbsUpFilledIcon size="sm" className="text-blue-600" />
+                    : <ThumbsUpIcon size="sm" />
+                  }
+                  onClick={handleVote}
+                  onDoubleClick={(e: Event) => e.stopPropagation()}
+                  variant="text"
+                  size='sm'
+                  className={`dark:hover:bg-[rgba(0,0,0,0.1)] ${!canVote ? "opacity-40 cursor-not-allowed" : ""}`}
+                  title={
+                    !user
+                      ? "Log in to vote"
+                      : !canVote
+                      ? "No votes remaining"
+                      : userVoted
+                      ? "Remove vote"
+                      : "Cast vote"
+                  }
+                />
+              ) : (
+                <Button
+                  text={likes.toString()}
+                  icon={<ThumbsUpIcon size="sm" />}
+                  onClick={handleLike}
+                  onDoubleClick={(e: Event) => e.stopPropagation()}
+                  variant="text"
+                  size='sm'
+                  className="dark:hover:bg-[rgba(0,0,0,0.1)]"
+                />
+              )}
               <div className='grow' />
               <Button
                 icon={<EditIcon size="sm" />}
