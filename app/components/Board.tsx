@@ -17,6 +17,7 @@ import BoardToolbar from "./BoardToolbar";
 import Column from "./Column";
 import TimerEndModal from "./TimerEndModal";
 import { AttachmentsList } from "./AttachmentsList";
+import { CommandDeck } from "./CommandDeck";
 
 const noteColors = [
   'bg-yellow-200',
@@ -28,7 +29,7 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, isOwner } = useBoard();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -183,6 +184,7 @@ export default function Board() {
         </DragOverlay>
       </DndContext>
       <AttachmentsList />
+      {isOwner && <CommandDeck />}
       <TimerEndModal
         isOpen={showTimerEndModal}
         onClose={() => setShowTimerEndModal(false)}
