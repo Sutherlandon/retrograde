@@ -227,7 +227,7 @@ export function AttachmentsList() {
   }
 
   return (
-    <div className="mt-8">
+    <div className="mt-8 mb-18">
       <h2 className="text-lg font-semibold mb-3">Attachments</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
         {attachments.map((attachment) => (

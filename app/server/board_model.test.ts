@@ -63,9 +63,9 @@ describe("duplicateBoardServer", () => {
     // SELECT columns
     mockQuery.mockResolvedValueOnce({
       rows: [
-        { title: "Good", col_order: 0 },
-        { title: "Bad", col_order: 1 },
-        { title: "Actions", col_order: 2 },
+        { title: "Good", col_order: 0, prompt: "What went well?" },
+        { title: "Bad", col_order: 1, prompt: "" },
+        { title: "Actions", col_order: 2, prompt: "What will we change?" },
       ],
     });
     // 3x INSERT column
@@ -95,11 +95,14 @@ describe("duplicateBoardServer", () => {
     expect(insertMemberCall[0]).toContain("owner");
     expect(insertMemberCall[1][1]).toBe("user-1");
 
-    // Verify 3 columns were copied
+    // Verify 3 columns were copied with titles and prompts
     const colInserts = mockQuery.mock.calls.slice(5, 8);
     expect(colInserts[0][1][2]).toBe("Good");
+    expect(colInserts[0][1][4]).toBe("What went well?");  // prompt
     expect(colInserts[1][1][2]).toBe("Bad");
+    expect(colInserts[1][1][4]).toBe("");                 // prompt (empty)
     expect(colInserts[2][1][2]).toBe("Actions");
+    expect(colInserts[2][1][4]).toBe("What will we change?"); // prompt
 
     // Verify transaction committed
     expect(mockQuery.mock.calls[8][0]).toBe("COMMIT");

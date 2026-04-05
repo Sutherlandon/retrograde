@@ -100,9 +100,22 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [votingAllowed, setVotingAllowed] = useState(loaderData.votingAllowed ?? 5);
   const [notesLocked, setNotesLocked] = useState(loaderData.notesLocked ?? false);
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
+  const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
+    loaderData.boardLocked ? new Date() : null
+  );
+
+  const setLocked = (locked: boolean) => {
+    setBoardLocked(locked);
+    if (locked) setBoardLockedAt((prev) => prev ?? new Date());
+    else setBoardLockedAt(null);
+  };
+
+  const [voterCount, setVoterCount] = useState(loaderData.voterCount ?? 0);
+  const [contributorCount, setContributorCount] = useState(loaderData.contributorCount ?? 0);
   const [attachments, setAttachments] = useState<Attachment[]>(loaderData.attachments ?? []);
   const attachmentFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
+  const [showPrompts, setShowPrompts] = useState(true);
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -120,7 +133,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setVotingEnabled(loaderData.votingEnabled ?? false);
     setVotingAllowed(loaderData.votingAllowed ?? 5);
     setNotesLocked(loaderData.notesLocked ?? false);
-    setBoardLocked(loaderData.boardLocked ?? false);
+    setLocked(loaderData.boardLocked ?? false);
   }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.notesLocked, loaderData.boardLocked]);
 
   // Sync timer from server (other users may have started/stopped it).
@@ -139,7 +152,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [columnFetcher.data]);
 
   useEffect(() => {
-    if (noteFetcher.data) setColumns((noteFetcher.data as BoardDTO).columns as Column[]);
+    if (noteFetcher.data) {
+      const data = noteFetcher.data as BoardDTO;
+      setColumns(data.columns as Column[]);
+      if (data.voterCount !== undefined) setVoterCount(data.voterCount);
+      if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
+    }
   }, [noteFetcher.data]);
 
   useEffect(() => {
@@ -155,7 +173,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       setVotingEnabled(data.votingEnabled ?? false);
       setVotingAllowed(data.votingAllowed ?? 5);
       setNotesLocked(data.notesLocked ?? false);
-      setBoardLocked(data.boardLocked ?? false);
+      setLocked(data.boardLocked ?? false);
     }
   }, [settingsFetcher.data]);
 
@@ -187,7 +205,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setVotingEnabled(data.votingEnabled ?? false);
         setVotingAllowed(data.votingAllowed ?? 5);
         setNotesLocked(data.notesLocked ?? false);
-        setBoardLocked(data.boardLocked ?? false);
+        setLocked(data.boardLocked ?? false);
+        if (data.voterCount !== undefined) setVoterCount(data.voterCount);
+        if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
         if (data.attachments) setAttachments(data.attachments);
 
         syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
@@ -458,6 +478,37 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const sortNotesByScore = () => {
+    if (isReadOnly) return;
+
+    setColumns((prev) => {
+      const sorted = prev.map((col) => {
+        const notes = [...col.notes].sort((a, b) => {
+          const scoreA = votingEnabled ? (a.votes ?? 0) : a.likes;
+          const scoreB = votingEnabled ? (b.votes ?? 0) : b.likes;
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          return a.created < b.created ? -1 : a.created > b.created ? 1 : 0;
+        });
+        const reordered = notes.map((n, i) => ({ ...n, note_order: i }));
+
+        // Fire server update for this column
+        const orderedNoteIds = reordered.map((n) => n.id);
+        fetch(`/app/board/${boardId}/notes`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            intent: "reorder",
+            toColumnId: col.id,
+            orderedNoteIds: JSON.stringify(orderedNoteIds),
+          }),
+        });
+
+        return { ...col, notes: reordered };
+      });
+      return sorted;
+    });
+  };
+
   const voteNote = (noteId: string) => {
     if (isReadOnly || boardLocked) return;
     noteFetcher.submit(
@@ -471,7 +522,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setVotingEnabled(settings.votingEnabled);
     setVotingAllowed(settings.votingAllowed);
     setNotesLocked(settings.notesLocked);
-    setBoardLocked(settings.boardLocked);
+    setLocked(settings.boardLocked);
     settingsFetcher.submit(
       {
         votingEnabled: String(settings.votingEnabled),
@@ -561,6 +612,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     votingAllowed,
     notesLocked,
     boardLocked,
+    boardLockedAt,
+    voterCount,
+    contributorCount,
     addColumn,
     updateColumnTitle,
     updateColumnPrompt,
@@ -573,6 +627,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     deleteNote,
     moveNote,
     reorderNote,
+    sortNotesByScore,
+    clearParticipantCounts: () => { setVoterCount(0); },
     moveNoteLocally,
     attachments,
     addLinkAttachment,
@@ -580,6 +636,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     deleteAttachment,
     startTimer,
     stopTimer,
+    showPrompts,
+    setShowPrompts,
   };
 
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>;
