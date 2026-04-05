@@ -20,7 +20,7 @@ export function CommandDeckToggle({ label, checked, onChange, disabled = false, 
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <StatusLED color={ledColor} active={checked} size="sm" />
-        <span className="text-xs text-gray-300">{label}</span>
+        <span className="text-xs text-gray-600 dark:text-gray-300">{label}</span>
       </div>
       <button
         type="button"
@@ -28,7 +28,7 @@ export function CommandDeckToggle({ label, checked, onChange, disabled = false, 
         aria-checked={checked}
         onClick={() => !disabled && onChange(!checked)}
         className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none
-          ${checked ? toggleColorMap[ledColor] : "bg-gray-600"}
+          ${checked ? toggleColorMap[ledColor] : "bg-gray-300 dark:bg-gray-600"}
           ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
       >
         <span

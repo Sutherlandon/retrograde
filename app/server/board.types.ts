@@ -49,6 +49,8 @@ export interface BoardDTO {
   votingAllowed?: number;
   notesLocked?: boolean;
   boardLocked?: boolean;
+  voterCount?: number;
+  contributorCount?: number;
   columns: ColumnDTO[];
   attachments?: AttachmentDTO[];
 }
@@ -87,6 +89,12 @@ export interface BoardClientState {
   // Locking
   notesLocked: boolean;
   boardLocked: boolean;
+  boardLockedAt: Date | null;
+  // Participation stats
+  voterCount: number;
+  contributorCount: number;
+  // UI preferences (client-only, not persisted)
+  showPrompts: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +122,9 @@ export interface BoardActions {
   addLinkAttachment: (filename: string, link: string) => void;
   addImageAttachment: (filename: string, imageData: string) => void;
   deleteAttachment: (attachmentId: string) => void;
+  setShowPrompts: (show: boolean) => void;
+  sortNotesByScore: () => void;
+  clearParticipantCounts: () => void;
 }
 
 // ---------------------------------------------------------------------------

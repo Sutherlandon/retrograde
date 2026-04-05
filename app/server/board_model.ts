@@ -25,10 +25,16 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'timerRunning',   b.timer_running,
       'timerStartedAt', to_char(b.timer_started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'timerEndsAt',    to_char(b.timer_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-      'votingEnabled',  b.voting_enabled,
-      'votingAllowed',  b.voting_allowed,
-      'notesLocked',   b.notes_locked,
-      'boardLocked',   b.board_locked,
+      'votingEnabled',    b.voting_enabled,
+      'votingAllowed',    b.voting_allowed,
+      'notesLocked',      b.notes_locked,
+      'boardLocked',      b.board_locked,
+      'voterCount',       (SELECT COUNT(DISTINCT user_id) FROM (
+                            SELECT nv.user_id FROM note_votes nv JOIN notes n ON nv.note_id = n.id JOIN columns c ON n.column_id = c.id WHERE c.board_id = b.id
+                            UNION
+                            SELECT nl.user_id FROM note_likes nl JOIN notes n ON nl.note_id = n.id JOIN columns c ON n.column_id = c.id WHERE c.board_id = b.id
+                          ) participants),
+      'contributorCount', (SELECT COUNT(DISTINCT n.created_by) FROM notes n JOIN columns c ON n.column_id = c.id WHERE c.board_id = b.id AND n.created_by IS NOT NULL),
       'columns', COALESCE(
         json_agg(
           json_build_object(
@@ -166,12 +172,13 @@ export async function upsertNoteServer(
   columnId: string,
   newText: string,
   likes: number,
-  created: string
+  created: string,
+  userId?: string | null
 ) {
   await pool.query(
     `
-    INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order)
-    VALUES ($1, $2, $3, $4, false, $5, COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0))
+    INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order, created_by)
+    VALUES ($1, $2, $3, $4, false, $5, COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0), $6)
     ON CONFLICT (id) DO UPDATE
     SET
       text   = EXCLUDED.text,
@@ -181,13 +188,16 @@ export async function upsertNoteServer(
                  ELSE EXCLUDED.likes
                END
     `,
-    [noteId, columnId, newText, likes, created]
+    [noteId, columnId, newText, likes, created, userId ?? null]
   );
   return getBoardServer(boardId);
 }
 
-export async function likeNoteServer(boardId: string, noteId: string, delta: number) {
+export async function likeNoteServer(boardId: string, noteId: string, delta: number, userId?: string | null) {
   await pool.query(`UPDATE notes SET likes = likes + $1 WHERE id = $2`, [delta, noteId]);
+  if (userId && delta > 0) {
+    await pool.query(`INSERT INTO note_likes (note_id, user_id) VALUES ($1, $2)`, [noteId, userId]);
+  }
   return getBoardServer(boardId);
 }
 
@@ -221,10 +231,9 @@ export async function updateBoardSettingsServer(
 }
 
 export async function clearBoardVotesServer(boardId: string) {
-  await pool.query(
-    `DELETE FROM note_votes WHERE note_id IN (SELECT n.id FROM notes n JOIN columns c ON c.id = n.column_id WHERE c.board_id = $1)`,
-    [boardId]
-  );
+  const noteIds = `SELECT n.id FROM notes n JOIN columns c ON c.id = n.column_id WHERE c.board_id = $1`;
+  await pool.query(`DELETE FROM note_votes WHERE note_id IN (${noteIds})`, [boardId]);
+  await pool.query(`DELETE FROM note_likes WHERE note_id IN (${noteIds})`, [boardId]);
   await pool.query(
     `UPDATE notes SET likes = 0 WHERE column_id IN (SELECT id FROM columns WHERE board_id = $1)`,
     [boardId]

@@ -29,7 +29,7 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, isOwner } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, isOwner } = useBoard();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -163,7 +163,10 @@ export default function Board() {
         <div className="flex flex-wrap gap-4">
           {boardLocked && (
             <div className="w-full py-1 text-center text-sm text-gray-400 dark:text-gray-500">
-              This board has been locked by the owner.
+              This board has been locked by the owner
+              {boardLockedAt && (
+                <> on {boardLockedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} at {boardLockedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</>
+              )}.
             </div>
           )}
           {offline && (

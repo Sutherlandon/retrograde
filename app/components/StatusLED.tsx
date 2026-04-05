@@ -20,7 +20,7 @@ const sizeMap = {
 export function StatusLED({ color, active = false, pulse = false, size = "md" }: StatusLEDProps) {
   return (
     <span
-      className={`rounded-full inline-block ${sizeMap[size]} ${active ? activeColorMap[color] : "bg-gray-600"} ${active && pulse ? "animate-pulse" : ""}`}
+      className={`rounded-full inline-block ${sizeMap[size]} ${active ? activeColorMap[color] : "bg-gray-300 dark:bg-gray-600"} ${active && pulse ? "animate-pulse" : ""}`}
     />
   );
 }

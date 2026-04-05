@@ -1,0 +1,98 @@
+import { useEffect, useRef, useState } from "react";
+import { useBoard } from "~/context/BoardContext";
+import { StatusLED } from "./StatusLED";
+
+interface LedConfig {
+  color: "green" | "blue" | "amber" | "red";
+  active: boolean;
+  label: string;
+}
+
+export function BoardStatusBar() {
+  const {
+    showPrompts, votingEnabled, votingAllowed,
+    notesLocked, boardLocked, columns,
+  } = useBoard();
+
+  const [legendOpen, setLegendOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const votesUsed = votingEnabled
+    ? columns.flatMap((c) => c.notes).filter((n) => n.user_voted).length
+    : 0;
+  const votesRemaining = votingAllowed - votesUsed;
+
+  const leds: LedConfig[] = [
+    { color: "green", active: showPrompts, label: "Prompts" },
+    { color: "blue", active: votingEnabled, label: "Voting" },
+    { color: "amber", active: notesLocked || boardLocked, label: "Notes Locked" },
+    { color: "red", active: boardLocked, label: "Board Locked" },
+  ];
+
+  // Close legend when clicking anywhere outside
+  useEffect(() => {
+    if (!legendOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setLegendOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [legendOpen]);
+
+  return (
+    <div ref={containerRef} className="relative inline-flex items-center gap-2">
+      {/* Vote counter */}
+      {votingEnabled && (
+        <div className="flex items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
+          <span className="hidden sm:inline">Votes</span>
+          <span>{votesRemaining}</span>
+        </div>
+      )}
+
+      {/* LED pill — row on desktop, fixed 2x2 grid on mobile */}
+      <button
+        onClick={() => setLegendOpen((v) => !v)}
+        title="Board status"
+        className="rounded-full border border-gray-300 dark:border-gray-600
+          px-2.5 py-1.5
+          hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+      >
+        {/* Desktop: single row */}
+        <div className="hidden sm:flex items-center gap-1.5">
+          {leds.map((led) => (
+            <StatusLED key={led.label} color={led.color} active={led.active} size="sm" />
+          ))}
+        </div>
+        {/* Mobile: fixed-width 2x2 grid */}
+        <div className="grid grid-cols-2 gap-1 w-[18px] sm:hidden">
+          {leds.map((led) => (
+            <StatusLED key={led.label} color={led.color} active={led.active} size="sm" />
+          ))}
+        </div>
+      </button>
+
+      {/* Legend dropdown */}
+      {legendOpen && (
+        <div className="absolute top-full right-0 mt-2 z-50
+          bg-white dark:bg-gray-800 rounded-lg shadow-lg
+          border border-gray-200 dark:border-gray-700
+          p-3 min-w-[160px]"
+        >
+          <div className="space-y-2">
+            {leds.map((led) => (
+              <div key={led.label} className="flex items-center gap-2">
+                <StatusLED color={led.color} active={led.active} size="md" />
+                <span className="text-xs text-gray-600 dark:text-gray-300">{led.label}</span>
+                <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">
+                  {led.active ? "on" : "off"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

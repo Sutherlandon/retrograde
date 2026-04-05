@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { exportToCSV, exportToMarkdown } from "./exportBoard";
-import type { Column } from "~/server/board.types";
+import type { Attachment, Column } from "~/server/board.types";
 
-function makeColumn(title: string, notes: { text: string; likes: number }[]): Column {
+function makeColumn(title: string, notes: { text: string; likes: number; votes?: number }[]): Column {
   return {
     id: `col-${title}`,
     title,
@@ -13,12 +13,15 @@ function makeColumn(title: string, notes: { text: string; likes: number }[]): Co
       column_id: `col-${title}`,
       text: n.text,
       likes: n.likes,
+      votes: n.votes,
       is_new: false,
       created: "2026-01-01",
       note_order: i,
     })),
   };
 }
+
+const noOptions = { votingEnabled: false, votingAllowed: 5, voterCount: 0, attachments: [] };
 
 describe("exportToCSV", () => {
   it("generates CSV with column headers and note data", () => {
@@ -94,29 +97,80 @@ describe("exportToCSV", () => {
 });
 
 describe("exportToMarkdown", () => {
-  it("generates markdown with title, column headers, and bulleted notes", () => {
+  it("generates markdown with title, column headers, and bulleted notes (likes mode)", () => {
     const columns = [
       makeColumn("Good", [{ text: "Fast deploys", likes: 3 }, { text: "Great teamwork", likes: 1 }]),
       makeColumn("Bad", [{ text: "Slow reviews", likes: 2 }]),
     ];
 
-    const md = exportToMarkdown("Sprint 1", columns);
+    const md = exportToMarkdown("Sprint 1", columns, noOptions);
     const lines = md.split("\n");
 
     expect(lines[0]).toBe("# Sprint 1");
     expect(lines[1]).toBe("");
-    expect(lines[2]).toBe("## Good");
-    expect(lines[3]).toBe("- Fast deploys (3)");
-    expect(lines[4]).toBe("- Great teamwork (1)");
-    expect(lines[5]).toBe("");
-    expect(lines[6]).toBe("## Bad");
-    expect(lines[7]).toBe("- Slow reviews (2)");
+    expect(lines[2]).toBe("> **Scoring:** Likes");
+    expect(lines[3]).toBe("");
+    expect(lines[4]).toBe("## Good");
+    expect(lines[5]).toBe("- Fast deploys (3 likes)");
+    expect(lines[6]).toBe("- Great teamwork (1 likes)");
+    expect(lines[7]).toBe("");
+    expect(lines[8]).toBe("## Bad");
+    expect(lines[9]).toBe("- Slow reviews (2 likes)");
+  });
+
+  it("shows votes and participant count when voting is enabled", () => {
+    const columns = [
+      makeColumn("Good", [{ text: "Fast deploys", likes: 0, votes: 4 }]),
+    ];
+
+    const md = exportToMarkdown("Sprint 1", columns, {
+      votingEnabled: true,
+      votingAllowed: 5,
+      voterCount: 3,
+      attachments: [],
+    });
+    const lines = md.split("\n");
+
+    expect(lines[2]).toBe("> **Scoring:** Votes (max 5 per person) · 3 participants");
+    expect(lines[5]).toBe("- Fast deploys (4 votes)");
+  });
+
+  it("shows singular 'participant' when voterCount is 1", () => {
+    const md = exportToMarkdown("T", [], { votingEnabled: true, votingAllowed: 3, voterCount: 1, attachments: [] });
+    expect(md).toContain("1 participant");
+  });
+
+  it("includes source link when boardUrl is provided", () => {
+    const md = exportToMarkdown("T", [], { ...noOptions, boardUrl: "https://retrograde.app/app/board/abc123" });
+    expect(md).toContain("> **Source:** https://retrograde.app/app/board/abc123");
+  });
+
+  it("omits source line when boardUrl is not provided", () => {
+    const md = exportToMarkdown("T", [], noOptions);
+    expect(md).not.toContain("**Source:**");
+  });
+
+  it("appends attachments section with links", () => {
+    const attachments: Attachment[] = [
+      { id: "a1", board_id: "b1", filename: "Retro Notes", link: "https://example.com/notes", type: "link", image_data: null, created_at: "" },
+      { id: "a2", board_id: "b1", filename: "photo.png", link: null, type: "image", image_data: "base64...", created_at: "" },
+    ];
+
+    const md = exportToMarkdown("Sprint 1", [], { ...noOptions, attachments });
+    expect(md).toContain("## Attachments");
+    expect(md).toContain("- [Retro Notes](https://example.com/notes)");
+    expect(md).toContain("- photo.png _(image)_");
+  });
+
+  it("omits attachments section when there are none", () => {
+    const md = exportToMarkdown("Sprint 1", [], noOptions);
+    expect(md).not.toContain("## Attachments");
   });
 
   it("handles empty columns", () => {
     const columns = [makeColumn("Empty", [])];
 
-    const md = exportToMarkdown("Test", columns);
+    const md = exportToMarkdown("Test", columns, noOptions);
     expect(md).toContain("## Empty");
     // No bullet items after the header
     const lines = md.split("\n");
@@ -124,7 +178,7 @@ describe("exportToMarkdown", () => {
     expect(lines[headerIndex + 1]).toBe("");
   });
 
-  it("handles empty board", () => {
+  it("handles empty board with no options (legacy call)", () => {
     const md = exportToMarkdown("Empty Board", []);
     expect(md).toBe("# Empty Board\n");
   });

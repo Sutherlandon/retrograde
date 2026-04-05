@@ -50,7 +50,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!noteId || isNaN(delta)) {
           throw new Response("Missing like fields", { status: 422 });
         }
-        return likeNoteServer(boardId, noteId, delta);
+        const likeUser = await getOptionalUser(request);
+        return likeNoteServer(boardId, noteId, delta, likeUser?.id);
       }
 
       if (intent === "vote") {
@@ -70,7 +71,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (!noteId || !columnId || newText == null || isNaN(likes) || !created) {
         throw new Response("Missing note update fields", { status: 422 });
       }
-      return upsertNoteServer(boardId, noteId, columnId, newText, likes, created);
+      const noteUser = await getOptionalUser(request);
+      return upsertNoteServer(boardId, noteId, columnId, newText, likes, created, noteUser?.id);
     }
 
     case "DELETE": {

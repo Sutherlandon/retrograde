@@ -11,7 +11,7 @@ describe("StatusLED", () => {
 
   it("renders gray when inactive", () => {
     const { container } = render(<StatusLED color="green" active={false} />);
-    expect(container.firstChild).toHaveClass("bg-gray-600");
+    expect(container.firstChild).toHaveClass("dark:bg-gray-600");
   });
 
   it("adds pulse animation when active and pulse is true", () => {

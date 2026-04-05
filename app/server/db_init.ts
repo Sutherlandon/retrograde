@@ -187,6 +187,24 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS board_locked BOOLEAN NOT NULL DEFAULT FALSE;
     `);
 
+    // 12 Track note creator for contributor counts
+    await client.query(`
+      ALTER TABLE notes
+      ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL;
+    `);
+
+    // 13 Track note likes per user for participant counts
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS note_likes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_note_likes_note_id ON note_likes(note_id);
+      CREATE INDEX IF NOT EXISTS idx_note_likes_user_id ON note_likes(user_id);
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

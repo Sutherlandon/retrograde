@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import ExportButton from "./ExportButton";
 import { useBoard } from "~/context/BoardContext";
 import TimerDisplay from "./TimerDisplay";
+import { BoardStatusBar } from "./BoardStatusBar";
 
 export default function BoardToolbar({ title }: { title: string }) {
-  const { updateTitle, isOwner, votingEnabled, votingAllowed, columns, boardLocked } = useBoard();
+  const { updateTitle, isOwner, boardLocked } = useBoard();
   const [editing, setEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,11 +37,6 @@ export default function BoardToolbar({ title }: { title: string }) {
 
   const canEdit = isOwner && !boardLocked;
 
-  const votesUsed = votingEnabled
-    ? columns.flatMap((c) => c.notes).filter((n) => n.user_voted).length
-    : 0;
-  const votesRemaining = votingAllowed - votesUsed;
-
   return (
     <div className="flex items-center py-4 gap-2 sm:gap-4">
       <div className="min-w-0 flex-shrink">
@@ -67,12 +62,7 @@ export default function BoardToolbar({ title }: { title: string }) {
       <div className="flex-grow text-center">
         <TimerDisplay />
       </div>
-      {votingEnabled && (
-        <div className="text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
-          {votesRemaining} vote{votesRemaining !== 1 ? "s" : ""} remaining
-        </div>
-      )}
-      <ExportButton />
+      <BoardStatusBar />
     </div>
   );
 }
