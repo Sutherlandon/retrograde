@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs, useNavigate } from "react-router";
-import { requireUser } from "~/hooks/useAuth";
+import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { createBoard, duplicateBoardServer, deleteBoardServer } from "~/server/board_model";
 import { PlusIcon, CheckIcon } from "~/images/icons";
@@ -12,7 +12,7 @@ import { ClaimModal } from "~/components/ClaimModal";
 import { BoardActionsMenu } from "~/components/BoardActionsMenu";
 
 export async function loader({ request }: { request: Request }) {
-  const user = await requireUser(request);
+  const user = await requireRegisteredUser(request);
 
   const url = new URL(request.url);
   const sort = url.searchParams.get("sort") ?? "updated";
@@ -42,7 +42,7 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireUser(request);
+  const user = await requireRegisteredUser(request);
   const formData = await request.formData();
   const intent = formData.get("intent")?.toString();
 

@@ -1,19 +1,25 @@
 /**
  * Layout for board pages — authentication is optional.
- * Anonymous users can view and interact with boards.
+ * Anonymous visitors get an auto-created anonymous user record so they can
+ * fully interact with the board (vote, like, own boards they create, etc.).
  */
 import { useLoaderData, Outlet } from "react-router";
-import { getOptionalUser } from "~/hooks/useAuth";
+import { getOrCreateUser } from "~/hooks/useAuth";
+import { commitSession } from "~/session.server";
 import { UserProvider } from "~/context/userContext";
 import Header from "./Header";
 
-export async function loader({ request }: { request: Request }) {
-  const user = await getOptionalUser(request);
-  return { user };
+export async function loader({ request, params }: { request: Request; params: { id: string } }) {
+  const { user, session, isNew } = await getOrCreateUser(request, params.id);
+  const headers: HeadersInit = {};
+  if (isNew) {
+    headers["Set-Cookie"] = await commitSession(session);
+  }
+  return Response.json({ user }, { headers });
 }
 
 export default function BoardLayout() {
-  const { user } = useLoaderData();
+  const { user } = useLoaderData<typeof loader>();
 
   return (
     <UserProvider user={user}>

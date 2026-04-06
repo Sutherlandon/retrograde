@@ -1,5 +1,7 @@
 import { Form, redirect, useActionData, Link, type ActionFunctionArgs } from "react-router";
-import { createBoard } from "~/server/board_model";
+import { createBoard, setBoardOwner } from "~/server/board_model";
+import { getOrCreateUser } from "~/hooks/useAuth";
+import { commitSession } from "~/session.server";
 import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
@@ -98,11 +100,21 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // create the board in the database
+  // create the board first (no owner yet)
   const board_id = await createBoard(title!);
 
-  // redirect to the new board
-  return redirect(`/app/board/${board_id}`);
+  // ensure the user has an identity (creates anonymous user if needed)
+  const { user, session, isNew } = await getOrCreateUser(request, board_id);
+
+  // make this user the board owner
+  await setBoardOwner(board_id, user.id);
+
+  // redirect with session cookie if a new anonymous user was created
+  const headers: HeadersInit = {};
+  if (isNew) {
+    headers["Set-Cookie"] = await commitSession(session);
+  }
+  return redirect(`/app/board/${board_id}`, { headers });
 }
 
 export default function Home() {
