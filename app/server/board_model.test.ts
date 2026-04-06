@@ -179,12 +179,14 @@ describe("clearBoardVotesServer", () => {
     const { clearBoardVotesServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({}); // DELETE note_votes
+    mockPoolQuery.mockResolvedValueOnce({}); // DELETE note_likes
     mockPoolQuery.mockResolvedValueOnce({}); // UPDATE notes SET likes = 0
 
     await clearBoardVotesServer("board-1");
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("DELETE FROM note_votes");
-    expect(mockPoolQuery.mock.calls[1][0]).toContain("UPDATE notes SET likes = 0");
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("DELETE FROM note_likes");
+    expect(mockPoolQuery.mock.calls[2][0]).toContain("UPDATE notes SET likes = 0");
   });
 });
 

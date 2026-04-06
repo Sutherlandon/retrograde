@@ -130,6 +130,18 @@ export async function createBoard(
   }
 }
 
+export async function setBoardOwner(boardId: string, userId: string) {
+  await pool.query(
+    `UPDATE boards SET created_by = $1 WHERE id = $2`,
+    [userId, boardId]
+  );
+  await pool.query(
+    `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')
+     ON CONFLICT (board_id, user_id) DO NOTHING`,
+    [boardId, userId]
+  );
+}
+
 export async function addColumnServer(
   boardId: string,
   id: string,

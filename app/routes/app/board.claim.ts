@@ -1,9 +1,9 @@
 import { type ActionFunctionArgs } from "react-router";
-import { requireUser } from "~/hooks/useAuth";
+import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireUser(request);
+  const user = await requireRegisteredUser(request);
   const formData = await request.formData();
   const boardLink = formData.get("boardLink")?.toString().trim() ?? "";
 

@@ -2,12 +2,12 @@
  * Layout for the app pages.
  */
 import { useLoaderData, Outlet } from "react-router";
-import { requireUser } from "~/hooks/useAuth";
+import { requireRegisteredUser } from "~/hooks/useAuth";
 import { UserProvider } from "~/context/userContext";
 import Header from "./Header";
 
 export async function loader({ request }: { request: Request }) {
-  const user = await requireUser(request);
+  const user = await requireRegisteredUser(request);
   return { user };
 }
 

@@ -205,6 +205,17 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_note_likes_user_id ON note_likes(user_id);
     `);
 
+    // 14 Support anonymous users: flag + board they were created on
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS board_id TEXT REFERENCES boards(id) ON DELETE SET NULL;
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

@@ -18,6 +18,7 @@ import Column from "./Column";
 import TimerEndModal from "./TimerEndModal";
 import { AttachmentsList } from "./AttachmentsList";
 import { CommandDeck } from "./CommandDeck";
+import { useOptionalUser } from "~/context/userContext";
 
 const noteColors = [
   'bg-yellow-200',
@@ -29,7 +30,8 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, isOwner } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, isOwner, readonly: isReadOnly } = useBoard();
+  const user = useOptionalUser();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -186,6 +188,11 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
+      {!isReadOnly && user?.username === "Guest" && (
+        <p className="w-full mt-6 text-center text-sm text-gray-400 dark:text-gray-500">
+          You are using this board anonymously. <a href="/auth/login" className="underline hover:text-gray-600 dark:hover:text-gray-300">Log in</a> to claim this board and manage your boards from your dashboard.
+        </p>
+      )}
       <AttachmentsList />
       {isOwner && <CommandDeck />}
       <TimerEndModal
