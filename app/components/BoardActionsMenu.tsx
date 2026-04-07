@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { EllipsisIcon, CopyIcon, TrashIcon } from "~/images/icons";
+import { EllipsisIcon, CopyIcon, TrashIcon, ArchiveIcon } from "~/images/icons";
 
 interface BoardActionsMenuProps {
   boardId: string;
   boardTitle: string;
   isOwner: boolean;
+  isArchived: boolean;
 }
 
-export function BoardActionsMenu({ boardId, boardTitle, isOwner }: BoardActionsMenuProps) {
+export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: BoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,6 +42,15 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner }: BoardActionsM
     setOpen(false);
     fetcher.submit(
       { intent: "duplicate", boardId },
+      { method: "post" }
+    );
+  }
+
+  function handleArchive(e: React.MouseEvent) {
+    e.stopPropagation();
+    setOpen(false);
+    fetcher.submit(
+      { intent: isArchived ? "unarchive" : "archive", boardId },
       { method: "post" }
     );
   }
@@ -90,6 +100,16 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner }: BoardActionsM
             Duplicate Board
           </button>
           {isOwner && (
+            <button
+              type="button"
+              onClick={handleArchive}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            >
+              <span className="text-gray-500 dark:text-gray-400"><ArchiveIcon size="sm" /></span>
+              {isArchived ? "Unarchive Board" : "Archive Board"}
+            </button>
+          )}
+          {isOwner && !isArchived && (
             <button
               type="button"
               onClick={handleDeleteClick}

@@ -23,10 +23,15 @@ vi.mock("~/config/siteConfig", () => ({
   siteConfig: { usernameField: "preferred_username" },
 }));
 
+const mockArchiveBoard = vi.fn();
+const mockUnarchiveBoard = vi.fn();
+
 vi.mock("~/server/board_model", () => ({
   createBoard: vi.fn(),
   duplicateBoardServer: vi.fn(),
   deleteBoardServer: vi.fn(),
+  archiveBoardServer: (...args: unknown[]) => mockArchiveBoard(...args),
+  unarchiveBoardServer: (...args: unknown[]) => mockUnarchiveBoard(...args),
 }));
 
 vi.mock("~/server/db_init", () => ({}));
@@ -37,19 +42,28 @@ beforeEach(() => {
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
 });
 
+// Helper: mock a logged-in registered user (first pool query = user lookup)
+function loginAs(userId: string) {
+  sessionData["userId"] = userId;
+  mockPoolQuery.mockResolvedValueOnce({
+    rows: [{ id: userId, preferred_username: "realuser", is_anonymous: false }],
+    rowCount: 1,
+  });
+}
+
 describe("dashboard loader", () => {
-  it("returns boards for registered user", async () => {
+  it("returns active and archived boards with default sort 'created'", async () => {
     const { loader } = await import("./dashboard");
 
-    sessionData["userId"] = "user-1";
-    // requireRegisteredUser SELECT
-    mockPoolQuery.mockResolvedValueOnce({
-      rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
-      rowCount: 1,
-    });
-    // boards query
+    loginAs("user-1");
+    // active boards query
     mockPoolQuery.mockResolvedValueOnce({
       rows: [{ id: "board-1", title: "Sprint Retro", role: "owner" }],
+      rowCount: 1,
+    });
+    // archived boards query
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "board-2", title: "Old Retro", role: "owner", archived_at: "2025-01-01" }],
       rowCount: 1,
     });
 
@@ -58,8 +72,54 @@ describe("dashboard loader", () => {
 
     expect(result).toEqual({
       boards: [{ id: "board-1", title: "Sprint Retro", role: "owner" }],
-      sort: "updated",
+      archivedBoards: [{ id: "board-2", title: "Old Retro", role: "owner", archived_at: "2025-01-01" }],
+      sort: "created",
     });
+  });
+
+  it("respects the sort query param", async () => {
+    const { loader } = await import("./dashboard");
+
+    loginAs("user-1");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // active boards
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // archived boards
+
+    const request = new Request("http://localhost:3000/app/dashboard?sort=title");
+    const result = await loader({ request });
+
+    expect((result as { sort: string }).sort).toBe("title");
+    // Verify the active boards query used title sort
+    const activeBoardsCall = mockPoolQuery.mock.calls[1];
+    expect(activeBoardsCall[0]).toContain("b.title ASC");
+  });
+
+  it("active boards query excludes archived boards", async () => {
+    const { loader } = await import("./dashboard");
+
+    loginAs("user-1");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // active boards
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // archived boards
+
+    const request = new Request("http://localhost:3000/app/dashboard");
+    await loader({ request });
+
+    const activeBoardsCall = mockPoolQuery.mock.calls[1];
+    expect(activeBoardsCall[0]).toContain("archived_at IS NULL");
+  });
+
+  it("archived boards query includes only archived boards", async () => {
+    const { loader } = await import("./dashboard");
+
+    loginAs("user-1");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // active boards
+    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // archived boards
+
+    const request = new Request("http://localhost:3000/app/dashboard");
+    await loader({ request });
+
+    const archivedBoardsCall = mockPoolQuery.mock.calls[2];
+    expect(archivedBoardsCall[0]).toContain("archived_at IS NOT NULL");
+    expect(archivedBoardsCall[0]).toContain("b.title ASC");
   });
 
   it("redirects anonymous user to login", async () => {
@@ -95,6 +155,58 @@ describe("dashboard loader", () => {
       const res = response as Response;
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toContain("/auth/login");
+    }
+  });
+});
+
+describe("dashboard action — archive / unarchive", () => {
+  function makeRequest(intent: string, boardId: string) {
+    const form = new FormData();
+    form.append("intent", intent);
+    form.append("boardId", boardId);
+    return new Request("http://localhost:3000/app/dashboard", { method: "post", body: form });
+  }
+
+  it("archives a board when intent is 'archive'", async () => {
+    const { action } = await import("./dashboard");
+
+    loginAs("user-1");
+    mockArchiveBoard.mockResolvedValueOnce(undefined);
+
+    const request = makeRequest("archive", "board-1");
+    const result = await action({ request });
+
+    expect(mockArchiveBoard).toHaveBeenCalledWith("board-1", "user-1");
+    expect(result).toBeNull();
+  });
+
+  it("unarchives a board when intent is 'unarchive'", async () => {
+    const { action } = await import("./dashboard");
+
+    loginAs("user-1");
+    mockUnarchiveBoard.mockResolvedValueOnce(undefined);
+
+    const request = makeRequest("unarchive", "board-1");
+    const result = await action({ request });
+
+    expect(mockUnarchiveBoard).toHaveBeenCalledWith("board-1", "user-1");
+    expect(result).toBeNull();
+  });
+
+  it("throws 400 when boardId is missing on archive", async () => {
+    const { action } = await import("./dashboard");
+
+    loginAs("user-1");
+
+    const form = new FormData();
+    form.append("intent", "archive");
+    const request = new Request("http://localhost:3000/app/dashboard", { method: "post", body: form });
+
+    try {
+      await action({ request });
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(400);
     }
   });
 });

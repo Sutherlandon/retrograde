@@ -223,6 +223,66 @@ describe("voteNoteServer", () => {
   });
 });
 
+describe("archiveBoardServer", () => {
+  it("sets archived_at when the user is the board owner", async () => {
+    const { archiveBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards SET archived_at
+
+    await archiveBoardServer("board-1", "user-1");
+
+    const updateCall = mockPoolQuery.mock.calls[1];
+    expect(updateCall[0]).toContain("UPDATE boards SET archived_at");
+    expect(updateCall[1]).toEqual(["board-1"]);
+  });
+
+  it("throws when user is not the board owner", async () => {
+    const { archiveBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "member" }] });
+
+    await expect(archiveBoardServer("board-1", "user-2")).rejects.toThrow(
+      "Only the board owner can archive a board"
+    );
+  });
+
+  it("throws when user is not a board member", async () => {
+    const { archiveBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(archiveBoardServer("board-1", "stranger")).rejects.toThrow(
+      "Only the board owner can archive a board"
+    );
+  });
+});
+
+describe("unarchiveBoardServer", () => {
+  it("clears archived_at when the user is the board owner", async () => {
+    const { unarchiveBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards SET archived_at = NULL
+
+    await unarchiveBoardServer("board-1", "user-1");
+
+    const updateCall = mockPoolQuery.mock.calls[1];
+    expect(updateCall[0]).toContain("UPDATE boards SET archived_at = NULL");
+    expect(updateCall[1]).toEqual(["board-1"]);
+  });
+
+  it("throws when user is not the board owner", async () => {
+    const { unarchiveBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(unarchiveBoardServer("board-1", "stranger")).rejects.toThrow(
+      "Only the board owner can unarchive a board"
+    );
+  });
+});
+
 describe("deleteBoardServer", () => {
   it("deletes board and all related data when user is owner", async () => {
     const { deleteBoardServer } = await import("./board_model");

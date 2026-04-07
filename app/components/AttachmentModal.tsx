@@ -100,10 +100,23 @@ export function AttachmentModal({ onClose }: AttachmentModalProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Paste image from clipboard while image tab is active
+  useEffect(() => {
+    if (mode !== "image") return;
+    function handleDocPaste(e: ClipboardEvent) {
+      const imageItem = Array.from(e.clipboardData?.items ?? []).find(
+        (item) => item.type.startsWith("image/")
+      );
+      if (!imageItem) return;
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (file) processImageFile(file, "pasted-image");
+    }
+    document.addEventListener("paste", handleDocPaste);
+    return () => document.removeEventListener("paste", handleDocPaste);
+  }, [mode, imageCount, filename]);
 
+  async function processImageFile(file: File, defaultName?: string) {
     if (!file.type.startsWith("image/")) {
       setError("Only image files are supported for upload");
       return;
@@ -121,8 +134,8 @@ export function AttachmentModal({ onClose }: AttachmentModalProps) {
       const compressed = await compressImage(file, MAX_IMAGE_SIZE);
       setImageData(compressed);
       setImagePreview(compressed);
-      if (!filename) {
-        setFilename(file.name);
+      if (!filename && defaultName) {
+        setFilename(defaultName);
       }
     } catch {
       setError("Could not compress image to fit within size limit. Try a smaller image.");
@@ -130,6 +143,13 @@ export function AttachmentModal({ onClose }: AttachmentModalProps) {
       setCompressing(false);
     }
   }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processImageFile(file, file.name);
+  }
+
 
   function handleSave() {
     const trimmedFilename = filename.trim();
@@ -271,7 +291,7 @@ export function AttachmentModal({ onClose }: AttachmentModalProps) {
                 ) : (
                   <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
                     <ImageIcon size="xl" />
-                    <p className="text-sm">Click to select an image</p>
+                    <p className="text-sm">Click to select or paste an image</p>
                   </div>
                 )}
               </div>

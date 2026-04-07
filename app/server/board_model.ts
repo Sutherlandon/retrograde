@@ -433,3 +433,25 @@ export async function updateBoardTitleServer(boardId: string, newTitle: string) 
   await pool.query(`UPDATE boards SET title = $1 WHERE id = $2`, [newTitle, boardId]);
   return getBoardServer(boardId);
 }
+
+export async function archiveBoardServer(boardId: string, userId: string): Promise<void> {
+  const memberRes = await pool.query(
+    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
+    [boardId, userId]
+  );
+  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
+    throw new Error("Only the board owner can archive a board");
+  }
+  await pool.query(`UPDATE boards SET archived_at = NOW() WHERE id = $1`, [boardId]);
+}
+
+export async function unarchiveBoardServer(boardId: string, userId: string): Promise<void> {
+  const memberRes = await pool.query(
+    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
+    [boardId, userId]
+  );
+  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
+    throw new Error("Only the board owner can unarchive a board");
+  }
+  await pool.query(`UPDATE boards SET archived_at = NULL WHERE id = $1`, [boardId]);
+}
