@@ -52,20 +52,29 @@ describe("CommandDeck", () => {
     mockUseBoard.mockReturnValue(defaultBoard);
   });
 
-  it("renders minimized pill by default", () => {
+  it("renders expanded by default", () => {
     render(<CommandDeck />);
-    expect(screen.getByTitle("Command Deck")).toBeInTheDocument();
-  });
-
-  it("expands when pill is clicked", () => {
-    render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
     expect(screen.getByText("Command Deck")).toBeInTheDocument();
     expect(screen.getByText("Mission Clock")).toBeInTheDocument();
   });
 
-  it("shows 4 status LEDs in pill", () => {
+  it("collapses to pill when minimize button clicked", () => {
+    render(<CommandDeck />);
+    fireEvent.click(screen.getByTitle("Minimize"));
+    expect(screen.queryByText("Mission Clock")).not.toBeInTheDocument();
+    expect(screen.getByTitle("Command Deck")).toBeInTheDocument();
+  });
+
+  it("re-expands when pill is clicked after collapsing", () => {
+    render(<CommandDeck />);
+    fireEvent.click(screen.getByTitle("Minimize"));
+    fireEvent.click(screen.getByTitle("Command Deck"));
+    expect(screen.getByText("Mission Clock")).toBeInTheDocument();
+  });
+
+  it("shows 4 status LEDs in pill when collapsed", () => {
     const { container } = render(<CommandDeck />);
+    fireEvent.click(screen.getByTitle("Minimize"));
     // Pill has 4 LEDs: prompts (green/active), voting (gray), notes locked (gray), board locked (gray)
     const leds = container.querySelectorAll(".rounded-full.inline-block");
     expect(leds.length).toBe(4);
@@ -73,43 +82,32 @@ describe("CommandDeck", () => {
 
   it("shows Launch button when timer not running", () => {
     render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
     expect(screen.getByText("Start Countdown")).toBeInTheDocument();
   });
 
   it("shows Abort Mission button when timer running", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, timerRunning: true, timeLeft: 120 });
     render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
     expect(screen.getByText("Abort Mission")).toBeInTheDocument();
   });
 
   it("disables Add Column when board locked", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, boardLocked: true });
     render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
     expect(screen.getByText("+ Add Column")).toBeDisabled();
   });
 
   it("shows stats footer with notes, contributors, and voters", () => {
     render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
     expect(screen.getByText(/1 note/)).toBeInTheDocument();
     expect(screen.getByText(/3 contributors/)).toBeInTheDocument();
     expect(screen.getByText(/2 voters/)).toBeInTheDocument();
   });
 
-  it("minimizes when chevron clicked", () => {
-    render(<CommandDeck />);
-    fireEvent.click(screen.getByTitle("Command Deck"));
-    expect(screen.getByText("Command Deck")).toBeInTheDocument();
-    fireEvent.click(screen.getByTitle("Minimize"));
-    expect(screen.queryByText("Mission Clock")).not.toBeInTheDocument();
-  });
-
   it("lights amber LED when board is locked even if notes lock is off", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, boardLocked: true, notesLocked: false });
     const { container } = render(<CommandDeck />);
+    fireEvent.click(screen.getByTitle("Minimize"));
     const amberLeds = container.querySelectorAll(".bg-amber-400");
     expect(amberLeds.length).toBeGreaterThan(0);
   });

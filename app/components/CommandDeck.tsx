@@ -19,7 +19,7 @@ export function CommandDeck() {
     voterCount, contributorCount, clearParticipantCounts,
   } = useBoard();
 
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [showAttachments, setShowAttachments] = useState(false);
   const [minutes, setMinutes] = useState(3);
   const [seconds, setSeconds] = useState(0);

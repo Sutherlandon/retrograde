@@ -216,6 +216,12 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS board_id TEXT REFERENCES boards(id) ON DELETE SET NULL;
     `);
 
+    // 15 Add archived_at to boards for soft-archive
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE NULL;
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

@@ -4,7 +4,7 @@ import { CloseIcon } from "~/images/icons";
 import type { Attachment } from "~/server/board.types";
 
 // ---------------------------------------------------------------------------
-// File-type icon colors and labels derived from filename extension
+// File-type badge derived from filename extension
 // ---------------------------------------------------------------------------
 
 interface FileTypeInfo {
@@ -33,11 +33,7 @@ function getFileTypeInfo(filename: string): FileTypeInfo {
   }
 }
 
-// ---------------------------------------------------------------------------
-// File icon component
-// ---------------------------------------------------------------------------
-
-function FileTypeIcon({ filename }: { filename: string }) {
+function FileTypeBadge({ filename }: { filename: string }) {
   const { label, bgColor, textColor } = getFileTypeInfo(filename);
   return (
     <div
@@ -90,7 +86,7 @@ function ConfirmDeleteDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Image preview modal
+// Full-size image preview modal
 // ---------------------------------------------------------------------------
 
 function ImagePreviewModal({
@@ -134,10 +130,10 @@ function ImagePreviewModal({
 }
 
 // ---------------------------------------------------------------------------
-// Single attachment row
+// Image card — shown at full size, capped at max-w-xs (320px)
 // ---------------------------------------------------------------------------
 
-function AttachmentItem({
+function ImageCard({
   attachment,
   isOwner,
   onDelete,
@@ -145,57 +141,53 @@ function AttachmentItem({
 }: {
   attachment: Attachment;
   isOwner: boolean;
-  onDelete: (id: string) => void;
-  onImageClick: (attachment: Attachment) => void;
+  onDelete: () => void;
+  onImageClick: () => void;
 }) {
-  const isImage = attachment.type === "image" && attachment.image_data;
-
-  const content = (
-    <>
-      {/* Icon or thumbnail */}
-      {isImage ? (
+  return (
+    <div className="relative group inline-block max-w-xs">
+      <button
+        type="button"
+        onClick={onImageClick}
+        className="block cursor-zoom-in"
+        title={attachment.filename}
+      >
         <img
           src={attachment.image_data!}
           alt={attachment.filename}
-          className="w-10 h-10 rounded object-cover shrink-0"
+          className="rounded-lg w-full object-contain"
         />
-      ) : (
-        <FileTypeIcon filename={attachment.filename} />
-      )}
-
-      {/* Filename */}
-      <span className="text-sm truncate flex-1">{attachment.filename}</span>
-
-      {/* Delete button (owner only, visible on hover) */}
+      </button>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+        {attachment.filename}
+      </p>
       {isOwner && (
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete(attachment.id);
-          }}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 transition-all cursor-pointer"
-          title="Delete attachment"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 rounded bg-black/50 text-white hover:bg-red-600 transition-all cursor-pointer"
+          title="Delete image"
         >
           <CloseIcon size="sm" />
         </button>
       )}
-    </>
+    </div>
   );
+}
 
-  if (isImage) {
-    return (
-      <button
-        type="button"
-        onClick={() => onImageClick(attachment)}
-        className="group flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer text-left w-full"
-      >
-        {content}
-      </button>
-    );
-  }
+// ---------------------------------------------------------------------------
+// Link row
+// ---------------------------------------------------------------------------
 
+function LinkItem({
+  attachment,
+  isOwner,
+  onDelete,
+}: {
+  attachment: Attachment;
+  isOwner: boolean;
+  onDelete: () => void;
+}) {
   return (
     <a
       href={attachment.link ?? "#"}
@@ -203,7 +195,18 @@ function AttachmentItem({
       rel="noopener noreferrer"
       className="group flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
     >
-      {content}
+      <FileTypeBadge filename={attachment.filename} />
+      <span className="text-sm truncate flex-1">{attachment.filename}</span>
+      {isOwner && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-500 transition-all cursor-pointer"
+          title="Delete attachment"
+        >
+          <CloseIcon size="sm" />
+        </button>
+      )}
     </a>
   );
 }
@@ -219,6 +222,9 @@ export function AttachmentsList() {
 
   if (attachments.length === 0) return null;
 
+  const images = attachments.filter((a) => a.type === "image" && a.image_data);
+  const links = attachments.filter((a) => a.type === "link");
+
   function handleConfirmDelete() {
     if (deleteTarget) {
       deleteAttachment(deleteTarget.id);
@@ -229,17 +235,33 @@ export function AttachmentsList() {
   return (
     <div className="mt-8 mb-18">
       <h2 className="text-lg font-semibold mb-3">Attachments</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
-        {attachments.map((attachment) => (
-          <AttachmentItem
-            key={attachment.id}
-            attachment={attachment}
-            isOwner={isOwner}
-            onDelete={() => setDeleteTarget(attachment)}
-            onImageClick={setPreviewImage}
-          />
-        ))}
-      </div>
+
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-4 items-start mb-4">
+          {images.map((attachment) => (
+            <ImageCard
+              key={attachment.id}
+              attachment={attachment}
+              isOwner={isOwner}
+              onDelete={() => setDeleteTarget(attachment)}
+              onImageClick={() => setPreviewImage(attachment)}
+            />
+          ))}
+        </div>
+      )}
+
+      {links.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {links.map((attachment) => (
+            <LinkItem
+              key={attachment.id}
+              attachment={attachment}
+              isOwner={isOwner}
+              onDelete={() => setDeleteTarget(attachment)}
+            />
+          ))}
+        </div>
+      )}
 
       {deleteTarget && (
         <ConfirmDeleteDialog
