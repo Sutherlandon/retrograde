@@ -17,6 +17,7 @@ export default [
   route("/app", "components/AppLayout.tsx", [
     route("dashboard", "routes/app/dashboard.tsx"),
     route("board/claim", "routes/app/board.claim.ts"),
+    route("admin/dashboard", "routes/app/admin.dashboard.tsx"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */

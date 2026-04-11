@@ -4,6 +4,9 @@
 export type SiteConfig = {
   dashboardHome: boolean;
   usernameField: string;
+  // List of external_id values (from the OAuth provider) that may access the
+  // admin metrics dashboard at /app/admin/dashboard. Empty = no one can access.
+  adminUsers: string[];
   logoLight?: string;
   logoDark?: string;
   logoAlt?: string;
@@ -18,8 +21,12 @@ export const siteConfig: SiteConfig = {
   // If you are using SSO, set the username field to whatever field in the OIDC token you want to use as the username.
   usernameField: "preferred_username",
 
-  // if you are going to provide logos, you must provide both light and dark 
-  // versions for proper theming support. Import them at the top of this file 
+  // Add the external_id values (as provided by your OAuth/SSO provider) for any
+  // users who should be able to view the admin metrics dashboard.
+  adminUsers: [],
+
+  // if you are going to provide logos, you must provide both light and dark
+  // versions for proper theming support. Import them at the top of this file
   // then add them to the config object below and provied alt text for accessibility.
   // logoLight,
   // logoDark,
