@@ -222,6 +222,18 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE NULL;
     `);
 
+    // 16 Admin users — dynamically granted admin dashboard access
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        granted_by TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON admin_users(user_id);
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 
