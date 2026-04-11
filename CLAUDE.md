@@ -4,6 +4,56 @@ This file describes the codebase structure, development workflows, and conventio
 
 ---
 
+## Engineering Rules
+
+These rules apply to all work in this repository.
+
+### 1. Test-Driven Development
+
+Write tests before writing implementation code. Every feature must have tests that verify it works. Tests protect against regressions during refactoring.
+
+- Add a `*.test.ts` / `*.test.tsx` file alongside every new module, route, or component.
+- Tests must pass before a change is considered complete.
+- When fixing a bug, write a failing test that reproduces it first.
+
+### 2. Function Size
+
+Keep functions under **150 lines**. If a function grows beyond that, break it into smaller, well-named pieces. Smaller functions are easier to read, test, and debug.
+
+### 3. Language Preference
+
+**TypeScript is the default.** Python is acceptable as an alternative. Any other language requires strong justification — only warranted for performance-critical work or hard architectural constraints.
+
+### 4. Modular Plugin Architecture
+
+Organize code by **feature/domain**, not by type. Each domain owns all of its related logic together:
+
+```
+app/server/      # e.g. board_model.ts owns all board SQL
+app/routes/app/  # e.g. board.notes.ts owns note mutations
+app/context/     # e.g. BoardContext.tsx owns board client state
+```
+
+Wire domains together with minimal integration points at the top level. Avoid cross-domain imports except through well-defined interfaces.
+
+### 5. Centralized Configuration
+
+All environment variables must be **defined, validated, and loaded in one place at startup** (`app/server/db_config.ts`, `app/config/siteConfig.ts`). If a required variable is missing, the app must fail loudly at startup with a clear error — not silently at runtime.
+
+Never scatter `process.env` references throughout the codebase. Import config values from the config modules.
+
+### 6. Decision Logs
+
+Maintain a record of key decisions, current project state, and progress in `plan/`. Before starting a significant feature or refactor, note the approach and rationale. This allows new sessions to resume context without re-explaining the problem.
+
+When completing a meaningful change, update or create a brief note in `plan/` describing what was done and why.
+
+### 7. Keep Secrets Secret
+
+Never hardcode secrets, credentials, or API keys in source-controlled files. Always use environment variables. See the [Environment Variables](#environment-variables) section for the full list. Never commit `.env` files.
+
+---
+
 ## Project Overview
 
 **Retrograde** is a full-stack TypeScript/React SSR web app for facilitating retrospective meetings. Teams use it to create collaborative kanban-style boards with sticky notes, voting, timers, drag-and-drop, and OAuth authentication.
@@ -187,6 +237,11 @@ Test files mirror source files: `foo.ts` → `foo.test.ts` in the same directory
 npm test            # Run all tests
 ```
 
+**Workflow — write tests first:**
+1. Write a failing test that describes the expected behaviour.
+2. Implement the feature until the test passes.
+3. Refactor if needed; tests must remain green.
+
 **Patterns in use:**
 - `describe / it / expect` structure
 - `vi.mock()` for session, database, and environment variable dependencies
@@ -250,6 +305,10 @@ docker run -p 3000:3000 --env-file .env retrograde
 - Do not use a global state dispatcher bus — use separate fetchers per concern.
 - Do not import from `react-router-dom` — import from `react-router` (v7).
 - Do not use CSS modules or styled-components — use Tailwind utility classes.
-- Do not commit `.env` files.
+- Do not commit `.env` files or hardcode any secret in source code.
 - Do not collapse the 4-layer type system in `board.types.ts`.
 - Do not add migration files — schema changes go in `db_init.ts` as idempotent DDL.
+- Do not scatter `process.env` references — read config from `app/server/db_config.ts` or `app/config/siteConfig.ts`.
+- Do not write functions longer than 150 lines — break them up.
+- Do not ship a feature without a corresponding test.
+- Do not introduce a new language without strong justification — default to TypeScript.
