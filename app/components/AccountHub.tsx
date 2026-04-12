@@ -9,10 +9,11 @@ interface AccountHubProps {
     id: string;
     username: string;
   };
+  isAdmin?: boolean;
   closeMenu?: () => void;
 }
 
-export default function AccountHub({ user, closeMenu }: AccountHubProps) {
+export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -92,6 +93,16 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
             className="w-full justify-start"
             onClick={() => setOpen(false)}
           />
+          {isAdmin && (
+            <Button
+              as="a"
+              href="/app/admin/dashboard"
+              variant="text"
+              text="Admin Dashboard"
+              className="w-full justify-start"
+              onClick={() => setOpen(false)}
+            />
+          )}
           <div className="inline-flex justify-between items-center w-full px-4 py-2">
             <div className="text-sm font-semibold mr-1">
               Theme

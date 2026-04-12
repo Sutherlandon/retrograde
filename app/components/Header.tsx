@@ -9,9 +9,10 @@ interface HeaderProps {
     id: string;
     username: string;
   };
+  isAdmin?: boolean;
 }
 
-export default function Header({ user }: HeaderProps) {
+export default function Header({ user, isAdmin }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -99,7 +100,7 @@ export default function Header({ user }: HeaderProps) {
         <a href="/contact" className="hover:underline">
           Contact
         </a>
-        <AccountHub user={user} />
+        <AccountHub user={user} isAdmin={isAdmin} />
       </nav>
 
       {/* Hamburger */}
