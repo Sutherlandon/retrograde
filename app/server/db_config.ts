@@ -58,3 +58,16 @@ const enableSSL = process.env.NODE_ENV !== "development";
 const dropplet: { connectionString: string; ssl?: object } = { connectionString }
 
 export const pool = new Pool(dropplet);
+
+// Site admin IDs — external_id values (from the OAuth provider) that always
+// have access to the admin dashboard and can manage other admins.
+// Set via SITE_ADMIN_IDS in your environment (comma-separated).
+const rawSiteAdminIds = process.env.SITE_ADMIN_IDS ?? "";
+export const siteAdminIds: string[] = rawSiteAdminIds
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+if (siteAdminIds.length === 0) {
+  console.warn("Warning: SITE_ADMIN_IDS is not set — the admin dashboard will be inaccessible.");
+}

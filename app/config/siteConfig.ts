@@ -18,8 +18,8 @@ export const siteConfig: SiteConfig = {
   // If you are using SSO, set the username field to whatever field in the OIDC token you want to use as the username.
   usernameField: "preferred_username",
 
-  // if you are going to provide logos, you must provide both light and dark 
-  // versions for proper theming support. Import them at the top of this file 
+  // if you are going to provide logos, you must provide both light and dark
+  // versions for proper theming support. Import them at the top of this file
   // then add them to the config object below and provied alt text for accessibility.
   // logoLight,
   // logoDark,
