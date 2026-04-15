@@ -513,6 +513,17 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   const voteNote = (noteId: string, delta: number) => {
     if (isReadOnly || boardLocked) return;
+    // Optimistically update vote counts
+    setColumns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        notes: c.notes.map((n) =>
+          n.id === noteId
+            ? { ...n, user_votes: (n.user_votes ?? 0) + delta, votes: (n.votes ?? 0) + delta }
+            : n
+        ),
+      }))
+    );
     noteFetcher.submit(
       { intent: "vote", noteId, delta: String(delta) },
       { method: "PATCH", action: `/app/board/${boardId}/notes` }
