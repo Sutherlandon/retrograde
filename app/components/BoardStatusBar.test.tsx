@@ -13,6 +13,7 @@ const defaultBoard = {
   showPrompts: true,
   votingEnabled: false,
   votingAllowed: 5,
+  votingScope: "board",
   notesLocked: false,
   boardLocked: false,
   columns: [
@@ -79,5 +80,33 @@ describe("BoardStatusBar", () => {
     const { container } = render(<BoardStatusBar />);
     const amberLed = container.querySelector(".bg-amber-400");
     expect(amberLed).toBeInTheDocument();
+  });
+
+  it("shows voting info icon in legend next to Voting label", () => {
+    render(<BoardStatusBar />);
+    fireEvent.click(screen.getByTitle("Board status"));
+    expect(screen.getByTitle("Voting info")).toBeInTheDocument();
+  });
+
+  it("opens voting info modal when info icon is clicked", () => {
+    render(<BoardStatusBar />);
+    fireEvent.click(screen.getByTitle("Board status"));
+    fireEvent.click(screen.getByTitle("Voting info"));
+    expect(screen.getByText("Like Mode")).toBeInTheDocument();
+    expect(screen.getByText("Voting Mode")).toBeInTheDocument();
+  });
+
+  it("shows votes per scope for column scope", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true, votingAllowed: 3, votingScope: "column" });
+    render(<BoardStatusBar />);
+    expect(screen.getByText("3")).toBeInTheDocument();
+    expect(screen.getByText("Votes/column")).toBeInTheDocument();
+  });
+
+  it("shows votes per scope for note scope", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true, votingAllowed: 2, votingScope: "note" });
+    render(<BoardStatusBar />);
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Votes/note")).toBeInTheDocument();
   });
 });

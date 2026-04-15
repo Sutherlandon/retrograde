@@ -118,7 +118,7 @@ describe("exportToMarkdown", () => {
     expect(lines[9]).toBe("- Slow reviews (2 likes)");
   });
 
-  it("shows votes and participant count when voting is enabled", () => {
+  it("shows votes and participant count when voting is enabled (board scope)", () => {
     const columns = [
       makeColumn("Good", [{ text: "Fast deploys", likes: 0, votes: 4 }]),
     ];
@@ -126,17 +126,32 @@ describe("exportToMarkdown", () => {
     const md = exportToMarkdown("Sprint 1", columns, {
       votingEnabled: true,
       votingAllowed: 5,
+      votingScope: "board",
       voterCount: 3,
       attachments: [],
     });
     const lines = md.split("\n");
 
-    expect(lines[2]).toBe("> **Scoring:** Votes (max 5 per person) · 3 participants");
+    expect(lines[2]).toBe("> **Scoring:** Votes (max 5 per person per board) · 3 participants");
     expect(lines[5]).toBe("- Fast deploys (4 votes)");
   });
 
+  it("shows voting scope in scoring line for column scope", () => {
+    const md = exportToMarkdown("T", [], {
+      votingEnabled: true, votingAllowed: 3, votingScope: "column", voterCount: 2, attachments: [],
+    });
+    expect(md).toContain("> **Scoring:** Votes (max 3 per person per column) · 2 participants");
+  });
+
+  it("shows voting scope in scoring line for note scope", () => {
+    const md = exportToMarkdown("T", [], {
+      votingEnabled: true, votingAllowed: 2, votingScope: "note", voterCount: 4, attachments: [],
+    });
+    expect(md).toContain("> **Scoring:** Votes (max 2 per person per note) · 4 participants");
+  });
+
   it("shows singular 'participant' when voterCount is 1", () => {
-    const md = exportToMarkdown("T", [], { votingEnabled: true, votingAllowed: 3, voterCount: 1, attachments: [] });
+    const md = exportToMarkdown("T", [], { votingEnabled: true, votingAllowed: 3, votingScope: "board", voterCount: 1, attachments: [] });
     expect(md).toContain("1 participant");
   });
 

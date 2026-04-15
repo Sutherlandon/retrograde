@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useBoard } from "~/context/BoardContext";
+import { InfoIcon } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
+import { VotingInfoModal } from "./VotingInfoModal";
 
 interface LedConfig {
   color: "green" | "blue" | "amber" | "red";
@@ -10,14 +12,15 @@ interface LedConfig {
 
 export function BoardStatusBar() {
   const {
-    showPrompts, votingEnabled, votingAllowed,
+    showPrompts, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, columns,
   } = useBoard();
 
   const [legendOpen, setLegendOpen] = useState(false);
+  const [showVotingInfo, setShowVotingInfo] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const votesUsed = votingEnabled
+  const votesUsed = votingEnabled && votingScope === "board"
     ? columns.flatMap((c) => c.notes).reduce((sum, n) => sum + (n.user_votes ?? 0), 0)
     : 0;
   const votesRemaining = votingAllowed - votesUsed;
@@ -44,10 +47,16 @@ export function BoardStatusBar() {
   return (
     <div ref={containerRef} className="relative inline-flex items-center gap-2">
       {/* Vote counter */}
-      {votingEnabled && (
+      {votingEnabled && votingScope === "board" && (
         <div className="flex items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
           <span className="hidden sm:inline">Votes</span>
           <span>{votesRemaining}</span>
+        </div>
+      )}
+      {votingEnabled && votingScope !== "board" && (
+        <div className="flex items-center gap-1 text-sm font-medium text-gray-600 dark:text-gray-300 whitespace-nowrap">
+          <span>{votingAllowed}</span>
+          <span className="hidden sm:inline">Votes/{votingScope}</span>
         </div>
       )}
 
@@ -85,6 +94,16 @@ export function BoardStatusBar() {
               <div key={led.label} className="flex items-center gap-2">
                 <StatusLED color={led.color} active={led.active} size="md" />
                 <span className="text-xs text-gray-600 dark:text-gray-300">{led.label}</span>
+                {led.label === "Voting" && (
+                  <button
+                    type="button"
+                    title="Voting info"
+                    onClick={(e) => { e.stopPropagation(); setShowVotingInfo(true); }}
+                    className="text-gray-400 hover:text-blue-500 transition-colors cursor-pointer"
+                  >
+                    <InfoIcon size="sm" />
+                  </button>
+                )}
                 <span className="ml-auto text-[10px] text-gray-400 dark:text-gray-500">
                   {led.active ? "on" : "off"}
                 </span>
@@ -93,6 +112,8 @@ export function BoardStatusBar() {
           </div>
         </div>
       )}
+
+      <VotingInfoModal isOpen={showVotingInfo} onClose={() => setShowVotingInfo(false)} />
     </div>
   );
 }

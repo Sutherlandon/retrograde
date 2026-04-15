@@ -25,10 +25,11 @@ describe("VotingInfoModal", () => {
     expect(screen.getByText(/Like as many notes as you want/)).toBeInTheDocument();
   });
 
-  it("describes voting mode as 1 vote per note with limited votes", () => {
+  it("describes voting mode with scopes", () => {
     render(<VotingInfoModal isOpen={true} onClose={() => {}} />);
-    expect(screen.getByText(/1 vote per note/)).toBeInTheDocument();
-    expect(screen.getByText(/Limited number of votes/)).toBeInTheDocument();
+    expect(screen.getByText("Per Board")).toBeInTheDocument();
+    expect(screen.getByText("Per Column")).toBeInTheDocument();
+    expect(screen.getByText("Per Note")).toBeInTheDocument();
   });
 
   it("calls onClose when backdrop is clicked", () => {

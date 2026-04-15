@@ -31,6 +31,7 @@ const defaultBoard = {
   columns: [{ id: "c1", title: "Col 1", notes: [{ id: "n1" }], col_order: 0, prompt: "" }],
   votingEnabled: false,
   votingAllowed: 5,
+  votingScope: "board",
   notesLocked: false,
   boardLocked: false,
   attachments: [],

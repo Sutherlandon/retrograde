@@ -17,7 +17,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, columns, notesLocked, boardLocked } = useBoard();
+  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -68,10 +68,15 @@ export default function Note({
     flushLikes();
   };
 
-  // Count votes the user has already cast across the board
-  const votesUsed = columns.flatMap((c) => c.notes).reduce((sum, n) => sum + (n.user_votes ?? 0), 0);
-  const votesRemaining = votingAllowed - votesUsed;
+  // Count votes the user has already cast, scoped by votingScope
   const userVotes = note.user_votes ?? 0;
+  const votesUsed =
+    votingScope === "note"
+      ? userVotes
+      : votingScope === "column"
+      ? columns.find((c) => c.id === columnId)?.notes.reduce((sum, n) => sum + (n.user_votes ?? 0), 0) ?? 0
+      : columns.flatMap((c) => c.notes).reduce((sum, n) => sum + (n.user_votes ?? 0), 0);
+  const votesRemaining = votingAllowed - votesUsed;
 
   const canVoteUp = !!user && votesRemaining > 0;
   const canVoteDown = !!user && userVotes > 0;

@@ -3,6 +3,8 @@
 // Three distinct layers — never mix them.
 // ---------------------------------------------------------------------------
 
+export type VotingScope = "board" | "column" | "note";
+
 // ---------------------------------------------------------------------------
 // 1. SERVER / WIRE TYPES — exactly what the DB returns. No client concerns.
 // ---------------------------------------------------------------------------
@@ -47,6 +49,7 @@ export interface BoardDTO {
   timerEndsAt: string | null;
   votingEnabled?: boolean;
   votingAllowed?: number;
+  votingScope?: VotingScope;
   notesLocked?: boolean;
   boardLocked?: boolean;
   voterCount?: number;
@@ -86,6 +89,7 @@ export interface BoardClientState {
   // Voting
   votingEnabled: boolean;
   votingAllowed: number;
+  votingScope: VotingScope;
   // Locking
   notesLocked: boolean;
   boardLocked: boolean;
@@ -112,7 +116,7 @@ export interface BoardActions {
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
-  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; notesLocked: boolean; boardLocked: boolean }) => void;
+  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean }) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

@@ -241,6 +241,12 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON admin_users(user_id);
     `);
 
+    // 17 Add voting_scope to boards for board/column/note vote limits
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS voting_scope TEXT NOT NULL DEFAULT 'board';
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

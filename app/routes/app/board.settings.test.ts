@@ -86,6 +86,7 @@ describe("board.settings action", () => {
       expect(mockUpdateSettings).toHaveBeenCalledWith("board-1", {
         votingEnabled: true,
         votingAllowed: 3,
+        votingScope: "board",
         notesLocked: false,
         boardLocked: false,
       });

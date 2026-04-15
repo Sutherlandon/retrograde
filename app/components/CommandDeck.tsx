@@ -14,7 +14,7 @@ const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().p
 export function CommandDeck() {
   const {
     id: boardId, title, timerRunning, timeLeft, startTimer, stopTimer,
-    addColumn, columns, votingEnabled, votingAllowed,
+    addColumn, columns, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, attachments, updateBoardSettings,
     showPrompts, setShowPrompts, sortNotesByScore,
     voterCount, contributorCount, clearParticipantCounts,
@@ -29,6 +29,7 @@ export function CommandDeck() {
   // Local toggle state
   const [localVotingEnabled, setLocalVotingEnabled] = useState(votingEnabled);
   const [localVotingAllowed, setLocalVotingAllowed] = useState(votingAllowed);
+  const [localVotingScope, setLocalVotingScope] = useState(votingScope);
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
   const [showVotingWarning, setShowVotingWarning] = useState(false);
@@ -41,9 +42,10 @@ export function CommandDeck() {
   useEffect(() => {
     setLocalVotingEnabled(votingEnabled);
     setLocalVotingAllowed(votingAllowed);
+    setLocalVotingScope(votingScope);
     setLocalNotesLocked(notesLocked);
     setLocalBoardLocked(boardLocked);
-  }, [votingEnabled, votingAllowed, notesLocked, boardLocked]);
+  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked]);
 
   // Close on Escape
   useEffect(() => {
@@ -60,6 +62,7 @@ export function CommandDeck() {
       updateBoardSettings({
         votingEnabled: pendingVotingEnabled,
         votingAllowed: localVotingAllowed,
+        votingScope: localVotingScope,
         notesLocked: localNotesLocked,
         boardLocked: localBoardLocked,
       });
@@ -81,10 +84,11 @@ export function CommandDeck() {
     startTimer(totalSeconds);
   };
 
-  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; notesLocked: boolean; boardLocked: boolean }> = {}) => {
+  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }> = {}) => {
     updateBoardSettings({
       votingEnabled: overrides.votingEnabled ?? localVotingEnabled,
       votingAllowed: overrides.votingAllowed ?? localVotingAllowed,
+      votingScope: overrides.votingScope ?? localVotingScope,
       notesLocked: overrides.notesLocked ?? localNotesLocked,
       boardLocked: overrides.boardLocked ?? localBoardLocked,
     });
@@ -121,6 +125,11 @@ export function CommandDeck() {
     const clamped = clamp(value, 1, 99);
     setLocalVotingAllowed(clamped);
     saveSettings({ votingAllowed: clamped });
+  };
+
+  const handleVotingScopeChange = (scope: "board" | "column" | "note") => {
+    setLocalVotingScope(scope);
+    saveSettings({ votingScope: scope });
   };
 
   const totalNotes = columns.reduce((sum, c) => sum + c.notes.length, 0);
@@ -307,6 +316,17 @@ export function CommandDeck() {
                   disabled={localBoardLocked}
                   className="w-12 h-6 text-center bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-800 dark:text-white text-xs disabled:opacity-40 disabled:cursor-not-allowed"
                 />
+                <span className="text-xs text-gray-500 dark:text-gray-400">per</span>
+                <select
+                  value={localVotingScope}
+                  onChange={(e) => handleVotingScopeChange(e.target.value as "board" | "column" | "note")}
+                  disabled={localBoardLocked}
+                  className="h-6 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-800 dark:text-white text-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <option value="board">Board</option>
+                  <option value="column">Column</option>
+                  <option value="note">Note</option>
+                </select>
               </div>
             )}
             <CommandDeckToggle
@@ -331,7 +351,7 @@ export function CommandDeck() {
               <TableIcon size="sm" /> .CSV
             </button>
             <button
-              onClick={() => { const md = exportToMarkdown(title, columns, { votingEnabled, votingAllowed, voterCount, attachments, boardUrl: window.location.href }); downloadFile(md, `${title}.md`, "text/markdown"); }}
+              onClick={() => { const md = exportToMarkdown(title, columns, { votingEnabled, votingAllowed, votingScope, voterCount, attachments, boardUrl: window.location.href }); downloadFile(md, `${title}.md`, "text/markdown"); }}
               className="flex-1 py-1.5 rounded-lg border border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-400 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-sm transition-colors cursor-pointer flex items-center justify-center gap-1"
             >
               <DocumentIcon size="sm" /> .MD
