@@ -57,7 +57,7 @@ const enableSSL = process.env.NODE_ENV !== "development";
 
 const dropplet: { connectionString: string; ssl?: object } = { connectionString };
 if (enableSSL) {
-  dropplet.ssl = { rejectUnauthorized: false };
+  dropplet.ssl = {};
 }
 
 export const pool = new Pool(dropplet);
