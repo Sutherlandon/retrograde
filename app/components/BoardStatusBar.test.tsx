@@ -16,7 +16,7 @@ const defaultBoard = {
   notesLocked: false,
   boardLocked: false,
   columns: [
-    { id: "c1", notes: [{ id: "n1", user_voted: false }, { id: "n2", user_voted: true }] },
+    { id: "c1", notes: [{ id: "n1", user_votes: 0 }, { id: "n2", user_votes: 1 }] },
   ],
 };
 
@@ -70,7 +70,7 @@ describe("BoardStatusBar", () => {
   it("shows correct vote count", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true, votingAllowed: 5 });
     render(<BoardStatusBar />);
-    // 1 vote used (n2 has user_voted: true), so 4 remaining
+    // 1 vote used (n2 has user_votes: 1), so 4 remaining
     expect(screen.getByText("4")).toBeInTheDocument();
   });
 

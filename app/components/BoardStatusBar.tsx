@@ -18,7 +18,7 @@ export function BoardStatusBar() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const votesUsed = votingEnabled
-    ? columns.flatMap((c) => c.notes).filter((n) => n.user_voted).length
+    ? columns.flatMap((c) => c.notes).reduce((sum, n) => sum + (n.user_votes ?? 0), 0)
     : 0;
   const votesRemaining = votingAllowed - votesUsed;
 

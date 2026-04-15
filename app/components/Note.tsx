@@ -5,7 +5,7 @@ import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
 import { useOptionalUser } from "~/context/userContext";
 import type { Note } from "~/server/board.types";
-import { EditIcon, ThumbsUpIcon, ThumbsUpFilledIcon, TrashIcon } from "~/images/icons";
+import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from "~/images/icons";
 import Button from "./Button";
 
 export default function Note({
@@ -69,16 +69,21 @@ export default function Note({
   };
 
   // Count votes the user has already cast across the board
-  const votesUsed = columns.flatMap((c) => c.notes).filter((n) => n.user_voted).length;
+  const votesUsed = columns.flatMap((c) => c.notes).reduce((sum, n) => sum + (n.user_votes ?? 0), 0);
   const votesRemaining = votingAllowed - votesUsed;
-  const userVoted = note.user_voted ?? false;
+  const userVotes = note.user_votes ?? 0;
 
-  // Vote is allowed if: user is logged in, they haven't maxed out votes, OR they're un-voting
-  const canVote = !!user && (userVoted || votesRemaining > 0);
+  const canVoteUp = !!user && votesRemaining > 0;
+  const canVoteDown = !!user && userVotes > 0;
 
-  const handleVote = () => {
-    if (!canVote) return;
-    voteNote(note.id);
+  const handleVoteUp = () => {
+    if (!canVoteUp) return;
+    voteNote(note.id, 1);
+  };
+
+  const handleVoteDown = () => {
+    if (!canVoteDown) return;
+    voteNote(note.id, -1);
   };
 
   // save note (on blur or enter)
@@ -148,32 +153,33 @@ export default function Note({
               {boardLocked ? (
                 <span className="flex items-center gap-1 px-2 py-1 text-xs text-slate-900">
                   {votingEnabled
-                    ? <><ThumbsUpIcon size="sm" /> {note.votes ?? 0}</>
+                    ? <><ArrowUpIcon size="sm" /> {note.votes ?? 0}</>
                     : <><ThumbsUpIcon size="sm" /> {likes}</>
                   }
                 </span>
               ) : votingEnabled ? (
-                <Button
-                  text={(note.votes ?? 0).toString()}
-                  icon={userVoted
-                    ? <ThumbsUpFilledIcon size="sm" className="text-blue-600" />
-                    : <ThumbsUpIcon size="sm" />
-                  }
-                  onClick={handleVote}
-                  onDoubleClick={(e: Event) => e.stopPropagation()}
-                  variant="text"
-                  size='sm'
-                  className={`dark:hover:bg-[rgba(0,0,0,0.1)] ${!canVote ? "opacity-40 cursor-not-allowed" : ""}`}
-                  title={
-                    !user
-                      ? "Log in to vote"
-                      : !canVote
-                      ? "No votes remaining"
-                      : userVoted
-                      ? "Remove vote"
-                      : "Cast vote"
-                  }
-                />
+                <div className="flex items-center" onDoubleClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={handleVoteUp}
+                    disabled={!canVoteUp}
+                    title={!user ? "Log in to vote" : !canVoteUp ? "No votes remaining" : "Cast vote"}
+                    className={`p-0.5 rounded transition-colors ${canVoteUp ? "hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer" : "opacity-40 cursor-not-allowed"}`}
+                  >
+                    <ArrowUpIcon size="sm" />
+                  </button>
+                  <span className="text-xs font-medium min-w-[1.25rem] text-center tabular-nums">{note.votes ?? 0}</span>
+                  {userVotes > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleVoteDown}
+                      title="Remove vote"
+                      className="p-0.5 rounded transition-colors hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer"
+                    >
+                      <ArrowDownIcon size="sm" />
+                    </button>
+                  )}
+                </div>
               ) : (
                 <Button
                   text={likes.toString()}

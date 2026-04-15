@@ -509,10 +509,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const voteNote = (noteId: string) => {
+  const voteNote = (noteId: string, delta: number) => {
     if (isReadOnly || boardLocked) return;
     noteFetcher.submit(
-      { intent: "vote", noteId },
+      { intent: "vote", noteId, delta: String(delta) },
       { method: "PATCH", action: `/app/board/${boardId}/notes` }
     );
   };

@@ -191,35 +191,36 @@ describe("clearBoardVotesServer", () => {
 });
 
 describe("voteNoteServer", () => {
-  it("inserts a vote row when the user has not yet voted on the note", async () => {
+  it("upserts a vote row with count when delta is positive", async () => {
     const { voteNoteServer } = await import("./board_model");
 
-    // INSERT vote (ON CONFLICT DO NOTHING returns rowCount 1)
+    // UPSERT vote
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
     // getBoardServer
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await voteNoteServer("board-1", "note-1", "user-1");
+    await voteNoteServer("board-1", "note-1", "user-1", 1);
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("INSERT INTO note_votes");
-    expect(mockPoolQuery.mock.calls[0][1]).toContain("note-1");
-    expect(mockPoolQuery.mock.calls[0][1]).toContain("user-1");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", 1]);
   });
 
-  it("removes the vote row when the user has already voted on the note", async () => {
+  it("decrements and cleans up vote row when delta is negative", async () => {
     const { voteNoteServer } = await import("./board_model");
 
-    // INSERT returns rowCount 0 (conflict — vote already exists)
-    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
-    // DELETE
+    // UPDATE count
+    mockPoolQuery.mockResolvedValueOnce({});
+    // DELETE if count <= 0
     mockPoolQuery.mockResolvedValueOnce({});
     // getBoardServer
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await voteNoteServer("board-1", "note-1", "user-1");
+    await voteNoteServer("board-1", "note-1", "user-1", -1);
 
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE note_votes SET count");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", -1]);
     expect(mockPoolQuery.mock.calls[1][0]).toContain("DELETE FROM note_votes");
-    expect(mockPoolQuery.mock.calls[1][1]).toEqual(["note-1", "user-1"]);
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("count <= 0");
   });
 });
 

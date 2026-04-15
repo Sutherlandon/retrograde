@@ -70,10 +70,10 @@ describe("board.notes action", () => {
       });
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
-      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1" });
+      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
       await action({ request, params: { id: "board-1" }, context: {} });
 
-      expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "anon-user-1");
+      expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "anon-user-1", 1);
     });
 
     it("allows registered user to vote", async () => {
@@ -86,16 +86,16 @@ describe("board.notes action", () => {
       });
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
-      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1" });
+      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
       await action({ request, params: { id: "board-1" }, context: {} });
 
-      expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "user-1");
+      expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "user-1", 1);
     });
 
     it("returns 401 when no user session exists at all", async () => {
       const { action } = await import("./board.notes");
 
-      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1" });
+      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
 
       try {
         await action({ request, params: { id: "board-1" }, context: {} });

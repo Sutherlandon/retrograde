@@ -267,7 +267,7 @@ export function CommandDeck() {
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
           <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">System Toggles</p>
           <div className="space-y-2">
-            <CommandDeckToggle label="Show Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked} />
+            <CommandDeckToggle label="Show Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked || showVotingWarning} />
             <CommandDeckToggle
               label="Enable Voting"
               checked={localVotingEnabled}
@@ -294,7 +294,7 @@ export function CommandDeck() {
                 </p>
                 <div className="flex justify-between mt-1">
                   <button onClick={confirmVotingToggle} className="w-[30%] py-0.5 rounded bg-amber-600 text-white text-xs cursor-pointer">Confirm</button>
-                  <button onClick={cancelVotingToggle} className="w-[30%] py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs cursor-pointer">Cancel</button>
+                  <button onClick={cancelVotingToggle} className="w-[30%] py-0.5 rounded border border-current text-amber-800 dark:text-amber-200 text-xs cursor-pointer">Cancel</button>
                 </div>
               </div>
             )}
@@ -314,9 +314,9 @@ export function CommandDeck() {
               checked={localNotesLocked || localBoardLocked}
               onChange={handleNotesLockToggle}
               ledColor="amber"
-              disabled={localBoardLocked}
+              disabled={localBoardLocked || showVotingWarning}
             />
-            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" />
+            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" disabled={showVotingWarning} />
           </div>
         </div>
 
