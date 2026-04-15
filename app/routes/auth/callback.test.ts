@@ -21,6 +21,7 @@ vi.mock("~/server/db_config", () => ({
       release: mockRelease,
     })),
   },
+  oauthRedirectUri: "http://localhost:3000/auth/callback",
 }));
 
 // Mock global fetch for token and profile requests

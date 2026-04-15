@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import crypto from "crypto";
 import { getSession, commitSession } from "../../session.server";
+import { oauthRedirectUri } from "~/server/db_config";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -18,7 +19,7 @@ export async function loader({ request }: { request: Request }) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.OAUTH_CLIENT_ID!,
-    redirect_uri: process.env.OAUTH_REDIRECT_URI!,
+    redirect_uri: oauthRedirectUri,
     scope: process.env.OAUTH_SCOPES!,
     state,
   });

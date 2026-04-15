@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+vi.mock("~/server/db_config", () => ({
+  oauthRedirectUri: "http://localhost:3000/auth/callback",
+}));
+
 vi.mock("~/session.server", () => ({
   getSession: vi.fn(async () => {
     const data: Record<string, string> = {};

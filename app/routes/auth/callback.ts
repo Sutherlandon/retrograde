@@ -1,6 +1,6 @@
 import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
-import { pool } from "~/server/db_config";
+import { pool, oauthRedirectUri } from "~/server/db_config";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -37,7 +37,7 @@ export async function loader({ request }: { request: Request }) {
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
-      redirect_uri: process.env.OAUTH_REDIRECT_URI!,
+      redirect_uri: oauthRedirectUri,
       client_id: process.env.OAUTH_CLIENT_ID!,
       client_secret: process.env.OAUTH_CLIENT_SECRET!,
     }),
