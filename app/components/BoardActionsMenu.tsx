@@ -110,6 +110,8 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: B
             </button>
           )}
           {isOwner && !isArchived && (
+            <>
+            <hr className="border-gray-200 dark:border-gray-700" />
             <button
               type="button"
               onClick={handleDeleteClick}
@@ -118,6 +120,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: B
               <span><TrashIcon size="sm" /></span>
               Delete Board
             </button>
+            </>
           )}
         </div>
       )}
