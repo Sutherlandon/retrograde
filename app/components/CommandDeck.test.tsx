@@ -31,6 +31,7 @@ const defaultBoard = {
   columns: [{ id: "c1", title: "Col 1", notes: [{ id: "n1" }], col_order: 0, prompt: "" }],
   votingEnabled: false,
   votingAllowed: 5,
+  votingScope: "board",
   notesLocked: false,
   boardLocked: false,
   attachments: [],
@@ -102,6 +103,24 @@ describe("CommandDeck", () => {
     expect(screen.getByText(/1 note/)).toBeInTheDocument();
     expect(screen.getByText(/3 contributors/)).toBeInTheDocument();
     expect(screen.getByText(/2 voters/)).toBeInTheDocument();
+  });
+
+  it("disables voting toggle while confirm warning is showing", () => {
+    render(<CommandDeck />);
+    // Click the Enable Voting toggle to trigger the warning
+    const votingSwitch = screen.getByText("Enable Voting").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(votingSwitch);
+    // Warning should appear
+    expect(screen.getByText(/Enabling voting will clear all likes and votes/)).toBeInTheDocument();
+    // Toggle should now be disabled (opacity-50 indicates disabled state)
+    expect(votingSwitch.className).toContain("opacity-50");
+  });
+
+  it("opens voting info modal when info icon is clicked", () => {
+    render(<CommandDeck />);
+    fireEvent.click(screen.getByTitle("Voting info"));
+    expect(screen.getByText("Like Mode")).toBeInTheDocument();
+    expect(screen.getByText("Voting Mode")).toBeInTheDocument();
   });
 
   it("lights amber LED when board is locked even if notes lock is off", () => {

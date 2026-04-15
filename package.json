@@ -7,6 +7,7 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
+    "start:local": "react-router-serve ./dist/server/index.js",
     "test": "vitest run",
     "typecheck": "react-router typegen && tsc"
   },

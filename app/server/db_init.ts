@@ -159,11 +159,18 @@ export async function initializeDatabase() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        count INTEGER NOT NULL DEFAULT 1,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         UNIQUE(note_id, user_id)
       );
       CREATE INDEX IF NOT EXISTS idx_note_votes_note_id ON note_votes(note_id);
       CREATE INDEX IF NOT EXISTS idx_note_votes_user_id ON note_votes(user_id);
+    `);
+
+    // 15 Add count column to note_votes for multi-vote support
+    await client.query(`
+      ALTER TABLE note_votes
+      ADD COLUMN IF NOT EXISTS count INTEGER NOT NULL DEFAULT 1;
     `);
 
     // 10 Create attachments table for board file links and uploaded images
@@ -232,6 +239,12 @@ export async function initializeDatabase() {
         UNIQUE(user_id)
       );
       CREATE INDEX IF NOT EXISTS idx_admin_users_user_id ON admin_users(user_id);
+    `);
+
+    // 17 Add voting_scope to boards for board/column/note vote limits
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS voting_scope TEXT NOT NULL DEFAULT 'board';
     `);
 
     console.log("Done");

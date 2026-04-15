@@ -196,7 +196,7 @@ export default function AppDashboard() {
             />
           </div>
 
-          <div className="overflow-x-auto border rounded-lg w-full">
+          <div className="border rounded-lg w-full">
             <table className="table-auto w-full">
               <thead>
                 <tr>
@@ -255,7 +255,7 @@ export default function AppDashboard() {
               </button>
 
               {showArchived && (
-                <div className="overflow-x-auto border rounded-lg w-full opacity-75">
+                <div className="border rounded-lg w-full opacity-75">
                   <table className="table-auto w-full">
                     <thead>
                       <tr>

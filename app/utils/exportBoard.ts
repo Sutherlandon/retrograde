@@ -1,4 +1,4 @@
-import type { Attachment, Column } from "~/server/board.types";
+import type { Attachment, Column, VotingScope } from "~/server/board.types";
 
 function escapeCSVField(field: string): string {
   if (field.includes(",") || field.includes('"') || field.includes("\n")) {
@@ -31,6 +31,7 @@ export function exportToCSV(_title: string, columns: Column[]): string {
 export interface ExportOptions {
   votingEnabled: boolean;
   votingAllowed: number;
+  votingScope?: VotingScope;
   voterCount: number;
   attachments: Attachment[];
   boardUrl?: string;
@@ -41,9 +42,9 @@ export function exportToMarkdown(title: string, columns: Column[], options?: Exp
 
   // System info block
   if (options) {
-    const { votingEnabled, votingAllowed, voterCount, boardUrl } = options;
+    const { votingEnabled, votingAllowed, votingScope = "board", voterCount, boardUrl } = options;
     if (votingEnabled) {
-      lines.push(`> **Scoring:** Votes (max ${votingAllowed} per person) · ${voterCount} participant${voterCount !== 1 ? "s" : ""}`);
+      lines.push(`> **Scoring:** Votes (max ${votingAllowed} per person per ${votingScope}) · ${voterCount} participant${voterCount !== 1 ? "s" : ""}`);
     } else {
       lines.push(`> **Scoring:** Likes`);
     }

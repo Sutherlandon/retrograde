@@ -54,7 +54,7 @@ describe("duplicateBoardServer", () => {
     // SELECT title + voting settings
     mockQuery.mockResolvedValueOnce({
       rowCount: 1,
-      rows: [{ title: "Sprint 1", voting_enabled: true, voting_allowed: 3 }],
+      rows: [{ title: "Sprint 1", voting_enabled: true, voting_allowed: 3, voting_scope: "column" }],
     });
     // INSERT board
     mockQuery.mockResolvedValueOnce({});
@@ -86,8 +86,9 @@ describe("duplicateBoardServer", () => {
     expect(insertBoardCall[1][1]).toBe("Sprint 1 (copy)");
 
     // Verify voting settings were copied
-    expect(insertBoardCall[1][3]).toBe(true);  // voting_enabled
-    expect(insertBoardCall[1][4]).toBe(3);     // voting_allowed
+    expect(insertBoardCall[1][3]).toBe(true);     // voting_enabled
+    expect(insertBoardCall[1][4]).toBe(3);        // voting_allowed
+    expect(insertBoardCall[1][5]).toBe("column"); // voting_scope
 
     // Verify owner membership
     const insertMemberCall = mockQuery.mock.calls[3];
@@ -130,14 +131,15 @@ describe("updateBoardSettingsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] }); // getBoardServer
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 3, notesLocked: false, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 3, votingScope: "board", notesLocked: false, boardLocked: false });
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE boards");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_enabled");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_allowed");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_scope");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("notes_locked");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("board_locked");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, "board-1"]);
   });
 
   it("disables voting", async () => {
@@ -146,9 +148,9 @@ describe("updateBoardSettingsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, notesLocked: false, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, "board-1"]);
   });
 
   it("enables notes lock to prevent note editing during voting", async () => {
@@ -157,9 +159,9 @@ describe("updateBoardSettingsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, notesLocked: true, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, votingScope: "board", notesLocked: true, boardLocked: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, true, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, "board-1"]);
   });
 
   it("enables full board lock to prevent all modifications", async () => {
@@ -168,9 +170,9 @@ describe("updateBoardSettingsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, notesLocked: false, boardLocked: true });
+    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: true });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, "board-1"]);
   });
 });
 
@@ -191,35 +193,36 @@ describe("clearBoardVotesServer", () => {
 });
 
 describe("voteNoteServer", () => {
-  it("inserts a vote row when the user has not yet voted on the note", async () => {
+  it("upserts a vote row with count when delta is positive", async () => {
     const { voteNoteServer } = await import("./board_model");
 
-    // INSERT vote (ON CONFLICT DO NOTHING returns rowCount 1)
+    // UPSERT vote
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
     // getBoardServer
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await voteNoteServer("board-1", "note-1", "user-1");
+    await voteNoteServer("board-1", "note-1", "user-1", 1);
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("INSERT INTO note_votes");
-    expect(mockPoolQuery.mock.calls[0][1]).toContain("note-1");
-    expect(mockPoolQuery.mock.calls[0][1]).toContain("user-1");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", 1]);
   });
 
-  it("removes the vote row when the user has already voted on the note", async () => {
+  it("decrements and cleans up vote row when delta is negative", async () => {
     const { voteNoteServer } = await import("./board_model");
 
-    // INSERT returns rowCount 0 (conflict — vote already exists)
-    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
-    // DELETE
+    // UPDATE count
+    mockPoolQuery.mockResolvedValueOnce({});
+    // DELETE if count <= 0
     mockPoolQuery.mockResolvedValueOnce({});
     // getBoardServer
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await voteNoteServer("board-1", "note-1", "user-1");
+    await voteNoteServer("board-1", "note-1", "user-1", -1);
 
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE note_votes SET count");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", -1]);
     expect(mockPoolQuery.mock.calls[1][0]).toContain("DELETE FROM note_votes");
-    expect(mockPoolQuery.mock.calls[1][1]).toEqual(["note-1", "user-1"]);
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("count <= 0");
   });
 });
 

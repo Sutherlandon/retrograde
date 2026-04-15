@@ -9,8 +9,8 @@ describe("CommandDeckToggle", () => {
   });
 
   it("renders label text", () => {
-    render(<CommandDeckToggle label="Voting" checked={false} onChange={() => {}} ledColor="blue" />);
-    expect(screen.getByText("Voting")).toBeInTheDocument();
+    render(<CommandDeckToggle label="Enable Voting" checked={false} onChange={() => {}} ledColor="blue" />);
+    expect(screen.getByText("Enable Voting")).toBeInTheDocument();
   });
 
   it("shows active LED when checked", () => {

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { useBoard } from "~/context/BoardContext";
-import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon } from "~/images/icons";
+import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon, InfoIcon } from "~/images/icons";
 import { exportToCSV, exportToMarkdown, downloadFile } from "~/utils/exportBoard";
 import { StatusLED } from "./StatusLED";
 import { CommandDeckToggle } from "./CommandDeckToggle";
 import { AttachmentModal } from "./AttachmentModal";
+import { VotingInfoModal } from "./VotingInfoModal";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -13,7 +14,7 @@ const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().p
 export function CommandDeck() {
   const {
     id: boardId, title, timerRunning, timeLeft, startTimer, stopTimer,
-    addColumn, columns, votingEnabled, votingAllowed,
+    addColumn, columns, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, attachments, updateBoardSettings,
     showPrompts, setShowPrompts, sortNotesByScore,
     voterCount, contributorCount, clearParticipantCounts,
@@ -21,12 +22,14 @@ export function CommandDeck() {
 
   const [expanded, setExpanded] = useState(true);
   const [showAttachments, setShowAttachments] = useState(false);
+  const [showVotingInfo, setShowVotingInfo] = useState(false);
   const [minutes, setMinutes] = useState(3);
   const [seconds, setSeconds] = useState(0);
 
   // Local toggle state
   const [localVotingEnabled, setLocalVotingEnabled] = useState(votingEnabled);
   const [localVotingAllowed, setLocalVotingAllowed] = useState(votingAllowed);
+  const [localVotingScope, setLocalVotingScope] = useState(votingScope);
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
   const [showVotingWarning, setShowVotingWarning] = useState(false);
@@ -39,9 +42,10 @@ export function CommandDeck() {
   useEffect(() => {
     setLocalVotingEnabled(votingEnabled);
     setLocalVotingAllowed(votingAllowed);
+    setLocalVotingScope(votingScope);
     setLocalNotesLocked(notesLocked);
     setLocalBoardLocked(boardLocked);
-  }, [votingEnabled, votingAllowed, notesLocked, boardLocked]);
+  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked]);
 
   // Close on Escape
   useEffect(() => {
@@ -58,6 +62,7 @@ export function CommandDeck() {
       updateBoardSettings({
         votingEnabled: pendingVotingEnabled,
         votingAllowed: localVotingAllowed,
+        votingScope: localVotingScope,
         notesLocked: localNotesLocked,
         boardLocked: localBoardLocked,
       });
@@ -79,10 +84,11 @@ export function CommandDeck() {
     startTimer(totalSeconds);
   };
 
-  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; notesLocked: boolean; boardLocked: boolean }> = {}) => {
+  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }> = {}) => {
     updateBoardSettings({
       votingEnabled: overrides.votingEnabled ?? localVotingEnabled,
       votingAllowed: overrides.votingAllowed ?? localVotingAllowed,
+      votingScope: overrides.votingScope ?? localVotingScope,
       notesLocked: overrides.notesLocked ?? localNotesLocked,
       boardLocked: overrides.boardLocked ?? localBoardLocked,
     });
@@ -119,6 +125,11 @@ export function CommandDeck() {
     const clamped = clamp(value, 1, 99);
     setLocalVotingAllowed(clamped);
     saveSettings({ votingAllowed: clamped });
+  };
+
+  const handleVotingScopeChange = (scope: "board" | "column" | "note") => {
+    setLocalVotingScope(scope);
+    saveSettings({ votingScope: scope });
   };
 
   const totalNotes = columns.reduce((sum, c) => sum + c.notes.length, 0);
@@ -265,8 +276,24 @@ export function CommandDeck() {
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
           <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">System Toggles</p>
           <div className="space-y-2">
-            <CommandDeckToggle label="Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked} />
-            <CommandDeckToggle label="Voting" checked={localVotingEnabled} onChange={handleVotingToggle} ledColor="blue" disabled={localBoardLocked} />
+            <CommandDeckToggle label="Show Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked || showVotingWarning} />
+            <CommandDeckToggle
+              label="Enable Voting"
+              checked={localVotingEnabled}
+              onChange={handleVotingToggle}
+              ledColor="blue"
+              disabled={localBoardLocked || showVotingWarning}
+              labelExtra={
+                <button
+                  type="button"
+                  onClick={() => setShowVotingInfo(true)}
+                  title="Voting info"
+                  className="p-0.5 rounded text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors cursor-pointer"
+                >
+                  <InfoIcon size="xs" />
+                </button>
+              }
+            />
             {showVotingWarning && (
               <div className="p-2 rounded bg-amber-50 dark:bg-amber-900/50 border border-amber-300 dark:border-amber-600/50 text-xs text-amber-800 dark:text-amber-200">
                 <p className="font-medium">
@@ -274,9 +301,9 @@ export function CommandDeck() {
                     ? "Enabling voting will clear all likes and votes."
                     : "Disabling voting will clear all votes and likes."}
                 </p>
-                <div className="flex gap-2 mt-1">
-                  <button onClick={confirmVotingToggle} className="px-2 py-0.5 rounded bg-amber-600 text-white text-xs cursor-pointer">Confirm</button>
-                  <button onClick={cancelVotingToggle} className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-xs cursor-pointer">Cancel</button>
+                <div className="flex justify-between mt-1">
+                  <button onClick={confirmVotingToggle} className="w-[30%] py-0.5 rounded bg-amber-600 text-white text-xs cursor-pointer">Confirm</button>
+                  <button onClick={cancelVotingToggle} className="w-[30%] py-0.5 rounded border border-current text-amber-800 dark:text-amber-200 text-xs cursor-pointer">Cancel</button>
                 </div>
               </div>
             )}
@@ -289,6 +316,17 @@ export function CommandDeck() {
                   disabled={localBoardLocked}
                   className="w-12 h-6 text-center bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-800 dark:text-white text-xs disabled:opacity-40 disabled:cursor-not-allowed"
                 />
+                <span className="text-xs text-gray-500 dark:text-gray-400">per</span>
+                <select
+                  value={localVotingScope}
+                  onChange={(e) => handleVotingScopeChange(e.target.value as "board" | "column" | "note")}
+                  disabled={localBoardLocked}
+                  className="h-6 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded text-gray-800 dark:text-white text-xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  <option value="board">Board</option>
+                  <option value="column">Column</option>
+                  <option value="note">Note</option>
+                </select>
               </div>
             )}
             <CommandDeckToggle
@@ -296,9 +334,9 @@ export function CommandDeck() {
               checked={localNotesLocked || localBoardLocked}
               onChange={handleNotesLockToggle}
               ledColor="amber"
-              disabled={localBoardLocked}
+              disabled={localBoardLocked || showVotingWarning}
             />
-            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" />
+            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" disabled={showVotingWarning} />
           </div>
         </div>
 
@@ -313,7 +351,7 @@ export function CommandDeck() {
               <TableIcon size="sm" /> .CSV
             </button>
             <button
-              onClick={() => { const md = exportToMarkdown(title, columns, { votingEnabled, votingAllowed, voterCount, attachments, boardUrl: window.location.href }); downloadFile(md, `${title}.md`, "text/markdown"); }}
+              onClick={() => { const md = exportToMarkdown(title, columns, { votingEnabled, votingAllowed, votingScope, voterCount, attachments, boardUrl: window.location.href }); downloadFile(md, `${title}.md`, "text/markdown"); }}
               className="flex-1 py-1.5 rounded-lg border border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-400 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-sm transition-colors cursor-pointer flex items-center justify-center gap-1"
             >
               <DocumentIcon size="sm" /> .MD
@@ -333,6 +371,9 @@ export function CommandDeck() {
 
       {/* Attachment Modal */}
       {showAttachments && <AttachmentModal onClose={() => setShowAttachments(false)} />}
+
+      {/* Voting Info Modal */}
+      <VotingInfoModal isOpen={showVotingInfo} onClose={() => setShowVotingInfo(false)} />
     </>
   );
 }

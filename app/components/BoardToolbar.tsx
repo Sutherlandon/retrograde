@@ -38,7 +38,7 @@ export default function BoardToolbar({ title }: { title: string }) {
   const canEdit = isOwner && !boardLocked;
 
   return (
-    <div className="flex items-center py-4 gap-2 sm:gap-4">
+    <div className="flex items-baseline py-4 gap-2 sm:gap-4">
       <div className="min-w-0 flex-shrink">
         {editing ? (
           <input
@@ -62,7 +62,9 @@ export default function BoardToolbar({ title }: { title: string }) {
       <div className="flex-grow text-center">
         <TimerDisplay />
       </div>
-      <BoardStatusBar />
+      <div className="flex-shrink-0">
+        <BoardStatusBar />
+      </div>
     </div>
   );
 }

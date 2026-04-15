@@ -98,6 +98,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [offline, setOffline] = useState(false);
   const [votingEnabled, setVotingEnabled] = useState(loaderData.votingEnabled ?? false);
   const [votingAllowed, setVotingAllowed] = useState(loaderData.votingAllowed ?? 5);
+  const [votingScope, setVotingScope] = useState<"board" | "column" | "note">(loaderData.votingScope ?? "board");
   const [notesLocked, setNotesLocked] = useState(loaderData.notesLocked ?? false);
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
@@ -132,9 +133,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setVotingEnabled(loaderData.votingEnabled ?? false);
     setVotingAllowed(loaderData.votingAllowed ?? 5);
+    setVotingScope(loaderData.votingScope ?? "board");
     setNotesLocked(loaderData.notesLocked ?? false);
     setLocked(loaderData.boardLocked ?? false);
-  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.notesLocked, loaderData.boardLocked]);
+  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -509,24 +511,37 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const voteNote = (noteId: string) => {
+  const voteNote = (noteId: string, delta: number) => {
     if (isReadOnly || boardLocked) return;
+    // Optimistically update vote counts
+    setColumns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        notes: c.notes.map((n) =>
+          n.id === noteId
+            ? { ...n, user_votes: (n.user_votes ?? 0) + delta, votes: (n.votes ?? 0) + delta }
+            : n
+        ),
+      }))
+    );
     noteFetcher.submit(
-      { intent: "vote", noteId },
+      { intent: "vote", noteId, delta: String(delta) },
       { method: "PATCH", action: `/app/board/${boardId}/notes` }
     );
   };
 
-  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; notesLocked: boolean; boardLocked: boolean }) => {
+  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }) => {
     if (isReadOnly) return;
     setVotingEnabled(settings.votingEnabled);
     setVotingAllowed(settings.votingAllowed);
+    setVotingScope(settings.votingScope);
     setNotesLocked(settings.notesLocked);
     setLocked(settings.boardLocked);
     settingsFetcher.submit(
       {
         votingEnabled: String(settings.votingEnabled),
         votingAllowed: settings.votingAllowed,
+        votingScope: settings.votingScope,
         notesLocked: String(settings.notesLocked),
         boardLocked: String(settings.boardLocked),
       },
@@ -610,6 +625,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     timeLeft,
     votingEnabled,
     votingAllowed,
+    votingScope,
     notesLocked,
     boardLocked,
     boardLockedAt,

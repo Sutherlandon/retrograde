@@ -56,9 +56,6 @@ console.log("NODE_ENV", process.env.NODE_ENV);
 const enableSSL = process.env.NODE_ENV !== "development";
 
 const dropplet: { connectionString: string; ssl?: object } = { connectionString };
-if (enableSSL) {
-  dropplet.ssl = { rejectUnauthorized: false };
-}
 
 export const pool = new Pool(dropplet);
 
@@ -74,3 +71,9 @@ export const siteAdminIds: string[] = rawSiteAdminIds
 if (siteAdminIds.length === 0) {
   console.warn("Warning: SITE_ADMIN_IDS is not set — the admin dashboard will be inaccessible.");
 }
+
+// OAuth redirect URI — use VERCEL_URL for preview deployments, fall back to
+// the explicit OAUTH_REDIRECT_URI for local dev and production.
+export const oauthRedirectUri = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}/auth/callback`
+  : process.env.OAUTH_REDIRECT_URI!;

@@ -6,6 +6,7 @@ interface CommandDeckToggleProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   ledColor: "green" | "blue" | "amber" | "red";
+  labelExtra?: React.ReactNode;
 }
 
 const toggleColorMap = {
@@ -15,12 +16,13 @@ const toggleColorMap = {
   red: "bg-red-600",
 };
 
-export function CommandDeckToggle({ label, checked, onChange, disabled = false, ledColor }: CommandDeckToggleProps) {
+export function CommandDeckToggle({ label, checked, onChange, disabled = false, ledColor, labelExtra }: CommandDeckToggleProps) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <StatusLED color={ledColor} active={checked} size="sm" />
         <span className="text-xs text-gray-600 dark:text-gray-300">{label}</span>
+        {labelExtra}
       </div>
       <button
         type="button"

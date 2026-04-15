@@ -56,10 +56,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       if (intent === "vote") {
         const noteId = data.get("noteId") as string;
-        if (!noteId) throw new Response("Missing noteId", { status: 422 });
+        const delta = Number(data.get("delta"));
+        if (!noteId || isNaN(delta) || delta === 0) throw new Response("Missing vote fields", { status: 422 });
         const user = await getOptionalUser(request);
         if (!user) throw new Response("Unauthorized", { status: 401 });
-        return voteNoteServer(boardId, noteId, user.id);
+        return voteNoteServer(boardId, noteId, user.id, delta);
       }
 
       // default PATCH: update note content

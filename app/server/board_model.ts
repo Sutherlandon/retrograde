@@ -27,6 +27,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'timerEndsAt',    to_char(b.timer_ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
       'votingEnabled',    b.voting_enabled,
       'votingAllowed',    b.voting_allowed,
+      'votingScope',      b.voting_scope,
       'notesLocked',      b.notes_locked,
       'boardLocked',      b.board_locked,
       'voterCount',       (SELECT COUNT(DISTINCT user_id) FROM (
@@ -49,11 +50,11 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
                     'id',         n.id,
                     'text',       n.text,
                     'likes',      n.likes,
-                    'votes',      (SELECT COUNT(*) FROM note_votes nv WHERE nv.note_id = n.id),
-                    'user_voted', CASE
+                    'votes',      (SELECT COALESCE(SUM(nv.count), 0) FROM note_votes nv WHERE nv.note_id = n.id),
+                    'user_votes', CASE
                                     WHEN $2::uuid IS NOT NULL
-                                    THEN EXISTS(SELECT 1 FROM note_votes nv WHERE nv.note_id = n.id AND nv.user_id = $2::uuid)
-                                    ELSE FALSE
+                                    THEN COALESCE((SELECT nv.count FROM note_votes nv WHERE nv.note_id = n.id AND nv.user_id = $2::uuid), 0)
+                                    ELSE 0
                                   END,
                     'is_new',     n.is_new,
                     'created',    n.created,
@@ -213,15 +214,25 @@ export async function likeNoteServer(boardId: string, noteId: string, delta: num
   return getBoardServer(boardId);
 }
 
-export async function voteNoteServer(boardId: string, noteId: string, userId: string) {
-  // Try to insert. If the row already exists (user already voted), delete it instead.
-  const insert = await pool.query(
-    `INSERT INTO note_votes (note_id, user_id) VALUES ($1, $2) ON CONFLICT (note_id, user_id) DO NOTHING`,
-    [noteId, userId]
-  );
-  if (insert.rowCount === 0) {
-    // Vote existed — remove it (toggle off)
-    await pool.query(`DELETE FROM note_votes WHERE note_id = $1 AND user_id = $2`, [noteId, userId]);
+export async function voteNoteServer(boardId: string, noteId: string, userId: string, delta: number) {
+  if (delta > 0) {
+    // Upsert: insert or increment count
+    await pool.query(
+      `INSERT INTO note_votes (note_id, user_id, count)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (note_id, user_id) DO UPDATE SET count = note_votes.count + $3`,
+      [noteId, userId, delta]
+    );
+  } else if (delta < 0) {
+    // Decrement count, then delete row if count reached 0
+    await pool.query(
+      `UPDATE note_votes SET count = count + $3 WHERE note_id = $1 AND user_id = $2`,
+      [noteId, userId, delta]
+    );
+    await pool.query(
+      `DELETE FROM note_votes WHERE note_id = $1 AND user_id = $2 AND count <= 0`,
+      [noteId, userId]
+    );
   }
   return getBoardServer(boardId, userId);
 }
@@ -231,13 +242,14 @@ export async function updateBoardSettingsServer(
   settings: {
     votingEnabled: boolean;
     votingAllowed: number;
+    votingScope: string;
     notesLocked: boolean;
     boardLocked: boolean;
   }
 ) {
   await pool.query(
-    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, notes_locked = $3, board_locked = $4 WHERE id = $5`,
-    [settings.votingEnabled, settings.votingAllowed, settings.notesLocked, settings.boardLocked, boardId]
+    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5 WHERE id = $6`,
+    [settings.votingEnabled, settings.votingAllowed, settings.votingScope, settings.notesLocked, settings.boardLocked, boardId]
   );
   return getBoardServer(boardId);
 }
@@ -346,17 +358,17 @@ export async function duplicateBoardServer(
 
     // Get the original board title and settings
     const boardRes = await client.query(
-      `SELECT title, voting_enabled, voting_allowed FROM boards WHERE id = $1`,
+      `SELECT title, voting_enabled, voting_allowed, voting_scope FROM boards WHERE id = $1`,
       [boardId]
     );
     if (boardRes.rowCount === 0) throw new Error("Board not found");
-    const { title, voting_enabled, voting_allowed } = boardRes.rows[0];
+    const { title, voting_enabled, voting_allowed, voting_scope } = boardRes.rows[0];
     const newTitle = `${title} (copy)`;
 
-    // Create the new board (copy voting settings)
+    // Create the new board (copy voting settings, locks default to false)
     await client.query(
-      `INSERT INTO boards (id, title, created_by, voting_enabled, voting_allowed) VALUES ($1, $2, $3, $4, $5)`,
-      [newId, newTitle, userId, voting_enabled, voting_allowed]
+      `INSERT INTO boards (id, title, created_by, voting_enabled, voting_allowed, voting_scope) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [newId, newTitle, userId, voting_enabled, voting_allowed, voting_scope]
     );
 
     // Add the user as owner
