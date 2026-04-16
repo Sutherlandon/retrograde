@@ -134,7 +134,7 @@ export default function AppDashboard() {
       <WelcomeBanner
         id={`${pkg.version}-release`}
         title={`Version ${pkg.version} Released`}
-        message="This release includes several new features the Command Deck for board owners, board attachments, sort by likes, and more. Check out the release notes for all the details!"
+        message="This release we've rebuild the voting system - You can now limit votes on a per board, column, or note basis and multiple votes can be cast per note! We've also added board filtering and archiving in the dashboard, board titles now set web page titles, and lots of usability improvements. Check out the release notes for all the details!"
         link="https://github.com/Sutherlandon/retrograde/releases"
       />
 
