@@ -72,8 +72,10 @@ if (siteAdminIds.length === 0) {
   console.warn("Warning: SITE_ADMIN_IDS is not set — the admin dashboard will be inaccessible.");
 }
 
-// OAuth redirect URI — use VERCEL_URL for preview deployments, fall back to
-// the explicit OAUTH_REDIRECT_URI for local dev and production.
-export const oauthRedirectUri = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}/auth/callback`
-  : process.env.OAUTH_REDIRECT_URI!;
+// OAuth redirect URI — use VERCEL_URL only in preview deployments (where each
+// deploy gets a unique hostname). Production also has VERCEL_URL set, but we
+// want the stable OAUTH_REDIRECT_URI there. Local dev also uses OAUTH_REDIRECT_URI.
+export const oauthRedirectUri =
+  process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/auth/callback`
+    : process.env.OAUTH_REDIRECT_URI!;
