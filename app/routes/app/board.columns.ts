@@ -11,46 +11,50 @@ import {
   updateColumnPromptServer,
   deleteColumnServer,
 } from "~/server/board_model";
+import { logMetric, withErrorLogging } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { id: boardId } = params;
-  if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+  return withErrorLogging("board.columns action", async () => {
+    const { id: boardId } = params;
+    if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  const data = await request.formData();
+    const data = await request.formData();
 
-  switch (request.method.toUpperCase()) {
-    case "POST": {
-      const id = data.get("id") as string;
-      const title = data.get("title") as string;
-      const colOrder = Number(data.get("col_order"));
-      if (!id || !title || isNaN(colOrder)) {
-        throw new Response("Missing column fields", { status: 422 });
-      }
-      return addColumnServer(boardId, id, title, colOrder);
-    }
-
-    case "PATCH": {
-      const columnId = data.get("columnId") as string;
-      if (!columnId) throw new Response("Missing columnId", { status: 422 });
-
-      const intent = data.get("intent") as string;
-      if (intent === "updatePrompt") {
-        const prompt = data.get("prompt") as string ?? "";
-        return updateColumnPromptServer(boardId, columnId, prompt);
+    switch (request.method.toUpperCase()) {
+      case "POST": {
+        const id = data.get("id") as string;
+        const title = data.get("title") as string;
+        const colOrder = Number(data.get("col_order"));
+        if (!id || !title || isNaN(colOrder)) {
+          throw new Response("Missing column fields", { status: 422 });
+        }
+        return addColumnServer(boardId, id, title, colOrder);
       }
 
-      const newTitle = data.get("title") as string;
-      if (!newTitle) throw new Response("Missing title", { status: 422 });
-      return updateColumnTitleServer(boardId, columnId, newTitle);
-    }
+      case "PATCH": {
+        const columnId = data.get("columnId") as string;
+        if (!columnId) throw new Response("Missing columnId", { status: 422 });
 
-    case "DELETE": {
-      const columnId = data.get("columnId") as string;
-      if (!columnId) throw new Response("Missing columnId", { status: 422 });
-      return deleteColumnServer(boardId, columnId);
-    }
+        const intent = data.get("intent") as string;
+        if (intent === "updatePrompt") {
+          const prompt = (data.get("prompt") as string) ?? "";
+          return updateColumnPromptServer(boardId, columnId, prompt);
+        }
 
-    default:
-      throw new Response("Method Not Allowed", { status: 405 });
-  }
+        const newTitle = data.get("title") as string;
+        if (!newTitle) throw new Response("Missing title", { status: 422 });
+        return updateColumnTitleServer(boardId, columnId, newTitle);
+      }
+
+      case "DELETE": {
+        const columnId = data.get("columnId") as string;
+        if (!columnId) throw new Response("Missing columnId", { status: 422 });
+        logMetric("Delete Column", { boardId, columnId });
+        return deleteColumnServer(boardId, columnId);
+      }
+
+      default:
+        throw new Response("Method Not Allowed", { status: 405 });
+    }
+  });
 }

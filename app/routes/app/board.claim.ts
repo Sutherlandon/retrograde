@@ -1,46 +1,50 @@
 import { type ActionFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
+import { logMetric, withErrorLogging } from "~/server/logger";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireRegisteredUser(request);
-  const formData = await request.formData();
-  const boardLink = formData.get("boardLink")?.toString().trim() ?? "";
+  return withErrorLogging("board.claim action", async () => {
+    const user = await requireRegisteredUser(request);
+    const formData = await request.formData();
+    const boardLink = formData.get("boardLink")?.toString().trim() ?? "";
 
-  const match = boardLink.match(/\/board\/([a-zA-Z0-9_-]+)/);
-  if (!match) {
-    return { error: "Invalid board link. Please check the URL and try again." };
-  }
+    const match = boardLink.match(/\/board\/([a-zA-Z0-9_-]+)/);
+    if (!match) {
+      return { error: "Invalid board link. Please check the URL and try again." };
+    }
 
-  const boardId = match[1];
+    const boardId = match[1];
 
-  const boardResult = await pool.query(
-    `SELECT b.created_by, bm.user_id as owner_id
-     FROM boards b
-     LEFT JOIN board_members bm ON bm.board_id = b.id AND bm.role = 'owner'
-     WHERE b.id = $1`,
-    [boardId]
-  );
+    const boardResult = await pool.query(
+      `SELECT b.created_by, bm.user_id as owner_id
+       FROM boards b
+       LEFT JOIN board_members bm ON bm.board_id = b.id AND bm.role = 'owner'
+       WHERE b.id = $1`,
+      [boardId]
+    );
 
-  if (boardResult.rowCount === 0) {
-    return { error: "Board not found." };
-  }
+    if (boardResult.rowCount === 0) {
+      return { error: "Board not found." };
+    }
 
-  const { owner_id, created_by } = boardResult.rows[0];
+    const { owner_id, created_by } = boardResult.rows[0];
 
-  const hasOwner = !!owner_id;
-  const isAnonymousCreator = !created_by;
+    const hasOwner = !!owner_id;
+    const isAnonymousCreator = !created_by;
 
-  if (hasOwner || !isAnonymousCreator) {
-    return { error: "This board already has an owner and cannot be claimed." };
-  }
+    if (hasOwner || !isAnonymousCreator) {
+      return { error: "This board already has an owner and cannot be claimed." };
+    }
 
-  await pool.query(
-    `INSERT INTO board_members (board_id, user_id, role)
-     VALUES ($1, $2, 'owner')
-     ON CONFLICT (board_id, user_id) DO UPDATE SET role = 'owner'`,
-    [boardId, user.id]
-  );
+    await pool.query(
+      `INSERT INTO board_members (board_id, user_id, role)
+       VALUES ($1, $2, 'owner')
+       ON CONFLICT (board_id, user_id) DO UPDATE SET role = 'owner'`,
+      [boardId, user.id]
+    );
 
-  return { success: true };
+    logMetric("Claim Board", { userId: user.id, boardId });
+    return { success: true };
+  });
 }

@@ -11,6 +11,7 @@ import {
   getBoardServer,
 } from "~/server/board_model";
 import { pool } from "~/server/db_config";
+import { logMetric, withErrorLogging } from "~/server/logger";
 
 async function requireOwner(request: Request, boardId: string) {
   const user = await getOptionalUser(request);
@@ -27,33 +28,43 @@ async function requireOwner(request: Request, boardId: string) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { id: boardId } = params;
-  if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+  return withErrorLogging("board.settings action", async () => {
+    const { id: boardId } = params;
+    if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  const data = await request.formData();
+    const data = await request.formData();
 
-  switch (request.method.toUpperCase()) {
-    case "PATCH": {
-      const user = await requireOwner(request, boardId);
-      const votingEnabled = data.get("votingEnabled") === "true";
-      const votingAllowed = Number(data.get("votingAllowed"));
-      const votingScope = (data.get("votingScope") as string) || "board";
-      const notesLocked = data.get("notesLocked") === "true";
-      const boardLocked = data.get("boardLocked") === "true";
-      if (isNaN(votingAllowed) || votingAllowed < 1) {
-        throw new Response("Invalid votingAllowed", { status: 422 });
+    switch (request.method.toUpperCase()) {
+      case "PATCH": {
+        const user = await requireOwner(request, boardId);
+        const votingEnabled = data.get("votingEnabled") === "true";
+        const votingAllowed = Number(data.get("votingAllowed"));
+        const votingScope = (data.get("votingScope") as string) || "board";
+        const notesLocked = data.get("notesLocked") === "true";
+        const boardLocked = data.get("boardLocked") === "true";
+        if (isNaN(votingAllowed) || votingAllowed < 1) {
+          throw new Response("Invalid votingAllowed", { status: 422 });
+        }
+        logMetric("Update Board Settings", {
+          userId: user.id,
+          boardId,
+          votingEnabled,
+          notesLocked,
+          boardLocked,
+        });
+        return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked });
       }
-      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked });
-    }
 
-    case "POST": {
-      // Clear all votes/likes — called when enabling voting to wipe existing likes
-      await requireOwner(request, boardId);
-      await clearBoardVotesServer(boardId);
-      return getBoardServer(boardId);
-    }
+      case "POST": {
+        // Clear all votes/likes — called when enabling voting to wipe existing likes
+        const user = await requireOwner(request, boardId);
+        await clearBoardVotesServer(boardId);
+        logMetric("Clear Board Votes", { userId: user.id, boardId });
+        return getBoardServer(boardId);
+      }
 
-    default:
-      throw new Response("Method Not Allowed", { status: 405 });
-  }
+      default:
+        throw new Response("Method Not Allowed", { status: 405 });
+    }
+  });
 }

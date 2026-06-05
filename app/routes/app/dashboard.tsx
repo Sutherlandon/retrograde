@@ -5,6 +5,7 @@ import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { createBoard, duplicateBoardServer, deleteBoardServer, archiveBoardServer, unarchiveBoardServer } from "~/server/board_model";
+import { logMetric, withErrorLogging } from "~/server/logger";
 import { PlusIcon, CheckIcon, SearchIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
@@ -56,42 +57,46 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const user = await requireRegisteredUser(request);
-  const formData = await request.formData();
-  const intent = formData.get("intent")?.toString();
+  return withErrorLogging("dashboard action", async () => {
+    const user = await requireRegisteredUser(request);
+    const formData = await request.formData();
+    const intent = formData.get("intent")?.toString();
 
-  if (intent === "duplicate") {
-    const boardId = formData.get("boardId")?.toString();
-    if (!boardId) throw new Response("Missing boardId", { status: 400 });
-    const newBoardId = await duplicateBoardServer(boardId, user.id);
-    return redirect(`/app/board/${newBoardId}`);
-  }
+    if (intent === "duplicate") {
+      const boardId = formData.get("boardId")?.toString();
+      if (!boardId) throw new Response("Missing boardId", { status: 400 });
+      const newBoardId = await duplicateBoardServer(boardId, user.id);
+      logMetric("Duplicate Board", { userId: user.id, boardId, newBoardId });
+      return redirect(`/app/board/${newBoardId}`);
+    }
 
-  if (intent === "delete") {
-    const boardId = formData.get("boardId")?.toString();
-    if (!boardId) throw new Response("Missing boardId", { status: 400 });
-    await deleteBoardServer(boardId, user.id);
-    return redirect("/app/dashboard");
-  }
+    if (intent === "delete") {
+      const boardId = formData.get("boardId")?.toString();
+      if (!boardId) throw new Response("Missing boardId", { status: 400 });
+      await deleteBoardServer(boardId, user.id);
+      logMetric("Delete Board", { userId: user.id, boardId });
+      return redirect("/app/dashboard");
+    }
 
-  if (intent === "archive") {
-    const boardId = formData.get("boardId")?.toString();
-    if (!boardId) throw new Response("Missing boardId", { status: 400 });
-    await archiveBoardServer(boardId, user.id);
-    return null;
-  }
+    if (intent === "archive") {
+      const boardId = formData.get("boardId")?.toString();
+      if (!boardId) throw new Response("Missing boardId", { status: 400 });
+      await archiveBoardServer(boardId, user.id);
+      return null;
+    }
 
-  if (intent === "unarchive") {
-    const boardId = formData.get("boardId")?.toString();
-    if (!boardId) throw new Response("Missing boardId", { status: 400 });
-    await unarchiveBoardServer(boardId, user.id);
-    return null;
-  }
+    if (intent === "unarchive") {
+      const boardId = formData.get("boardId")?.toString();
+      if (!boardId) throw new Response("Missing boardId", { status: 400 });
+      await unarchiveBoardServer(boardId, user.id);
+      return null;
+    }
 
-  // Default: create board
-  const title = formData.get("title")?.toString().trim() || "Untitled";
-  const board_id = await createBoard(title, user.id);
-  return redirect(`/app/board/${board_id}`);
+    // Default: create board
+    const title = formData.get("title")?.toString().trim() || "Untitled";
+    const board_id = await createBoard(title, user.id);
+    return redirect(`/app/board/${board_id}`);
+  });
 }
 
 function fuzzyMatch(text: string, query: string): boolean {
