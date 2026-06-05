@@ -58,40 +58,40 @@ export async function loader({ request }: { request: Request }) {
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireRegisteredUser(request);
-    const formData = await request.formData();
-    const intent = formData.get("intent")?.toString();
+  const formData = await request.formData();
+  const intent = formData.get("intent")?.toString();
 
-    if (intent === "duplicate") {
-      const boardId = formData.get("boardId")?.toString();
-      if (!boardId) throw new Response("Missing boardId", { status: 400 });
-      const newBoardId = await duplicateBoardServer(boardId, user.id);
-      logMetric("Duplicate Board", { userId: user.id, boardId, newBoardId });
-      return redirect(`/app/board/${newBoardId}`);
-    }
+  if (intent === "duplicate") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    const newBoardId = await duplicateBoardServer(boardId, user.id);
+    logMetric("Duplicate Board", { userId: user.id, boardId, newBoardId });
+    return redirect(`/app/board/${newBoardId}`);
+  }
 
-    if (intent === "delete") {
-      const boardId = formData.get("boardId")?.toString();
-      if (!boardId) throw new Response("Missing boardId", { status: 400 });
-      await deleteBoardServer(boardId, user.id);
-      logMetric("Delete Board", { userId: user.id, boardId });
-      return redirect("/app/dashboard");
-    }
+  if (intent === "delete") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    await deleteBoardServer(boardId, user.id);
+    logMetric("Delete Board", { userId: user.id, boardId });
+    return redirect("/app/dashboard");
+  }
 
-    if (intent === "archive") {
-      const boardId = formData.get("boardId")?.toString();
-      if (!boardId) throw new Response("Missing boardId", { status: 400 });
-      await archiveBoardServer(boardId, user.id);
-      return null;
-    }
+  if (intent === "archive") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    await archiveBoardServer(boardId, user.id);
+    return null;
+  }
 
-    if (intent === "unarchive") {
-      const boardId = formData.get("boardId")?.toString();
-      if (!boardId) throw new Response("Missing boardId", { status: 400 });
-      await unarchiveBoardServer(boardId, user.id);
-      return null;
-    }
+  if (intent === "unarchive") {
+    const boardId = formData.get("boardId")?.toString();
+    if (!boardId) throw new Response("Missing boardId", { status: 400 });
+    await unarchiveBoardServer(boardId, user.id);
+    return null;
+  }
 
-    // Default: create board
+  // Default: create board
   const title = formData.get("title")?.toString().trim() || "Untitled";
   const board_id = await createBoard(title, user.id);
   return redirect(`/app/board/${board_id}`);

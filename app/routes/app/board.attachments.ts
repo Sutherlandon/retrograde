@@ -38,48 +38,48 @@ export async function loader({ params }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
-    if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+  if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-    const user = await requireOwner(request, boardId);
-    const data = await request.formData();
+  const user = await requireOwner(request, boardId);
+  const data = await request.formData();
 
-    switch (request.method.toUpperCase()) {
-      case "POST": {
-        const type = data.get("type") as string;
-        const filename = data.get("filename") as string;
+  switch (request.method.toUpperCase()) {
+    case "POST": {
+      const type = data.get("type") as string;
+      const filename = data.get("filename") as string;
 
-        if (!filename) throw new Response("Filename is required", { status: 422 });
+      if (!filename) throw new Response("Filename is required", { status: 422 });
 
-        if (type === "image") {
-          const imageData = data.get("imageData") as string;
-          if (!imageData) throw new Response("Image data is required", { status: 422 });
+      if (type === "image") {
+        const imageData = data.get("imageData") as string;
+        if (!imageData) throw new Response("Image data is required", { status: 422 });
 
-          try {
-            const result = await addImageAttachmentServer(boardId, filename, imageData);
-            logMetric("Add Image Attachment", { userId: user.id, boardId, filename });
-            return Response.json(result);
-          } catch (err) {
-            const message = (err as Error).message;
-            if (message.includes("Maximum") || message.includes("exceeds")) {
-              throw new Response(message, { status: 422 });
-            }
-            throw err;
+        try {
+          const result = await addImageAttachmentServer(boardId, filename, imageData);
+          logMetric("Add Image Attachment", { userId: user.id, boardId, filename });
+          return Response.json(result);
+        } catch (err) {
+          const message = (err as Error).message;
+          if (message.includes("Maximum") || message.includes("exceeds")) {
+            throw new Response(message, { status: 422 });
           }
-        } else {
-          const link = data.get("link") as string;
-          if (!link) throw new Response("Link is required", { status: 422 });
-          return Response.json(await addLinkAttachmentServer(boardId, filename, link));
+          throw err;
         }
+      } else {
+        const link = data.get("link") as string;
+        if (!link) throw new Response("Link is required", { status: 422 });
+        return Response.json(await addLinkAttachmentServer(boardId, filename, link));
       }
-
-      case "DELETE": {
-        const attachmentId = data.get("attachmentId") as string;
-        if (!attachmentId) throw new Response("Attachment ID is required", { status: 422 });
-        logMetric("Delete Attachment", { userId: user.id, boardId, attachmentId });
-        return Response.json(await deleteAttachmentServer(boardId, attachmentId));
-      }
-
-      default:
-        throw new Response("Method Not Allowed", { status: 405 });
     }
+
+    case "DELETE": {
+      const attachmentId = data.get("attachmentId") as string;
+      if (!attachmentId) throw new Response("Attachment ID is required", { status: 422 });
+      logMetric("Delete Attachment", { userId: user.id, boardId, attachmentId });
+      return Response.json(await deleteAttachmentServer(boardId, attachmentId));
+    }
+
+    default:
+      throw new Response("Method Not Allowed", { status: 405 });
+  }
 }

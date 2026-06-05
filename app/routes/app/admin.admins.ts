@@ -29,34 +29,34 @@ async function requireSiteAdmin(request: Request) {
 
 export async function action({ request }: { request: Request }) {
   const admin = await requireSiteAdmin(request);
-    const formData = await request.formData();
-    const intent = formData.get("intent")?.toString();
+  const formData = await request.formData();
+  const intent = formData.get("intent")?.toString();
 
-    if (intent === "add") {
-      const username = formData.get("username")?.toString().trim();
-      if (!username) {
-        return { error: "Username is required." };
-      }
-
-      const target = await findRegisteredUserByUsername(username);
-      if (!target) {
-        return { error: `No registered user found with username "${username}".` };
-      }
-
-      await addGrantedAdmin(target.id, admin.externalId);
-      logMetric("Grant Admin", { adminId: admin.id, targetUserId: target.id, username: target.username });
-      return { success: true, addedUsername: target.username };
+  if (intent === "add") {
+    const username = formData.get("username")?.toString().trim();
+    if (!username) {
+      return { error: "Username is required." };
     }
 
-    if (intent === "remove") {
-      const userId = formData.get("userId")?.toString();
-      if (!userId) {
-        return { error: "Missing userId." };
-      }
-      await removeGrantedAdmin(userId);
-      logMetric("Revoke Admin", { adminId: admin.id, targetUserId: userId });
-      return { success: true };
+    const target = await findRegisteredUserByUsername(username);
+    if (!target) {
+      return { error: `No registered user found with username "${username}".` };
     }
+
+    await addGrantedAdmin(target.id, admin.externalId);
+    logMetric("Grant Admin", { adminId: admin.id, targetUserId: target.id, username: target.username });
+    return { success: true, addedUsername: target.username };
+  }
+
+  if (intent === "remove") {
+    const userId = formData.get("userId")?.toString();
+    if (!userId) {
+      return { error: "Missing userId." };
+    }
+    await removeGrantedAdmin(userId);
+    logMetric("Revoke Admin", { adminId: admin.id, targetUserId: userId });
+    return { success: true };
+  }
 
   throw new Response("Bad Request", { status: 400 });
 }
