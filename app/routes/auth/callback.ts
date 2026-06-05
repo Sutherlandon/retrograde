@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
 import { pool, oauthRedirectUri } from "~/server/db_config";
-import { logMetric, logError } from "~/server/logger";
+import { logMetric } from "~/server/logger";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -87,9 +87,6 @@ export async function loader({ request }: { request: Request }) {
     const userId = result.rows[0].id;
     session.set("userId", userId);
     logMetric("Login", { userId });
-  } catch (err) {
-    logError("auth/callback user upsert", err);
-    throw err;
   } finally {
     client.release();
   }

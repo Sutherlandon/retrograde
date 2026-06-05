@@ -5,7 +5,7 @@ import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { createBoard, duplicateBoardServer, deleteBoardServer, archiveBoardServer, unarchiveBoardServer } from "~/server/board_model";
-import { logMetric, withErrorLogging } from "~/server/logger";
+import { logMetric } from "~/server/logger";
 import { PlusIcon, CheckIcon, SearchIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
@@ -57,8 +57,7 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  return withErrorLogging("dashboard action", async () => {
-    const user = await requireRegisteredUser(request);
+  const user = await requireRegisteredUser(request);
     const formData = await request.formData();
     const intent = formData.get("intent")?.toString();
 
@@ -93,10 +92,9 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     // Default: create board
-    const title = formData.get("title")?.toString().trim() || "Untitled";
-    const board_id = await createBoard(title, user.id);
-    return redirect(`/app/board/${board_id}`);
-  });
+  const title = formData.get("title")?.toString().trim() || "Untitled";
+  const board_id = await createBoard(title, user.id);
+  return redirect(`/app/board/${board_id}`);
 }
 
 function fuzzyMatch(text: string, query: string): boolean {

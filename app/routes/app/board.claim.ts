@@ -1,11 +1,10 @@
 import { type ActionFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
-import { logMetric, withErrorLogging } from "~/server/logger";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request }: ActionFunctionArgs) {
-  return withErrorLogging("board.claim action", async () => {
-    const user = await requireRegisteredUser(request);
+  const user = await requireRegisteredUser(request);
     const formData = await request.formData();
     const boardLink = formData.get("boardLink")?.toString().trim() ?? "";
 
@@ -44,7 +43,6 @@ export async function action({ request }: ActionFunctionArgs) {
       [boardId, user.id]
     );
 
-    logMetric("Claim Board", { userId: user.id, boardId });
-    return { success: true };
-  });
+  logMetric("Claim Board", { userId: user.id, boardId });
+  return { success: true };
 }

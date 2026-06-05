@@ -9,7 +9,7 @@ import {
   findRegisteredUserByUsername,
   removeGrantedAdmin,
 } from "~/server/admin_model";
-import { logMetric, withErrorLogging } from "~/server/logger";
+import { logMetric } from "~/server/logger";
 
 async function requireSiteAdmin(request: Request) {
   const user = await requireRegisteredUser(request);
@@ -28,8 +28,7 @@ async function requireSiteAdmin(request: Request) {
 }
 
 export async function action({ request }: { request: Request }) {
-  return withErrorLogging("admin.admins action", async () => {
-    const admin = await requireSiteAdmin(request);
+  const admin = await requireSiteAdmin(request);
     const formData = await request.formData();
     const intent = formData.get("intent")?.toString();
 
@@ -59,6 +58,5 @@ export async function action({ request }: { request: Request }) {
       return { success: true };
     }
 
-    throw new Response("Bad Request", { status: 400 });
-  });
+  throw new Response("Bad Request", { status: 400 });
 }

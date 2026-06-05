@@ -1,6 +1,6 @@
 // app/server/logger.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { logMetric, logError, withErrorLogging } from "./logger";
+import { logMetric, logError } from "./logger";
 
 describe("logger", () => {
   beforeEach(() => {
@@ -39,28 +39,4 @@ describe("logger", () => {
     });
   });
 
-  describe("withErrorLogging", () => {
-    it("returns the resolved value on success", async () => {
-      const result = await withErrorLogging("test", () =>
-        Promise.resolve("ok")
-      );
-      expect(result).toBe("ok");
-    });
-
-    it("logs and rethrows non-Response errors", async () => {
-      const err = new Error("db failure");
-      await expect(
-        withErrorLogging("test", () => Promise.reject(err))
-      ).rejects.toThrow("db failure");
-      expect(console.error).toHaveBeenCalledWith("[ERROR] test:", err);
-    });
-
-    it("does not log intentional HTTP Response errors", async () => {
-      const err = new Response("Not Found", { status: 404 });
-      await expect(
-        withErrorLogging("test", () => Promise.reject(err))
-      ).rejects.toBe(err);
-      expect(console.error).not.toHaveBeenCalled();
-    });
-  });
 });

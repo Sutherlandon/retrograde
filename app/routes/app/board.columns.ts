@@ -11,11 +11,10 @@ import {
   updateColumnPromptServer,
   deleteColumnServer,
 } from "~/server/board_model";
-import { logMetric, withErrorLogging } from "~/server/logger";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  return withErrorLogging("board.columns action", async () => {
-    const { id: boardId } = params;
+  const { id: boardId } = params;
     if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
     const data = await request.formData();
@@ -56,5 +55,4 @@ export async function action({ request, params }: ActionFunctionArgs) {
       default:
         throw new Response("Method Not Allowed", { status: 405 });
     }
-  });
 }
