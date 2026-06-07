@@ -13,6 +13,7 @@ import {
   deleteAttachmentServer,
 } from "~/server/attachment_model";
 import { pool } from "~/server/db_config";
+import { logMetric } from "~/server/logger";
 
 async function requireOwner(request: Request, boardId: string) {
   const user = await getOptionalUser(request);
@@ -39,7 +40,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  await requireOwner(request, boardId);
+  const user = await requireOwner(request, boardId);
   const data = await request.formData();
 
   switch (request.method.toUpperCase()) {
@@ -54,7 +55,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!imageData) throw new Response("Image data is required", { status: 422 });
 
         try {
-          return Response.json(await addImageAttachmentServer(boardId, filename, imageData));
+          const result = await addImageAttachmentServer(boardId, filename, imageData);
+          logMetric("Add Image Attachment", { userId: user.id, boardId, filename });
+          return Response.json(result);
         } catch (err) {
           const message = (err as Error).message;
           if (message.includes("Maximum") || message.includes("exceeds")) {
@@ -72,6 +75,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "DELETE": {
       const attachmentId = data.get("attachmentId") as string;
       if (!attachmentId) throw new Response("Attachment ID is required", { status: 422 });
+      logMetric("Delete Attachment", { userId: user.id, boardId, attachmentId });
       return Response.json(await deleteAttachmentServer(boardId, attachmentId));
     }
 

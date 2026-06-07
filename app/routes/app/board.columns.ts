@@ -11,6 +11,7 @@ import {
   updateColumnPromptServer,
   deleteColumnServer,
 } from "~/server/board_model";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -35,7 +36,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const intent = data.get("intent") as string;
       if (intent === "updatePrompt") {
-        const prompt = data.get("prompt") as string ?? "";
+        const prompt = (data.get("prompt") as string) ?? "";
         return updateColumnPromptServer(boardId, columnId, prompt);
       }
 
@@ -47,6 +48,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "DELETE": {
       const columnId = data.get("columnId") as string;
       if (!columnId) throw new Response("Missing columnId", { status: 422 });
+      logMetric("Delete Column", { boardId, columnId });
       return deleteColumnServer(boardId, columnId);
     }
 

@@ -13,6 +13,7 @@ import {
   moveNoteServer,
   reorderNotesServer,
 } from "~/server/board_model";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -60,6 +61,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!noteId || isNaN(delta) || delta === 0) throw new Response("Missing vote fields", { status: 422 });
         const user = await getOptionalUser(request);
         if (!user) throw new Response("Unauthorized", { status: 401 });
+        logMetric("Vote Note", { userId: user.id, boardId, noteId, delta });
         return voteNoteServer(boardId, noteId, user.id, delta);
       }
 
@@ -80,6 +82,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const noteId = data.get("noteId") as string;
       const columnId = data.get("columnId") as string;
       if (!noteId || !columnId) throw new Response("Missing noteId or columnId", { status: 422 });
+      logMetric("Delete Note", { boardId, noteId });
       return deleteNoteServer(boardId, columnId, noteId);
     }
 

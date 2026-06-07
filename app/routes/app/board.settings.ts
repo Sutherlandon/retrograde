@@ -11,6 +11,7 @@ import {
   getBoardServer,
 } from "~/server/board_model";
 import { pool } from "~/server/db_config";
+import { logMetric } from "~/server/logger";
 
 async function requireOwner(request: Request, boardId: string) {
   const user = await getOptionalUser(request);
@@ -43,13 +44,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
+      logMetric("Update Board Settings", {
+        userId: user.id,
+        boardId,
+        votingEnabled,
+        notesLocked,
+        boardLocked,
+      });
       return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked });
     }
 
     case "POST": {
       // Clear all votes/likes — called when enabling voting to wipe existing likes
-      await requireOwner(request, boardId);
+      const user = await requireOwner(request, boardId);
       await clearBoardVotesServer(boardId);
+      logMetric("Clear Board Votes", { userId: user.id, boardId });
       return getBoardServer(boardId);
     }
 

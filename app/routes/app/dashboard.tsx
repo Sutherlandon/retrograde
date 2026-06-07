@@ -5,6 +5,7 @@ import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { createBoard, duplicateBoardServer, deleteBoardServer, archiveBoardServer, unarchiveBoardServer } from "~/server/board_model";
+import { logMetric } from "~/server/logger";
 import { PlusIcon, CheckIcon, SearchIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
@@ -64,6 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const boardId = formData.get("boardId")?.toString();
     if (!boardId) throw new Response("Missing boardId", { status: 400 });
     const newBoardId = await duplicateBoardServer(boardId, user.id);
+    logMetric("Duplicate Board", { userId: user.id, boardId, newBoardId });
     return redirect(`/app/board/${newBoardId}`);
   }
 
@@ -71,6 +73,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const boardId = formData.get("boardId")?.toString();
     if (!boardId) throw new Response("Missing boardId", { status: 400 });
     await deleteBoardServer(boardId, user.id);
+    logMetric("Delete Board", { userId: user.id, boardId });
     return redirect("/app/dashboard");
   }
 

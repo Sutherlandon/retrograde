@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
 import { pool, oauthRedirectUri } from "~/server/db_config";
+import { logMetric } from "~/server/logger";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -83,7 +84,9 @@ export async function loader({ request }: { request: Request }) {
       ]
     );
 
-    session.set("userId", result.rows[0].id);
+    const userId = result.rows[0].id;
+    session.set("userId", userId);
+    logMetric("Login", { userId });
   } finally {
     client.release();
   }

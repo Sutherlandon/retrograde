@@ -9,6 +9,7 @@ import {
   findRegisteredUserByUsername,
   removeGrantedAdmin,
 } from "~/server/admin_model";
+import { logMetric } from "~/server/logger";
 
 async function requireSiteAdmin(request: Request) {
   const user = await requireRegisteredUser(request);
@@ -43,6 +44,7 @@ export async function action({ request }: { request: Request }) {
     }
 
     await addGrantedAdmin(target.id, admin.externalId);
+    logMetric("Grant Admin", { adminId: admin.id, targetUserId: target.id, username: target.username });
     return { success: true, addedUsername: target.username };
   }
 
@@ -52,6 +54,7 @@ export async function action({ request }: { request: Request }) {
       return { error: "Missing userId." };
     }
     await removeGrantedAdmin(userId);
+    logMetric("Revoke Admin", { adminId: admin.id, targetUserId: userId });
     return { success: true };
   }
 
