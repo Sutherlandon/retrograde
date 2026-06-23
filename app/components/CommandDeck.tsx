@@ -16,7 +16,7 @@ export function CommandDeck() {
     id: boardId, title, timerRunning, timeLeft, startTimer, stopTimer,
     addColumn, columns, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, attachments, updateBoardSettings,
-    showPrompts, setShowPrompts, sortNotesByScore,
+    attributionEnabled, sortNotesByScore,
     voterCount, contributorCount, clearParticipantCounts,
   } = useBoard();
 
@@ -32,6 +32,7 @@ export function CommandDeck() {
   const [localVotingScope, setLocalVotingScope] = useState(votingScope);
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
+  const [localAttributionEnabled, setLocalAttributionEnabled] = useState(attributionEnabled);
   const [showVotingWarning, setShowVotingWarning] = useState(false);
   const [pendingVotingEnabled, setPendingVotingEnabled] = useState<boolean | null>(null);
 
@@ -45,7 +46,8 @@ export function CommandDeck() {
     setLocalVotingScope(votingScope);
     setLocalNotesLocked(notesLocked);
     setLocalBoardLocked(boardLocked);
-  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked]);
+    setLocalAttributionEnabled(attributionEnabled);
+  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled]);
 
   // Close on Escape
   useEffect(() => {
@@ -65,6 +67,7 @@ export function CommandDeck() {
         votingScope: localVotingScope,
         notesLocked: localNotesLocked,
         boardLocked: localBoardLocked,
+        attributionEnabled: localAttributionEnabled,
       });
       setShowVotingWarning(false);
       setPendingVotingEnabled(null);
@@ -84,13 +87,14 @@ export function CommandDeck() {
     startTimer(totalSeconds);
   };
 
-  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }> = {}) => {
+  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean }> = {}) => {
     updateBoardSettings({
       votingEnabled: overrides.votingEnabled ?? localVotingEnabled,
       votingAllowed: overrides.votingAllowed ?? localVotingAllowed,
       votingScope: overrides.votingScope ?? localVotingScope,
       notesLocked: overrides.notesLocked ?? localNotesLocked,
       boardLocked: overrides.boardLocked ?? localBoardLocked,
+      attributionEnabled: overrides.attributionEnabled ?? localAttributionEnabled,
     });
   };
 
@@ -132,6 +136,11 @@ export function CommandDeck() {
     saveSettings({ votingScope: scope });
   };
 
+  const handleAttributionToggle = (enabled: boolean) => {
+    setLocalAttributionEnabled(enabled);
+    saveSettings({ attributionEnabled: enabled });
+  };
+
   const totalNotes = columns.reduce((sum, c) => sum + c.notes.length, 0);
 
   // ----- MINIMIZED PILL -----
@@ -150,7 +159,7 @@ export function CommandDeck() {
         <RocketIcon size="lg" />
         <span className="hidden sm:inline text-sm font-semibold tracking-wide">Command Deck</span>
         <div className="flex items-center gap-1.5 ml-1">
-          <StatusLED color="green" active={showPrompts} size="sm" />
+          <StatusLED color="green" active={localAttributionEnabled} size="sm" />
           <StatusLED color="blue" active={votingEnabled} size="sm" />
           <StatusLED color="amber" active={notesLocked || boardLocked} size="sm" />
           <StatusLED color="red" active={boardLocked} size="sm" />
@@ -185,7 +194,7 @@ export function CommandDeck() {
             Command Deck
           </h3>
           <div className="flex items-center gap-1.5">
-            <StatusLED color="green" active={showPrompts} size="sm" />
+            <StatusLED color="green" active={localAttributionEnabled} size="sm" />
             <StatusLED color="blue" active={localVotingEnabled} size="sm" />
             <StatusLED color="amber" active={localNotesLocked || localBoardLocked} size="sm" />
             <StatusLED color="red" active={localBoardLocked} size="sm" />
@@ -276,7 +285,13 @@ export function CommandDeck() {
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
           <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">System Toggles</p>
           <div className="space-y-2">
-            <CommandDeckToggle label="Show Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked || showVotingWarning} />
+            <CommandDeckToggle
+              label="User Attribution"
+              checked={localAttributionEnabled}
+              onChange={handleAttributionToggle}
+              ledColor="green"
+              disabled={localBoardLocked || showVotingWarning}
+            />
             <CommandDeckToggle
               label="Enable Voting"
               checked={localVotingEnabled}

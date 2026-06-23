@@ -101,6 +101,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [votingScope, setVotingScope] = useState<"board" | "column" | "note">(loaderData.votingScope ?? "board");
   const [notesLocked, setNotesLocked] = useState(loaderData.notesLocked ?? false);
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
+  const [attributionEnabled, setAttributionEnabled] = useState(loaderData.attributionEnabled ?? false);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
     loaderData.boardLocked ? new Date() : null
   );
@@ -116,7 +117,6 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [attachments, setAttachments] = useState<Attachment[]>(loaderData.attachments ?? []);
   const attachmentFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
-  const [showPrompts, setShowPrompts] = useState(true);
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -136,7 +136,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setVotingScope(loaderData.votingScope ?? "board");
     setNotesLocked(loaderData.notesLocked ?? false);
     setLocked(loaderData.boardLocked ?? false);
-  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked]);
+    setAttributionEnabled(loaderData.attributionEnabled ?? false);
+  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -176,6 +177,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       setVotingAllowed(data.votingAllowed ?? 5);
       setNotesLocked(data.notesLocked ?? false);
       setLocked(data.boardLocked ?? false);
+      setAttributionEnabled(data.attributionEnabled ?? false);
     }
   }, [settingsFetcher.data]);
 
@@ -530,13 +532,14 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }) => {
+  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean }) => {
     if (isReadOnly) return;
     setVotingEnabled(settings.votingEnabled);
     setVotingAllowed(settings.votingAllowed);
     setVotingScope(settings.votingScope);
     setNotesLocked(settings.notesLocked);
     setLocked(settings.boardLocked);
+    setAttributionEnabled(settings.attributionEnabled);
     settingsFetcher.submit(
       {
         votingEnabled: String(settings.votingEnabled),
@@ -544,6 +547,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         votingScope: settings.votingScope,
         notesLocked: String(settings.notesLocked),
         boardLocked: String(settings.boardLocked),
+        attributionEnabled: String(settings.attributionEnabled),
       },
       { method: "PATCH", action: `/app/board/${boardId}/settings` }
     );
@@ -652,8 +656,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     deleteAttachment,
     startTimer,
     stopTimer,
-    showPrompts,
-    setShowPrompts,
+    attributionEnabled,
   };
 
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>;

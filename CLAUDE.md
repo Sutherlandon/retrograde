@@ -44,9 +44,14 @@ Never scatter `process.env` references throughout the codebase. Import config va
 
 ### 6. Decision Logs
 
-Maintain a record of key decisions, current project state, and progress in `plan/`. Before starting a significant feature or refactor, note the approach and rationale. This allows new sessions to resume context without re-explaining the problem.
+Maintain a record of key decisions, current project state, and progress in `docs/`. Before starting a significant feature or refactor, note the approach and rationale. This allows new sessions to resume context without re-explaining the problem.
 
-When completing a meaningful change, update or create a brief note in `plan/` describing what was done and why.
+When completing a meaningful change, update or create a brief note in `docs/` describing what was done and why.
+
+**Two distinct kinds of decision record:**
+
+- **`docs/STATE.md`** — the short-term "what's where right now" snapshot. Edit freely as the project evolves.
+- **`docs/adr/`** — Architecture Decision Records. Long-memory documents capturing decisions that shape the architecture or product direction. Use ADRs when a decision is hard to reverse, shapes future work, has non-obvious rejected alternatives, or might otherwise be challenged without context. Read `docs/adr/README.md` for the convention. **Never edit an accepted ADR's substance** — supersede it with a new ADR that references the old one.
 
 ### 7. Keep Secrets Secret
 
@@ -84,7 +89,7 @@ app/
 ├── session.server.ts # Session cookie management
 └── features.ts       # Feature flags
 public/               # Static assets (icons, PDFs)
-plan/                 # Feature planning documents
+docs/                 # Decision log, project state, feature planning
 ```
 
 ---

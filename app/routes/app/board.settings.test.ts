@@ -89,6 +89,7 @@ describe("board.settings action", () => {
         votingScope: "board",
         notesLocked: false,
         boardLocked: false,
+        attributionEnabled: false,
       });
     });
 

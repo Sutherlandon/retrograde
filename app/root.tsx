@@ -43,6 +43,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="black-translucent" />
 
+        {/* AI-agent discoverability */}
+        <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM-readable site documentation" />
+
         <Meta />
         <Links />
         {/* Inline theme bootstrap to prevent wrong theme flash */}
@@ -62,7 +65,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
       </head>
       <body>
         <ThemeInitializer />

@@ -6,7 +6,6 @@ import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, 
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
-import CloudflareTurnstile from "~/components/CloudflareTurnstile";
 import { siteConfig } from "~/config/siteConfig";
 
 export const meta = () => {
@@ -69,35 +68,6 @@ export async function action({ request }: ActionFunctionArgs) {
   const honeypot = formData.get("website")?.toString();
   if (honeypot) {
     return redirect(`/app/board/example-board`);
-  }
-
-  // Cloudflare Turnstile verification — skipped gracefully if the script was
-  // blocked by an ad blocker (token will be absent). The honeypot above
-  // provides lightweight protection in that case.
-  const token = formData.get("cf-turnstile-response");
-
-  if (token) {
-    const verifyRes = await fetch(
-      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          secret: process.env.CLOUDFLARE_TURNSTILE_SECRET_KEY,
-          response: token,
-          remoteip: request.headers.get("CF-Connecting-IP"),
-        }),
-      }
-    );
-
-    const verifyData = await verifyRes.json();
-
-    if (!verifyData.success) {
-      return Response.json(
-        { errors: { captcha: "Captcha verification failed" } },
-        { status: 400 }
-      );
-    }
   }
 
   // create the board first (no owner yet)
@@ -176,7 +146,6 @@ export default function Home() {
                 <div className='mx-auto w-fit'>
                 </div>
               </div>
-              <CloudflareTurnstile actionData={actionData} />
               <div className="mb-4">
                 <button
                   type="submit"

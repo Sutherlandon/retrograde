@@ -8,7 +8,7 @@ import Button from "./Button";
 import { PlusIcon, EllipsisIcon, TrashIcon, EditIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
-  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked, showPrompts, isOwner } = useBoard();
+  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked, isOwner } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [deleteMode, setDeleteMode] = useState(false);
@@ -216,7 +216,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 />
               </div>
             </div>
-          ) : column.prompt && showPrompts ? (
+          ) : column.prompt ? (
             <div className="mb-6 p-2 border-b border-t border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-400 cursor-text whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
               {column.prompt}
             </div>

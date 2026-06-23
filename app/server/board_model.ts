@@ -16,6 +16,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
     SELECT json_build_object(
       'id',             b.id,
       'title',          b.title,
+      'team_id',        b.team_id,
       'readonly',       false,
       'isOwner',        CASE
                           WHEN $2::uuid IS NOT NULL
@@ -30,6 +31,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'votingScope',      b.voting_scope,
       'notesLocked',      b.notes_locked,
       'boardLocked',      b.board_locked,
+      'attributionEnabled', b.attribution_enabled,
       'voterCount',       (SELECT COUNT(DISTINCT user_id) FROM (
                             SELECT nv.user_id FROM note_votes nv JOIN notes n ON nv.note_id = n.id JOIN columns c ON n.column_id = c.id WHERE c.board_id = b.id
                             UNION
@@ -58,11 +60,22 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
                                   END,
                     'is_new',     n.is_new,
                     'created',    n.created,
-                    'note_order', n.note_order
+                    'note_order', n.note_order,
+                    -- Agent authorship is ALWAYS surfaced (transparency about AI involvement
+                    -- trumps anonymity). Human authorship is gated by attribution_enabled.
+                    'author',     CASE
+                                    WHEN u.id IS NOT NULL AND (b.attribution_enabled OR u.is_agent)
+                                    THEN json_build_object(
+                                      'display_name', COALESCE(u.display_name, u.preferred_username, 'Guest'),
+                                      'is_agent',     COALESCE(u.is_agent, false)
+                                    )
+                                    ELSE NULL
+                                  END
                   )
                   ORDER BY n.note_order, n.created
                 )
                 FROM notes n
+                LEFT JOIN users u ON u.id = n.created_by
                 WHERE n.column_id = c.id
               ),
               '[]'::json
@@ -129,6 +142,120 @@ export async function createBoard(
   } finally {
     client.release();
   }
+}
+
+export async function createBoardWithColumns(
+  title: string,
+  columns: { title: string; prompt?: string }[],
+  userId: string | null,
+  teamId: string | null = null
+): Promise<string> {
+  const client = await pool.connect();
+  const id = crypto.randomUUID();
+
+  // Empty array falls back to default retro columns
+  const cols = columns.length > 0
+    ? columns
+    : [
+        { title: "What went well?" },
+        { title: "What can we do better?" },
+        { title: "Action items" },
+      ];
+
+  try {
+    await client.query("BEGIN");
+
+    await client.query(
+      `INSERT INTO boards (id, title, created_by, team_id) VALUES ($1, $2, $3, $4)`,
+      [id, title, userId, teamId]
+    );
+
+    if (userId) {
+      await client.query(
+        `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')`,
+        [id, userId]
+      );
+    }
+
+    for (let i = 0; i < cols.length; i++) {
+      await client.query(
+        `INSERT INTO columns (id, board_id, title, col_order, prompt) VALUES ($1, $2, $3, $4, $5)`,
+        [crypto.randomUUID(), id, cols[i].title, i, cols[i].prompt ?? ""]
+      );
+    }
+
+    await client.query("COMMIT");
+    return id;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Bulk insert notes across one or more columns of a single board.
+ * Validates every columnId belongs to boardId; rejects the entire batch on mismatch.
+ * Per-column note_order continues from the existing max.
+ */
+export async function bulkInsertNotesServer(
+  boardId: string,
+  notes: { columnId: string; text: string }[],
+  userId: string
+): Promise<BoardDTO | null> {
+  if (notes.length === 0) return getBoardServer(boardId, userId);
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Validate all columnIds belong to this board
+    const requestedColumnIds = Array.from(new Set(notes.map((n) => n.columnId)));
+    const colCheck = await client.query(
+      `SELECT id FROM columns WHERE board_id = $1 AND id = ANY($2::text[])`,
+      [boardId, requestedColumnIds]
+    );
+    const validIds = new Set(colCheck.rows.map((r) => r.id));
+    const bad = requestedColumnIds.filter((id) => !validIds.has(id));
+    if (bad.length > 0) {
+      throw new Error(`COLUMN_NOT_ON_BOARD:${bad.join(",")}`);
+    }
+
+    // Find per-column starting note_order
+    const startOrder: Record<string, number> = {};
+    for (const colId of requestedColumnIds) {
+      const r = await client.query(
+        `SELECT COALESCE(MAX(note_order), -1) + 1 AS next FROM notes WHERE column_id = $1`,
+        [colId]
+      );
+      startOrder[colId] = Number(r.rows[0].next);
+    }
+
+    // Insert notes one row at a time inside the transaction.
+    // (A single multi-row INSERT was considered, but per-column order tracking
+    // is simpler this way and the batch is capped at 200 by the route.)
+    const perColumnCounter: Record<string, number> = {};
+    const nowMs = Date.now().toString();
+    for (const note of notes) {
+      const order = startOrder[note.columnId] + (perColumnCounter[note.columnId] ?? 0);
+      perColumnCounter[note.columnId] = (perColumnCounter[note.columnId] ?? 0) + 1;
+      await client.query(
+        `INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order, created_by)
+         VALUES ($1, $2, $3, 0, false, $4, $5, $6)`,
+        [crypto.randomUUID(), note.columnId, note.text, nowMs, order, userId]
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return getBoardServer(boardId, userId);
 }
 
 export async function setBoardOwner(boardId: string, userId: string) {
@@ -245,11 +372,20 @@ export async function updateBoardSettingsServer(
     votingScope: string;
     notesLocked: boolean;
     boardLocked: boolean;
+    attributionEnabled: boolean;
   }
 ) {
   await pool.query(
-    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5 WHERE id = $6`,
-    [settings.votingEnabled, settings.votingAllowed, settings.votingScope, settings.notesLocked, settings.boardLocked, boardId]
+    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5, attribution_enabled = $6 WHERE id = $7`,
+    [
+      settings.votingEnabled,
+      settings.votingAllowed,
+      settings.votingScope,
+      settings.notesLocked,
+      settings.boardLocked,
+      settings.attributionEnabled,
+      boardId,
+    ]
   );
   return getBoardServer(boardId);
 }

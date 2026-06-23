@@ -759,3 +759,31 @@ export function SearchIcon({ size = 'md', className = '' }: IconProps) {
     </svg>
   );
 }
+
+export function RobotIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${sizeMap[size]} ${className}`}
+    >
+      {/* Antenna */}
+      <path d="M12 3v2" />
+      <circle cx="12" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+      {/* Head */}
+      <rect x="4.5" y="6" width="15" height="12" rx="2.5" />
+      {/* Eyes */}
+      <circle cx="9" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      {/* Mouth */}
+      <path d="M9.5 15.5h5" />
+      {/* Side bolts */}
+      <path d="M2.5 11v2M21.5 11v2" />
+    </svg>
+  );
+}

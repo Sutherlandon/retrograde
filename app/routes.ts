@@ -19,6 +19,7 @@ export default [
     route("board/claim", "routes/app/board.claim.ts"),
     route("admin/dashboard", "routes/app/admin.dashboard.tsx"),
     route("admin/admins",   "routes/app/admin.admins.ts"),
+    route("account/api-keys", "routes/app/account.api-keys.tsx"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */
@@ -39,6 +40,12 @@ export default [
   route("/auth/login", "routes/auth/login.ts"),
   route("/auth/callback", "routes/auth/callback.ts"),
   route("/auth/logout", "routes/auth/logout.ts"),
+
+  /* JSON API — agent-facing */
+  route("/api/v1/boards", "routes/api/boards.ts"),
+  route("/api/v1/boards/:id", "routes/api/board.ts"),
+  route("/api/v1/boards/:id/notes", "routes/api/board.notes.ts"),
+  route("/api/v1/cron/archive-stale", "routes/api/cron.archive-stale.ts"),
 
   // legacy route for backward compatibility
   route("/board/:id", "routes/app/board.legacy.tsx"),

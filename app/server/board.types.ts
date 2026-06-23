@@ -9,6 +9,11 @@ export type VotingScope = "board" | "column" | "note";
 // 1. SERVER / WIRE TYPES — exactly what the DB returns. No client concerns.
 // ---------------------------------------------------------------------------
 
+export interface NoteAuthorDTO {
+  display_name: string;
+  is_agent: boolean;
+}
+
 export interface NoteDTO {
   id: string;
   column_id: string;
@@ -19,6 +24,7 @@ export interface NoteDTO {
   is_new: boolean;
   created: string;
   note_order: number;
+  author?: NoteAuthorDTO | null;
 }
 
 export interface ColumnDTO {
@@ -44,6 +50,7 @@ export interface BoardDTO {
   title: string;
   readonly: boolean;       // true for example boards — server sets this
   isOwner?: boolean;       // true when the current user is the board owner
+  team_id?: string | null; // null = teamless (trial / grandfathered); see ADR-0003
   timerRunning: boolean;
   timerStartedAt: string | null;
   timerEndsAt: string | null;
@@ -52,10 +59,32 @@ export interface BoardDTO {
   votingScope?: VotingScope;
   notesLocked?: boolean;
   boardLocked?: boolean;
+  attributionEnabled?: boolean;
   voterCount?: number;
   contributorCount?: number;
   columns: ColumnDTO[];
   attachments?: AttachmentDTO[];
+}
+
+// ---------------------------------------------------------------------------
+// Team + API key DTOs (server-side only; UI consumes them via specific routes)
+// ---------------------------------------------------------------------------
+
+export interface TeamDTO {
+  id: string;
+  name: string;
+  is_personal: boolean;
+  created_at: string;
+}
+
+export interface ApiKeyDTO {
+  id: string;
+  team_id: string;
+  key_prefix: string;        // e.g., "rk_live_abc1" — for display only
+  display_name: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,11 +123,12 @@ export interface BoardClientState {
   notesLocked: boolean;
   boardLocked: boolean;
   boardLockedAt: Date | null;
+  // Attribution — when false, note authorship is hidden everywhere.
+  // Off by default to preserve retro anonymity.
+  attributionEnabled: boolean;
   // Participation stats
   voterCount: number;
   contributorCount: number;
-  // UI preferences (client-only, not persisted)
-  showPrompts: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +146,7 @@ export interface BoardActions {
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
-  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean }) => void;
+  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean }) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
@@ -126,7 +156,6 @@ export interface BoardActions {
   addLinkAttachment: (filename: string, link: string) => void;
   addImageAttachment: (filename: string, imageData: string) => void;
   deleteAttachment: (attachmentId: string) => void;
-  setShowPrompts: (show: boolean) => void;
   sortNotesByScore: () => void;
   clearParticipantCounts: () => void;
 }

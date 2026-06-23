@@ -12,7 +12,7 @@ interface LedConfig {
 
 export function BoardStatusBar() {
   const {
-    showPrompts, votingEnabled, votingAllowed, votingScope,
+    attributionEnabled, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, columns,
   } = useBoard();
 
@@ -26,7 +26,7 @@ export function BoardStatusBar() {
   const votesRemaining = votingAllowed - votesUsed;
 
   const leds: LedConfig[] = [
-    { color: "green", active: showPrompts, label: "Prompts" },
+    { color: "green", active: attributionEnabled, label: "Attribution" },
     { color: "blue", active: votingEnabled, label: "Voting" },
     { color: "amber", active: notesLocked || boardLocked, label: "Notes Locked" },
     { color: "red", active: boardLocked, label: "Board Locked" },

@@ -5,7 +5,7 @@ import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
 import { useOptionalUser } from "~/context/userContext";
 import type { Note } from "~/server/board.types";
-import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from "~/images/icons";
+import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, RobotIcon } from "~/images/icons";
 import Button from "./Button";
 
 export default function Note({
@@ -133,6 +133,16 @@ export default function Note({
           className="flex flex-col gap-2 justify-between h-full"
           onDoubleClick={() => { if (!notesLocked && !boardLocked) setIsEditing(true); }}
         >
+          {note.author && (
+            <div
+              data-testid="note-author"
+              className={`text-[10px] flex items-center gap-1 ${note.author.is_agent ? "text-blue-700" : "text-slate-600"}`}
+              title={note.author.is_agent ? `Suggested by ${note.author.display_name} (AI agent)` : `by ${note.author.display_name}`}
+            >
+              {note.author.is_agent && <span aria-hidden="true" className="inline-flex"><RobotIcon size="xs" /></span>}
+              <span>{note.author.display_name}</span>
+            </div>
+          )}
           <div className="flex-1 whitespace-pre-wrap">
             {note.text}
           </div>

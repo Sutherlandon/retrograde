@@ -36,8 +36,7 @@ const defaultBoard = {
   boardLocked: false,
   attachments: [],
   updateBoardSettings: vi.fn(),
-  showPrompts: true,
-  setShowPrompts: vi.fn(),
+  attributionEnabled: false,
   sortNotesByScore: vi.fn(),
   voterCount: 2,
   contributorCount: 3,
@@ -76,7 +75,7 @@ describe("CommandDeck", () => {
   it("shows 4 status LEDs in pill when collapsed", () => {
     const { container } = render(<CommandDeck />);
     fireEvent.click(screen.getByTitle("Minimize"));
-    // Pill has 4 LEDs: prompts (green/active), voting (gray), notes locked (gray), board locked (gray)
+    // Pill has 4 LEDs: attribution (green), voting (blue), notes locked (amber), board locked (red)
     const leds = container.querySelectorAll(".rounded-full.inline-block");
     expect(leds.length).toBe(4);
   });
@@ -121,6 +120,22 @@ describe("CommandDeck", () => {
     fireEvent.click(screen.getByTitle("Voting info"));
     expect(screen.getByText("Like Mode")).toBeInTheDocument();
     expect(screen.getByText("Voting Mode")).toBeInTheDocument();
+  });
+
+  it("renders the User Attribution toggle (off by default)", () => {
+    render(<CommandDeck />);
+    expect(screen.getByText("User Attribution")).toBeInTheDocument();
+  });
+
+  it("calls updateBoardSettings with attributionEnabled:true when toggled on", () => {
+    const updateBoardSettings = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, updateBoardSettings });
+    render(<CommandDeck />);
+    const toggleSwitch = screen.getByText("User Attribution").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(toggleSwitch);
+    expect(updateBoardSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ attributionEnabled: true })
+    );
   });
 
   it("lights amber LED when board is locked even if notes lock is off", () => {

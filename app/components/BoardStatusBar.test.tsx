@@ -10,7 +10,7 @@ vi.mock("~/context/BoardContext", () => ({
 import { BoardStatusBar } from "./BoardStatusBar";
 
 const defaultBoard = {
-  showPrompts: true,
+  attributionEnabled: false,
   votingEnabled: false,
   votingAllowed: 5,
   votingScope: "board",
@@ -46,7 +46,7 @@ describe("BoardStatusBar", () => {
   it("expands legend when LEDs are clicked", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
     expect(screen.getByText("Voting")).toBeInTheDocument();
     expect(screen.getByText("Notes Locked")).toBeInTheDocument();
     expect(screen.getByText("Board Locked")).toBeInTheDocument();
@@ -55,17 +55,17 @@ describe("BoardStatusBar", () => {
   it("collapses legend when clicked again", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.queryByText("Prompts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
   });
 
   it("closes legend when clicking outside", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
-    expect(screen.queryByText("Prompts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
   });
 
   it("shows correct vote count", () => {

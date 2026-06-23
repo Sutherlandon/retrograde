@@ -25,10 +25,19 @@ vi.mock("~/config/siteConfig", () => ({
   },
 }));
 
+const mockFindApiKeyByValue = vi.fn();
+const mockTouchApiKeyLastUsed = vi.fn();
+vi.mock("~/server/api_key", () => ({
+  isApiKey: (t: string) => typeof t === "string" && t.startsWith("rk_live_"),
+  findApiKeyByValue: (...args: unknown[]) => mockFindApiKeyByValue(...args),
+  touchApiKeyLastUsed: (...args: unknown[]) => mockTouchApiKeyLastUsed(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
+  mockTouchApiKeyLastUsed.mockResolvedValue(undefined);
 });
 
 describe("getOptionalUser", () => {
@@ -161,6 +170,77 @@ describe("getOrCreateUser", () => {
     const result = await getOrCreateUser(request, "board-1");
 
     expect(result.user.username).toBe("Guest");
+  });
+});
+
+describe("getApiUser", () => {
+  it("resolves an rk_live_ token to the agent user with teamId", async () => {
+    const { getApiUser } = await import("./useAuth");
+    mockFindApiKeyByValue.mockResolvedValueOnce({
+      id: "key-1",
+      team_id: "team-1",
+      agent_user_id: "agent-1",
+    });
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "agent-1", display_name: "Claude", preferred_username: "Agent" }],
+      rowCount: 1,
+    });
+
+    const request = new Request("http://localhost:3000/api/v1/boards", {
+      headers: { Authorization: "Bearer rk_live_validkey" },
+    });
+    const result = await getApiUser(request);
+
+    expect(result).toEqual({
+      id: "agent-1",
+      username: "Claude",
+      teamId: "team-1",
+    });
+    expect(mockFindApiKeyByValue).toHaveBeenCalledWith("rk_live_validkey");
+    expect(mockTouchApiKeyLastUsed).toHaveBeenCalledWith("key-1");
+  });
+
+  it("returns null for an rk_live_ token that does not resolve (no fall-through to cookie)", async () => {
+    const { getApiUser } = await import("./useAuth");
+    mockFindApiKeyByValue.mockResolvedValueOnce(null);
+    sessionData["userId"] = "should-not-be-used";
+
+    const request = new Request("http://localhost:3000/api/v1/boards", {
+      headers: { Authorization: "Bearer rk_live_revokedkey" },
+    });
+    const result = await getApiUser(request);
+
+    expect(result).toBeNull();
+  });
+
+  it("falls back to cookie auth when no Authorization header is present", async () => {
+    const { getApiUser } = await import("./useAuth");
+    sessionData["userId"] = "cookie-user";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "cookie-user", preferred_username: "alice" }],
+      rowCount: 1,
+    });
+
+    const request = new Request("http://localhost:3000/api/v1/boards");
+    const result = await getApiUser(request);
+    expect(result).toEqual({ id: "cookie-user", username: "alice" });
+  });
+
+  it("legacy bearer (non-rk_live_) still resolves via session-cookie path", async () => {
+    const { getApiUser } = await import("./useAuth");
+    // Pre-seed session so the bearer-as-cookie parse finds a userId
+    sessionData["userId"] = "legacy-user";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "legacy-user", preferred_username: "legacy", display_name: null }],
+      rowCount: 1,
+    });
+
+    const request = new Request("http://localhost:3000/api/v1/boards", {
+      headers: { Authorization: "Bearer some-old-session-token" },
+    });
+    const result = await getApiUser(request);
+    expect(result).toEqual({ id: "legacy-user", username: "legacy" });
+    expect(mockFindApiKeyByValue).not.toHaveBeenCalled();
   });
 });
 

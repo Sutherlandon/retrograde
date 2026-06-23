@@ -33,9 +33,6 @@ vi.mock("~/server/board_model", () => ({
   setBoardOwner: (...args: unknown[]) => mockSetBoardOwner(...args),
 }));
 
-// Stub fetch for Turnstile verification
-vi.stubGlobal("fetch", vi.fn());
-
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};

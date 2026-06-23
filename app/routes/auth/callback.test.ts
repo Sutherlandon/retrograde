@@ -24,6 +24,11 @@ vi.mock("~/server/db_config", () => ({
   oauthRedirectUri: "http://localhost:3000/auth/callback",
 }));
 
+const mockEnsurePersonalTeam = vi.fn();
+vi.mock("~/server/team_model", () => ({
+  ensurePersonalTeam: (...args: unknown[]) => mockEnsurePersonalTeam(...args),
+}));
+
 // Mock global fetch for token and profile requests
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -53,6 +58,7 @@ function setupFetchMocks() {
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
+  mockEnsurePersonalTeam.mockResolvedValue("personal-team-id");
 
   process.env.OAUTH_TOKEN_URL = "https://auth.example.com/token";
   process.env.OAUTH_REDIRECT_URI = "http://localhost:3000/auth/callback";

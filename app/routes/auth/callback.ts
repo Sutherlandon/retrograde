@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
 import { pool, oauthRedirectUri } from "~/server/db_config";
+import { ensurePersonalTeam } from "~/server/team_model";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -83,7 +84,13 @@ export async function loader({ request }: { request: Request }) {
       ]
     );
 
-    session.set("userId", result.rows[0].id);
+    const userId = result.rows[0].id;
+    session.set("userId", userId);
+
+    // Ensure the user has a personal team (ADR-0003). Idempotent on returning
+    // logins; only does work for brand-new users not covered by the backfill.
+    const handle = profile.nickname || profile.preferred_username || profile.name || profile.email || "Personal";
+    await ensurePersonalTeam(userId, handle);
   } finally {
     client.release();
   }

@@ -93,6 +93,14 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
             className="w-full justify-start"
             onClick={() => setOpen(false)}
           />
+          <Button
+            as="a"
+            href="/app/account/api-keys"
+            variant="text"
+            text="API Keys"
+            className="w-full justify-start"
+            onClick={() => setOpen(false)}
+          />
           {isAdmin && (
             <Button
               as="a"
