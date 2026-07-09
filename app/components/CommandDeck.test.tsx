@@ -8,7 +8,7 @@ vi.mock("~/context/BoardContext", () => ({
 }));
 
 vi.mock("react-router", () => ({
-  useFetcher: () => ({ submit: vi.fn(), data: null, state: "idle" }),
+  useFetcher: () => ({ submit: vi.fn(), load: vi.fn(), data: null, state: "idle" }),
 }));
 
 vi.mock("~/utils/exportBoard", () => ({
@@ -136,6 +136,13 @@ describe("CommandDeck", () => {
     expect(updateBoardSettings).toHaveBeenCalledWith(
       expect.objectContaining({ attributionEnabled: true })
     );
+  });
+
+  it("opens the Crew Access modal from Board Controls", () => {
+    render(<CommandDeck />);
+    fireEvent.click(screen.getByText("Crew Access"));
+    expect(screen.getByRole("dialog", { name: "Crew Access" })).toBeInTheDocument();
+    expect(screen.getByText("Open Deck to Everyone")).toBeInTheDocument();
   });
 
   it("lights amber LED when board is locked even if notes lock is off", () => {

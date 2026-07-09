@@ -126,6 +126,34 @@ Bulk add notes to columns of an existing board.
 - `404 NOT_FOUND` — board does not exist.
 - `413 PAYLOAD_TOO_LARGE` — more than 200 notes in one request.
 
+### POST /api/v1/boards/:id/action-items
+
+Bulk create action items ("mission objectives") on a board — the follow-up
+checklist humans work through after the session. See issue #88 / ADR-0006.
+
+**Auth required.** The caller must be able to facilitate the board (agents
+always can on boards they created).
+
+**Request:**
+```json
+{
+  "items": [
+    { "text": "Schedule follow-up with infra team" },
+    { "text": "Prototype the passkey flow" }
+  ]
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `items` | yes | 1-100 per request; each needs non-empty `text` (≤2000 chars). |
+
+**Response (201):** full board state including `actionItems` (each with
+`id`, `text`, `completed`, `item_order`, `created_at`).
+
+Humans check items off in the UI; poll `GET /api/v1/boards/:id` and read
+`actionItems[].completed` to see progress.
+
 ### GET /api/v1/boards/:id
 
 Read the full board state as JSON.

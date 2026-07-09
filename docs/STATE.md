@@ -56,6 +56,14 @@ Live in production today, organized by domain:
 - Discoverability: `/llms.txt` and `docs/AI_AGENT_API.md` describe the surface.
 - **Out of scope (for now):** MCP server, account-level API keys, agent-name verification, rate limiting, JSON update/delete.
 
+### Teams, Facilitators, Action Items (new, 2026-07-07 — issues #72, #97, #88)
+- **Multi-member teams:** `/app/teams` (list + create) and `/app/teams/:id` (crew roster, add member by username, mission boards, team objectives). Team members see all team boards on the dashboard (role shown as `team`). Owner-only: rename/delete team (non-personal), member management. AccountHub → Teams link.
+- **Facilitator role (ADR-0006):** `board_members.role='facilitator'` + `boards.open_facilitation`. `canFacilitate` computed in `getBoardServer`, enforced via `app/server/board_permissions.ts`. Command Deck now gates on `canFacilitate`; its "Crew Access" modal grants/revokes facilitators by username and toggles open facilitation. Duplication does NOT copy grants. Settings + attachments routes accept facilitators.
+- **Action items (ADR-0006):** `action_items` table (board_id XOR team_id). "Mission Objectives" panel on the board (progress track, checkbox toggles for any session user, facilitator-only create/edit/delete, poll-synced via `BoardDTO.actionItems`). Team-level objectives + open-board-item rollup on the team page. Dashboard shows open counts per board.
+- **API parity:** `POST /api/v1/boards/:id/action-items` (bulk, ≤100/request); `GET /api/v1/boards/:id` includes `actionItems`, `canFacilitate`, `openFacilitation`.
+- **Dashboard:** create-board now attaches the personal team; Team + Objectives columns added; fixed a pre-existing bug where Created/Updated cells were swapped.
+- Schema blocks 26–27 in `db_init.ts`.
+
 ### Teams + API Keys + free-tier ephemerality (new, 2026-06-22)
 - Every registered user has a personal team auto-created on OAuth callback; one-time backfill in `db_init.ts` covers pre-existing users.
 - Boards belong to teams via `boards.team_id` (nullable: anonymous-flow boards stay teamless = the trial pool).

@@ -1,32 +1,17 @@
 // routes/app/board.attachments.ts
 // Resource route — no UI. Handles attachment mutations.
 // GET    → list attachments for a board
-// POST   → add a link or image attachment (owner only)
-// DELETE → remove an attachment (owner only)
+// POST   → add a link or image attachment (facilitators — ADR-0006)
+// DELETE → remove an attachment (facilitators — ADR-0006)
 
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
-import { getOptionalUser } from "~/hooks/useAuth";
 import {
   getAttachmentsServer,
   addLinkAttachmentServer,
   addImageAttachmentServer,
   deleteAttachmentServer,
 } from "~/server/attachment_model";
-import { pool } from "~/server/db_config";
-
-async function requireOwner(request: Request, boardId: string) {
-  const user = await getOptionalUser(request);
-  if (!user) throw new Response("Unauthorized", { status: 401 });
-
-  const res = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, user.id]
-  );
-  if (res.rowCount === 0 || res.rows[0].role !== "owner") {
-    throw new Response("Forbidden", { status: 403 });
-  }
-  return user;
-}
+import { requireFacilitator } from "~/server/board_permissions";
 
 export async function loader({ params }: LoaderFunctionArgs) {
   const { id: boardId } = params;
@@ -39,7 +24,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  await requireOwner(request, boardId);
+  await requireFacilitator(request, boardId);
   const data = await request.formData();
 
   switch (request.method.toUpperCase()) {

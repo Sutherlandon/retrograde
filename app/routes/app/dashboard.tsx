@@ -5,6 +5,7 @@ import { Form, useLoaderData, useSearchParams, redirect, type ActionFunctionArgs
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { createBoard, duplicateBoardServer, deleteBoardServer, archiveBoardServer, unarchiveBoardServer } from "~/server/board_model";
+import { getPersonalTeamForUser } from "~/server/team_model";
 import { PlusIcon, CheckIcon, SearchIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
@@ -21,32 +22,34 @@ export async function loader({ request }: { request: Request }) {
 
   const orderBy =
     sort === "title"
-      ? "b.title ASC"
+      ? "title ASC"
       : sort === "updated"
-        ? "b.updated_at DESC"
-        : "b.created_at DESC";
+        ? "updated_at DESC"
+        : "created_at DESC";
 
-  const boards = await pool.query(
-    `
-    SELECT b.*, bm.role
-    FROM boards b
-    JOIN board_members bm ON bm.board_id = b.id
-    WHERE bm.user_id = $1 AND b.archived_at IS NULL
-    ORDER BY ${orderBy}
-    `,
-    [user.id]
-  );
+  // A board is visible when the user is a board member (owner/facilitator)
+  // OR the board belongs to one of the user's teams (issue #72).
+  const visibleBoardsSql = (archived: boolean, order: string) => `
+    SELECT * FROM (
+      SELECT DISTINCT ON (b.id)
+        b.*,
+        COALESCE(bm.role, 'team') AS role,
+        t.name AS team_name,
+        (SELECT COUNT(*)::int FROM action_items ai
+          WHERE ai.board_id = b.id AND NOT ai.completed) AS open_action_items
+      FROM boards b
+      LEFT JOIN board_members bm ON bm.board_id = b.id AND bm.user_id = $1
+      LEFT JOIN teams t ON t.id = b.team_id
+      WHERE b.archived_at IS ${archived ? "NOT NULL" : "NULL"}
+        AND (bm.user_id IS NOT NULL
+             OR b.team_id IN (SELECT team_id FROM team_members WHERE user_id = $1))
+      ORDER BY b.id
+    ) visible
+    ORDER BY ${order}
+  `;
 
-  const archivedBoards = await pool.query(
-    `
-    SELECT b.*, bm.role
-    FROM boards b
-    JOIN board_members bm ON bm.board_id = b.id
-    WHERE bm.user_id = $1 AND b.archived_at IS NOT NULL
-    ORDER BY b.title ASC
-    `,
-    [user.id]
-  );
+  const boards = await pool.query(visibleBoardsSql(false, orderBy), [user.id]);
+  const archivedBoards = await pool.query(visibleBoardsSql(true, "title ASC"), [user.id]);
 
   return {
     boards: boards.rows,
@@ -88,9 +91,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return null;
   }
 
-  // Default: create board
+  // Default: create board under the user's personal team (ADR-0003 — boards
+  // created by authenticated users always belong to a team). Team-specific
+  // boards are created from the team page.
   const title = formData.get("title")?.toString().trim() || "Untitled";
-  const board_id = await createBoard(title, user.id);
+  const personalTeam = await getPersonalTeamForUser(user.id);
+  const board_id = await createBoard(title, user.id, personalTeam?.id ?? null);
   return redirect(`/app/board/${board_id}`);
 }
 
@@ -200,7 +206,7 @@ export default function AppDashboard() {
             <table className="table-auto w-full">
               <thead>
                 <tr>
-                  {["Title", "Role", "Created", "Updated"].map((field) => (
+                  {["Title", "Team", "Role", "Objectives", "Created", "Updated"].map((field) => (
                     <th key={field} className="text-left border-b-2 px-4 py-2">
                       {field}
                     </th>
@@ -220,14 +226,26 @@ export default function AppDashboard() {
                         {board.title}
                       </a>
                     </td>
+                    <td className="border-b dark:border-gray-600 px-4 py-4 text-sm text-gray-500 dark:text-gray-400">
+                      {board.team_name ?? "—"}
+                    </td>
                     <td className="border-b dark:border-gray-600 px-4 py-4">
                       {board.role}
                     </td>
                     <td className="border-b dark:border-gray-600 px-4 py-4">
-                      {new Date(board.updated_at).toLocaleDateString()}
+                      {board.open_action_items > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                          {board.open_action_items} open
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
+                      )}
                     </td>
                     <td className="border-b dark:border-gray-600 px-4 py-4">
                       {new Date(board.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="border-b dark:border-gray-600 px-4 py-4">
+                      {new Date(board.updated_at).toLocaleDateString()}
                     </td>
                     <td className="border-b dark:border-gray-600 px-4 py-2 text-right">
                       <BoardActionsMenu

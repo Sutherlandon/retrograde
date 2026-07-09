@@ -360,6 +360,31 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_boards_team_id ON boards(team_id);
     `);
 
+    // 26 Open facilitation: when true, anyone on the board may use the
+    //    Command Deck. See ADR-0006 and issue #97.
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS open_facilitation BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    // 27 Action items: board-level (board_id set) or team-level (team_id set).
+    //    See issues #88 and #72.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS action_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        board_id TEXT REFERENCES boards(id) ON DELETE CASCADE,
+        team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+        text TEXT NOT NULL,
+        completed BOOLEAN NOT NULL DEFAULT FALSE,
+        completed_at TIMESTAMP NULL,
+        created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        item_order INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_action_items_board_id ON action_items(board_id);
+      CREATE INDEX IF NOT EXISTS idx_action_items_team_id ON action_items(team_id);
+    `);
+
     // 24-25 Backfill personal teams for existing registered users + attach
     //       their existing boards. Server-side and transactional — runs once
     //       inside this same transaction so a failure rolls back cleanly.

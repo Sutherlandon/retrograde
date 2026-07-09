@@ -20,6 +20,8 @@ export default [
     route("admin/dashboard", "routes/app/admin.dashboard.tsx"),
     route("admin/admins",   "routes/app/admin.admins.ts"),
     route("account/api-keys", "routes/app/account.api-keys.tsx"),
+    route("teams", "routes/app/teams.tsx"),
+    route("teams/:id", "routes/app/teams.$id.tsx"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */
@@ -34,6 +36,8 @@ export default [
     route("poll", "routes/app/board.poll.ts"),
     route("settings", "routes/app/board.settings.ts"),
     route("attachments", "routes/app/board.attachments.ts"),
+    route("facilitators", "routes/app/board.facilitators.ts"),
+    route("action-items", "routes/app/board.action-items.ts"),
   ]),
 
   /* Api Routes */
@@ -45,6 +49,7 @@ export default [
   route("/api/v1/boards", "routes/api/boards.ts"),
   route("/api/v1/boards/:id", "routes/api/board.ts"),
   route("/api/v1/boards/:id/notes", "routes/api/board.notes.ts"),
+  route("/api/v1/boards/:id/action-items", "routes/api/board.action-items.ts"),
   route("/api/v1/cron/archive-stale", "routes/api/cron.archive-stale.ts"),
 
   // legacy route for backward compatibility

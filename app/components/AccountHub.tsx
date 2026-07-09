@@ -95,6 +95,14 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
           />
           <Button
             as="a"
+            href="/app/teams"
+            variant="text"
+            text="Teams"
+            className="w-full justify-start"
+            onClick={() => setOpen(false)}
+          />
+          <Button
+            as="a"
             href="/app/account/api-keys"
             variant="text"
             text="API Keys"

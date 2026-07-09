@@ -4,7 +4,7 @@ import TimerDisplay from "./TimerDisplay";
 import { BoardStatusBar } from "./BoardStatusBar";
 
 export default function BoardToolbar({ title }: { title: string }) {
-  const { updateTitle, isOwner, boardLocked } = useBoard();
+  const { updateTitle, canFacilitate, boardLocked } = useBoard();
   const [editing, setEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -35,7 +35,7 @@ export default function BoardToolbar({ title }: { title: string }) {
     }
   };
 
-  const canEdit = isOwner && !boardLocked;
+  const canEdit = canFacilitate && !boardLocked;
 
   return (
     <div className="flex items-baseline py-4 gap-2 sm:gap-4">
@@ -53,7 +53,7 @@ export default function BoardToolbar({ title }: { title: string }) {
           <h1
             onClick={() => { if (canEdit) setEditing(true); }}
             className={`text-xl sm:text-2xl md:text-4xl font-bold truncate p-2 border border-transparent rounded-md ${canEdit ? "cursor-text hover:bg-slate-200 dark:hover:bg-slate-950" : ""}`}
-            title={!canEdit ? (boardLocked ? "Board is locked" : "Only the owner can edit the title") : "Click to edit title"}
+            title={!canEdit ? (boardLocked ? "Board is locked" : "Only facilitators can edit the title") : "Click to edit title"}
           >
             {localTitle}
           </h1>

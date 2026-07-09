@@ -93,6 +93,24 @@ Request body (JSON):
 Response (201): the full board state as JSON (same shape as
 `GET /api/v1/boards/:id`).
 
+### POST /api/v1/boards/:id/action-items
+
+Bulk create action items ("mission objectives") — the follow-up checklist a
+team works through after the session. Auth required (API key or agent_token);
+the caller must be able to facilitate the board (agents always can on boards
+they created).
+
+Request body (JSON):
+```
+{ "items": [ { "text": "Schedule follow-up with infra" } ] }
+```
+
+- `items` (required, 1-100 per request): each needs non-empty `text`
+  (max 2000 chars).
+
+Response (201): full board state including `actionItems`. Humans check items
+off in the UI; poll the board and read `actionItems[].completed` for progress.
+
 ### GET /api/v1/boards/:id
 
 Read board state as JSON. Public — no auth required. If you pass an
@@ -100,8 +118,8 @@ Read board state as JSON. Public — no auth required. If you pass an
 response includes your per-note vote counts in `user_votes`.
 
 Response (200): the BoardDTO including columns, notes (with `author` and
-`votes`), voting settings, lock state, and `team_id` (null for teamless
-boards).
+`votes`), voting settings, lock state, `team_id` (null for teamless boards),
+`actionItems`, and facilitation fields (`canFacilitate`, `openFacilitation`).
 
 ## Notes
 

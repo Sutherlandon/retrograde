@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { useBoard } from "~/context/BoardContext";
-import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon, InfoIcon } from "~/images/icons";
+import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon, InfoIcon, UserIcon } from "~/images/icons";
 import { exportToCSV, exportToMarkdown, downloadFile } from "~/utils/exportBoard";
 import { StatusLED } from "./StatusLED";
 import { CommandDeckToggle } from "./CommandDeckToggle";
 import { AttachmentModal } from "./AttachmentModal";
 import { VotingInfoModal } from "./VotingInfoModal";
+import { FacilitatorModal } from "./FacilitatorModal";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -23,6 +24,7 @@ export function CommandDeck() {
   const [expanded, setExpanded] = useState(true);
   const [showAttachments, setShowAttachments] = useState(false);
   const [showVotingInfo, setShowVotingInfo] = useState(false);
+  const [showCrewAccess, setShowCrewAccess] = useState(false);
   const [minutes, setMinutes] = useState(3);
   const [seconds, setSeconds] = useState(0);
 
@@ -278,6 +280,12 @@ export function CommandDeck() {
             >
               <PaperclipIcon size="sm" /> Attach File
             </button>
+            <button
+              onClick={() => setShowCrewAccess(true)}
+              className="w-full py-1.5 rounded-lg border border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-400 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-sm transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <UserIcon size="sm" /> Crew Access
+            </button>
           </div>
         </div>
 
@@ -389,6 +397,9 @@ export function CommandDeck() {
 
       {/* Voting Info Modal */}
       <VotingInfoModal isOpen={showVotingInfo} onClose={() => setShowVotingInfo(false)} />
+
+      {/* Crew Access (facilitators) Modal */}
+      <FacilitatorModal boardId={boardId} isOpen={showCrewAccess} onClose={() => setShowCrewAccess(false)} />
     </>
   );
 }

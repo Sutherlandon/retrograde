@@ -54,19 +54,15 @@ function makePatchRequest(boardId: string, fields: Record<string, string>) {
   });
 }
 
-function setupUserAndOwnership(userId: string, isAnonymous: boolean, isOwner: boolean) {
+function setupUserAndOwnership(userId: string, isAnonymous: boolean, canFacilitate: boolean) {
   sessionData["userId"] = userId;
   // getOptionalUser SELECT
   mockPoolQuery.mockResolvedValueOnce({
     rows: [{ id: userId, preferred_username: isAnonymous ? "Guest" : "realuser", is_anonymous: isAnonymous }],
     rowCount: 1,
   });
-  // requireOwner board_members SELECT
-  if (isOwner) {
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ role: "owner" }], rowCount: 1 });
-  } else {
-    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-  }
+  // requireFacilitator → userCanFacilitate SELECT (ADR-0006)
+  mockPoolQuery.mockResolvedValueOnce({ rows: [{ can: canFacilitate }], rowCount: 1 });
 }
 
 describe("board.settings action", () => {

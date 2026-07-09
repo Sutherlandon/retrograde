@@ -36,3 +36,4 @@ Don't write an ADR for:
 - [ADR-0003: Teams as billing + auth unit](0003-teams-as-billing-unit.md) — every registered user has a personal team; teams own boards and API keys
 - [ADR-0004: API keys for agent authentication](0004-api-keys-for-agent-auth.md) — `rk_live_…` keys, team-scoped, hashed at rest, revocable; legacy bearer-as-session-cookie stays for backward compat
 - [ADR-0005: Free-tier ephemerality](0005-free-tier-ephemerality.md) — teamless boards auto-archive after 30 days; existing accounts and team boards exempt
+- [ADR-0006: Board facilitation + action items](0006-board-facilitation-and-action-items.md) — facilitator role on board_members, open_facilitation mode, action_items as first-class board/team records

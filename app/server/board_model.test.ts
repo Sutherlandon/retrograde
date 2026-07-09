@@ -286,6 +286,66 @@ describe("unarchiveBoardServer", () => {
   });
 });
 
+describe("facilitators", () => {
+  it("addFacilitatorServer upserts without demoting an owner", async () => {
+    const { addFacilitatorServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({});
+    await addFacilitatorServer("board-1", "user-2");
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("INSERT INTO board_members");
+    expect(call[0]).toContain("'facilitator'");
+    expect(call[0]).toContain("WHEN board_members.role = 'owner' THEN 'owner'");
+    expect(call[1]).toEqual(["board-1", "user-2"]);
+  });
+
+  it("removeFacilitatorServer only deletes facilitator rows", async () => {
+    const { removeFacilitatorServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({});
+    await removeFacilitatorServer("board-1", "user-2");
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("role = 'facilitator'");
+    expect(call[1]).toEqual(["board-1", "user-2"]);
+  });
+
+  it("setOpenFacilitationServer updates the board flag", async () => {
+    const { setOpenFacilitationServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({});
+    await setOpenFacilitationServer("board-1", true);
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("SET open_facilitation");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, "board-1"]);
+  });
+
+  it("listFacilitatorsServer returns owner first with usernames", async () => {
+    const { listFacilitatorsServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [
+        { user_id: "u1", role: "owner", username: "landon" },
+        { user_id: "u2", role: "facilitator", username: "sam" },
+      ],
+    });
+    const rows = await listFacilitatorsServer("board-1");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("role IN ('owner', 'facilitator')");
+    expect(rows[0].role).toBe("owner");
+  });
+});
+
+describe("getBoardServer facilitation + action item fields", () => {
+  it("selects canFacilitate, openFacilitation, and actionItems in the board JSON", async () => {
+    const { getBoardServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [], actionItems: [] } }],
+    });
+    await getBoardServer("board-1", "user-1");
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("'canFacilitate'");
+    expect(sql).toContain("'openFacilitation', b.open_facilitation");
+    expect(sql).toContain("'actionItems'");
+    expect(sql).toContain("FROM action_items ai");
+    expect(sql).toContain("bm2.role IN ('owner', 'facilitator')");
+  });
+});
+
 describe("createBoardWithColumns", () => {
   it("creates a board with caller-supplied custom columns in order", async () => {
     const { createBoardWithColumns } = await import("./board_model");

@@ -14,6 +14,30 @@ export interface NoteAuthorDTO {
   is_agent: boolean;
 }
 
+export interface ActionItemDTO {
+  id: string;
+  text: string;
+  completed: boolean;
+  item_order: number;
+  created_at: string;
+  completed_at?: string | null;
+  board_id?: string | null;
+  team_id?: string | null;
+}
+
+export interface TeamMemberDTO {
+  user_id: string;
+  username: string;
+  role: string;
+  created_at: string;
+}
+
+export interface BoardFacilitatorDTO {
+  user_id: string;
+  username: string;
+  role: "owner" | "facilitator";
+}
+
 export interface NoteDTO {
   id: string;
   column_id: string;
@@ -50,7 +74,10 @@ export interface BoardDTO {
   title: string;
   readonly: boolean;       // true for example boards — server sets this
   isOwner?: boolean;       // true when the current user is the board owner
+  canFacilitate?: boolean; // owner OR facilitator role OR open_facilitation — see ADR-0006
+  openFacilitation?: boolean;
   team_id?: string | null; // null = teamless (trial / grandfathered); see ADR-0003
+  actionItems?: ActionItemDTO[];
   timerRunning: boolean;
   timerStartedAt: string | null;
   timerEndsAt: string | null;
@@ -94,6 +121,7 @@ export interface ApiKeyDTO {
 
 export interface Note extends NoteDTO { }   // identical for now, alias for clarity
 export interface Attachment extends AttachmentDTO { }
+export interface ActionItem extends ActionItemDTO { }
 
 export interface Column extends ColumnDTO {
   notes: Note[];
@@ -104,6 +132,12 @@ export interface BoardClientState {
   title: string;
   readonly: boolean;
   isOwner: boolean;
+  // Facilitation — owner, granted facilitator, or open_facilitation. Gates the
+  // Command Deck and board-level action item management. See ADR-0006.
+  canFacilitate: boolean;
+  openFacilitation: boolean;
+  // Action items (issue #88)
+  actionItems: ActionItem[];
   columns: Column[];
   // Derived on client from columns — NOT from the server
   nextColOrder: number;
@@ -158,6 +192,10 @@ export interface BoardActions {
   deleteAttachment: (attachmentId: string) => void;
   sortNotesByScore: () => void;
   clearParticipantCounts: () => void;
+  addActionItem: (text: string) => void;
+  updateActionItem: (itemId: string, text: string) => void;
+  toggleActionItem: (itemId: string, completed: boolean) => void;
+  deleteActionItem: (itemId: string) => void;
 }
 
 // ---------------------------------------------------------------------------

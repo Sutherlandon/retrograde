@@ -88,9 +88,11 @@ describe("dashboard loader", () => {
     const result = await loader({ request });
 
     expect((result as { sort: string }).sort).toBe("title");
-    // Verify the active boards query used title sort
+    // Verify the active boards query used title sort (outer ORDER BY on the
+    // team-aware visibility subquery)
     const activeBoardsCall = mockPoolQuery.mock.calls[1];
-    expect(activeBoardsCall[0]).toContain("b.title ASC");
+    expect(activeBoardsCall[0]).toContain("ORDER BY title ASC");
+    expect(activeBoardsCall[0]).toContain("team_members");
   });
 
   it("active boards query excludes archived boards", async () => {
@@ -119,7 +121,7 @@ describe("dashboard loader", () => {
 
     const archivedBoardsCall = mockPoolQuery.mock.calls[2];
     expect(archivedBoardsCall[0]).toContain("archived_at IS NOT NULL");
-    expect(archivedBoardsCall[0]).toContain("b.title ASC");
+    expect(archivedBoardsCall[0]).toContain("ORDER BY title ASC");
   });
 
   it("redirects anonymous user to login", async () => {

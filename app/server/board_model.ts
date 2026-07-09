@@ -32,6 +32,33 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'notesLocked',      b.notes_locked,
       'boardLocked',      b.board_locked,
       'attributionEnabled', b.attribution_enabled,
+      'openFacilitation', b.open_facilitation,
+      'canFacilitate',    CASE
+                            WHEN $2::uuid IS NOT NULL
+                            THEN b.open_facilitation OR EXISTS(
+                              SELECT 1 FROM board_members bm2
+                              WHERE bm2.board_id = b.id
+                                AND bm2.user_id = $2::uuid
+                                AND bm2.role IN ('owner', 'facilitator')
+                            )
+                            ELSE b.open_facilitation
+                          END,
+      'actionItems', COALESCE(
+        (SELECT json_agg(
+           json_build_object(
+             'id',           ai.id,
+             'text',         ai.text,
+             'completed',    ai.completed,
+             'item_order',   ai.item_order,
+             'created_at',   ai.created_at,
+             'completed_at', ai.completed_at
+           )
+           ORDER BY ai.item_order, ai.created_at
+         )
+         FROM action_items ai
+         WHERE ai.board_id = b.id),
+        '[]'::json
+      ),
       'voterCount',       (SELECT COUNT(DISTINCT user_id) FROM (
                             SELECT nv.user_id FROM note_votes nv JOIN notes n ON nv.note_id = n.id JOIN columns c ON n.column_id = c.id WHERE c.board_id = b.id
                             UNION
@@ -104,7 +131,8 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
 
 export async function createBoard(
   title: string = "Untitled",
-  userId: string | null = null
+  userId: string | null = null,
+  teamId: string | null = null
 ): Promise<string> {
   const client = await pool.connect();
   const id = crypto.randomUUID();
@@ -113,8 +141,8 @@ export async function createBoard(
     await client.query("BEGIN");
 
     await client.query(
-      `INSERT INTO boards (id, title, created_by) VALUES ($1, $2, $3)`,
-      [id, title, userId]
+      `INSERT INTO boards (id, title, created_by, team_id) VALUES ($1, $2, $3, $4)`,
+      [id, title, userId, teamId]
     );
 
     if (userId) {
@@ -575,6 +603,59 @@ export async function deleteBoardServer(
   } finally {
     client.release();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Facilitators (ADR-0006, issue #97)
+// ---------------------------------------------------------------------------
+
+export async function listFacilitatorsServer(boardId: string) {
+  const res = await pool.query(
+    `SELECT bm.user_id, bm.role,
+            COALESCE(u.display_name, u.preferred_username, 'Guest') AS username
+     FROM board_members bm
+     JOIN users u ON u.id = bm.user_id
+     WHERE bm.board_id = $1 AND bm.role IN ('owner', 'facilitator')
+     ORDER BY (bm.role = 'owner') DESC, bm.created_at ASC`,
+    [boardId]
+  );
+  return res.rows as { user_id: string; role: "owner" | "facilitator"; username: string }[];
+}
+
+export async function addFacilitatorServer(boardId: string, userId: string) {
+  // Never demote an owner who is granted facilitator by mistake.
+  await pool.query(
+    `INSERT INTO board_members (board_id, user_id, role)
+     VALUES ($1, $2, 'facilitator')
+     ON CONFLICT (board_id, user_id) DO UPDATE
+     SET role = CASE WHEN board_members.role = 'owner' THEN 'owner' ELSE 'facilitator' END`,
+    [boardId, userId]
+  );
+}
+
+export async function removeFacilitatorServer(boardId: string, userId: string) {
+  // role guard means the owner can never be removed through this path
+  await pool.query(
+    `DELETE FROM board_members
+     WHERE board_id = $1 AND user_id = $2 AND role = 'facilitator'`,
+    [boardId, userId]
+  );
+}
+
+export async function setOpenFacilitationServer(boardId: string, open: boolean) {
+  await pool.query(
+    `UPDATE boards SET open_facilitation = $1 WHERE id = $2`,
+    [open, boardId]
+  );
+}
+
+export async function getOpenFacilitationServer(boardId: string): Promise<boolean | null> {
+  const res = await pool.query<{ open_facilitation: boolean }>(
+    `SELECT open_facilitation FROM boards WHERE id = $1`,
+    [boardId]
+  );
+  if (res.rowCount === 0) return null;
+  return res.rows[0].open_facilitation;
 }
 
 export async function updateBoardTitleServer(boardId: string, newTitle: string) {

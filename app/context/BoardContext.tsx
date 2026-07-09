@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { nanoid } from "nanoid";
-import type { Attachment, Board, BoardDTO, Column, Note } from "~/server/board.types";
+import type { ActionItem, Attachment, Board, BoardDTO, Column, Note } from "~/server/board.types";
 
 // ---------------------------------------------------------------------------
 // Context setup
@@ -102,6 +102,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [notesLocked, setNotesLocked] = useState(loaderData.notesLocked ?? false);
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
   const [attributionEnabled, setAttributionEnabled] = useState(loaderData.attributionEnabled ?? false);
+  const [canFacilitate, setCanFacilitate] = useState(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
+  const [openFacilitation, setOpenFacilitation] = useState(loaderData.openFacilitation ?? false);
+  const [actionItems, setActionItems] = useState<ActionItem[]>((loaderData.actionItems as ActionItem[]) ?? []);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
     loaderData.boardLocked ? new Date() : null
   );
@@ -116,6 +119,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [contributorCount, setContributorCount] = useState(loaderData.contributorCount ?? 0);
   const [attachments, setAttachments] = useState<Attachment[]>(loaderData.attachments ?? []);
   const attachmentFetcher = useFetcher();
+  const actionItemFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
 
   // ---------------------------------------------------------------------------
@@ -138,6 +142,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setLocked(loaderData.boardLocked ?? false);
     setAttributionEnabled(loaderData.attributionEnabled ?? false);
   }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled]);
+
+  useEffect(() => {
+    setActionItems((loaderData.actionItems as ActionItem[]) ?? []);
+    setCanFacilitate(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
+    setOpenFacilitation(loaderData.openFacilitation ?? false);
+  }, [loaderData.actionItems, loaderData.canFacilitate, loaderData.openFacilitation, loaderData.isOwner]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -168,6 +178,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       setAttachments(attachmentFetcher.data as Attachment[]);
     }
   }, [attachmentFetcher.data]);
+
+  useEffect(() => {
+    if (actionItemFetcher.data) {
+      const data = actionItemFetcher.data as BoardDTO;
+      if (data.actionItems) setActionItems(data.actionItems as ActionItem[]);
+    }
+  }, [actionItemFetcher.data]);
 
   useEffect(() => {
     if (settingsFetcher.data) {
@@ -213,6 +230,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         if (data.voterCount !== undefined) setVoterCount(data.voterCount);
         if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
         if (data.attachments) setAttachments(data.attachments);
+        setActionItems((data.actionItems as ActionItem[]) ?? []);
+        setCanFacilitate(data.canFacilitate ?? false);
+        setOpenFacilitation(data.openFacilitation ?? false);
 
         syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
       } catch (err) {
@@ -554,6 +574,45 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ---------------------------------------------------------------------------
+  // Action item actions (issue #88)
+  // ---------------------------------------------------------------------------
+
+  const addActionItem = (text: string) => {
+    if (isReadOnly || boardLocked) return;
+    actionItemFetcher.submit(
+      { text },
+      { method: "POST", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const updateActionItem = (itemId: string, text: string) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, text } : i)));
+    actionItemFetcher.submit(
+      { intent: "text", itemId, text },
+      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const toggleActionItem = (itemId: string, completed: boolean) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, completed } : i)));
+    actionItemFetcher.submit(
+      { intent: "complete", itemId, completed: String(completed) },
+      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const deleteActionItem = (itemId: string) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.filter((i) => i.id !== itemId));
+    actionItemFetcher.submit(
+      { itemId },
+      { method: "DELETE", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  // ---------------------------------------------------------------------------
   // Attachment actions
   // ---------------------------------------------------------------------------
 
@@ -657,6 +716,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     startTimer,
     stopTimer,
     attributionEnabled,
+    canFacilitate,
+    openFacilitation,
+    actionItems,
+    addActionItem,
+    updateActionItem,
+    toggleActionItem,
+    deleteActionItem,
   };
 
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>;

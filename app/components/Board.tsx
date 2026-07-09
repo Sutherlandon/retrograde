@@ -18,6 +18,7 @@ import Column from "./Column";
 import TimerEndModal from "./TimerEndModal";
 import { AttachmentsList } from "./AttachmentsList";
 import { CommandDeck } from "./CommandDeck";
+import { ActionItemsPanel } from "./ActionItemsPanel";
 import { useOptionalUser } from "~/context/userContext";
 
 const noteColors = [
@@ -30,7 +31,7 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, isOwner, readonly: isReadOnly } = useBoard();
+  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, canFacilitate, readonly: isReadOnly } = useBoard();
   const user = useOptionalUser();
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
@@ -155,6 +156,7 @@ export default function Board() {
   return (
     <main className="p-4">
       <BoardToolbar title={title} />
+      <ActionItemsPanel />
       <DndContext
         sensors={sensors}
         collisionDetection={rectIntersection}
@@ -194,7 +196,7 @@ export default function Board() {
         </p>
       )}
       <AttachmentsList />
-      {isOwner && <CommandDeck />}
+      {canFacilitate && <CommandDeck />}
       <TimerEndModal
         isOpen={showTimerEndModal}
         onClose={() => setShowTimerEndModal(false)}
