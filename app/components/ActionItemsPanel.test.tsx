@@ -37,7 +37,7 @@ describe("ActionItemsPanel", () => {
       actionItems: [item("1", "Ship it", true), item("2", "Test it")],
     });
     render(<ActionItemsPanel />);
-    expect(screen.getByText("Mission Objectives")).toBeInTheDocument();
+    expect(screen.getByText("Action Items")).toBeInTheDocument();
     expect(screen.getByTestId("objective-count").textContent).toBe("1/2 complete");
     expect(screen.getByTestId("objective-progress").style.width).toBe("50%");
     expect(screen.getAllByTestId("objective-row")).toHaveLength(2);
@@ -79,6 +79,26 @@ describe("ActionItemsPanel", () => {
     mockUseBoard.mockReturnValue({ ...baseBoard, canFacilitate: false, actionItems: [] });
     render(<ActionItemsPanel />);
     expect(screen.queryByTestId("action-items-panel")).toBeNull();
+  });
+
+  it("hides the column entirely when actionItemsVisible is false", () => {
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      actionItemsVisible: false,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    expect(screen.queryByTestId("action-items-panel")).toBeNull();
+  });
+
+  it("shows the column when actionItemsVisible is true", () => {
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      actionItemsVisible: true,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    expect(screen.getByTestId("action-items-panel")).toBeInTheDocument();
   });
 
   it("disables checkbox interactions when the board is locked", () => {

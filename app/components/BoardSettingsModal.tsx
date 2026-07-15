@@ -9,7 +9,7 @@ interface BoardSettingsModalProps {
 }
 
 export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
-  const { id: boardId, votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, updateBoardSettings } = useBoard();
+  const { id: boardId, votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, updateBoardSettings } = useBoard();
   const clearFetcher = useFetcher();
 
   const [localEnabled, setLocalEnabled] = useState(votingEnabled);
@@ -46,7 +46,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
   // When the clear fetcher completes, save the new settings
   useEffect(() => {
     if (clearFetcher.data) {
-      updateBoardSettings({ votingEnabled: true, votingAllowed: resolvedAllowed, votingScope, notesLocked: localNotesLocked, boardLocked: localBoardLocked, attributionEnabled });
+      updateBoardSettings({ votingEnabled: true, votingAllowed: resolvedAllowed, votingScope, notesLocked: localNotesLocked, boardLocked: localBoardLocked, attributionEnabled, actionItemsVisible });
       onClose();
     }
   }, [clearFetcher.data]);
@@ -66,7 +66,7 @@ export function BoardSettingsModal({ onClose }: BoardSettingsModalProps) {
       // User clicked save while warning is shown — they already saw it; confirm
       handleConfirmClear();
     } else {
-      updateBoardSettings({ votingEnabled: localEnabled, votingAllowed: resolvedAllowed, votingScope, notesLocked: localNotesLocked, boardLocked: localBoardLocked, attributionEnabled });
+      updateBoardSettings({ votingEnabled: localEnabled, votingAllowed: resolvedAllowed, votingScope, notesLocked: localNotesLocked, boardLocked: localBoardLocked, attributionEnabled, actionItemsVisible });
       onClose();
     }
   }

@@ -1,5 +1,5 @@
 interface StatusLEDProps {
-  color: "green" | "blue" | "amber" | "red";
+  color: "green" | "blue" | "amber" | "red" | "purple";
   active?: boolean;
   pulse?: boolean;
   size?: "sm" | "md";
@@ -10,6 +10,7 @@ const activeColorMap = {
   blue: "bg-blue-400",
   amber: "bg-amber-400",
   red: "bg-red-500",
+  purple: "bg-purple-400",
 };
 
 const sizeMap = {

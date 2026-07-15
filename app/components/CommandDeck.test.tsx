@@ -138,6 +138,17 @@ describe("CommandDeck", () => {
     );
   });
 
+  it("calls updateBoardSettings with actionItemsVisible:false when Action Items toggled off", () => {
+    const updateBoardSettings = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, actionItemsVisible: true, updateBoardSettings });
+    render(<CommandDeck />);
+    const toggleSwitch = screen.getByText("Action Items").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(toggleSwitch);
+    expect(updateBoardSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ actionItemsVisible: false })
+    );
+  });
+
   it("opens the Crew Access modal from Board Controls", () => {
     render(<CommandDeck />);
     fireEvent.click(screen.getByText("Crew Access"));

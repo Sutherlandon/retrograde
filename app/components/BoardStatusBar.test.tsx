@@ -82,6 +82,13 @@ describe("BoardStatusBar", () => {
     expect(amberLed).toBeInTheDocument();
   });
 
+  it("lights a purple LED (not green) for attribution when enabled", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, attributionEnabled: true });
+    const { container } = render(<BoardStatusBar />);
+    expect(container.querySelector(".bg-purple-400")).toBeInTheDocument();
+    expect(container.querySelector(".bg-green-400")).not.toBeInTheDocument();
+  });
+
   it("shows voting info icon in legend next to Voting label", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));

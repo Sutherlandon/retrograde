@@ -32,6 +32,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'notesLocked',      b.notes_locked,
       'boardLocked',      b.board_locked,
       'attributionEnabled', b.attribution_enabled,
+      'actionItemsVisible', b.action_items_visible,
       'openFacilitation', b.open_facilitation,
       'canFacilitate',    CASE
                             WHEN $2::uuid IS NOT NULL
@@ -152,7 +153,9 @@ export async function createBoard(
       );
     }
 
-    const defaultColumns = ["What went well?", "What can we do better?", "Action items"];
+    // Follow-ups live in the right-side Mission Objectives column (board-level
+    // action_items), so the default board no longer ships an "Action items" column.
+    const defaultColumns = ["What went well?", "What can we do better?"];
     await Promise.all(
       defaultColumns.map((colTitle, i) =>
         client.query(
@@ -187,7 +190,6 @@ export async function createBoardWithColumns(
     : [
         { title: "What went well?" },
         { title: "What can we do better?" },
-        { title: "Action items" },
       ];
 
   try {
@@ -401,10 +403,11 @@ export async function updateBoardSettingsServer(
     notesLocked: boolean;
     boardLocked: boolean;
     attributionEnabled: boolean;
+    actionItemsVisible?: boolean;
   }
 ) {
   await pool.query(
-    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5, attribution_enabled = $6 WHERE id = $7`,
+    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5, attribution_enabled = $6, action_items_visible = $7 WHERE id = $8`,
     [
       settings.votingEnabled,
       settings.votingAllowed,
@@ -412,6 +415,7 @@ export async function updateBoardSettingsServer(
       settings.notesLocked,
       settings.boardLocked,
       settings.attributionEnabled,
+      settings.actionItemsVisible ?? true,
       boardId,
     ]
   );

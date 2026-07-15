@@ -206,7 +206,7 @@ export default function AppDashboard() {
             <table className="table-auto w-full">
               <thead>
                 <tr>
-                  {["Title", "Team", "Role", "Objectives", "Created", "Updated"].map((field) => (
+                  {["Title", "Team", "Role", "Action Items", "Created", "Updated"].map((field) => (
                     <th key={field} className="text-left border-b-2 px-4 py-2">
                       {field}
                     </th>

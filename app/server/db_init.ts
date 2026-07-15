@@ -385,6 +385,13 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_action_items_team_id ON action_items(team_id);
     `);
 
+    // 28 Action items column visibility: facilitators can hide the board's
+    //    Action Items column from the Command Deck. Visible by default.
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS action_items_visible BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
     // 24-25 Backfill personal teams for existing registered users + attach
     //       their existing boards. Server-side and transactional — runs once
     //       inside this same transaction so a failure rolls back cleanly.

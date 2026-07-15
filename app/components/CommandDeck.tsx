@@ -17,7 +17,7 @@ export function CommandDeck() {
     id: boardId, title, timerRunning, timeLeft, startTimer, stopTimer,
     addColumn, columns, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, attachments, updateBoardSettings,
-    attributionEnabled, sortNotesByScore,
+    attributionEnabled, actionItemsVisible, sortNotesByScore,
     voterCount, contributorCount, clearParticipantCounts,
   } = useBoard();
 
@@ -35,6 +35,7 @@ export function CommandDeck() {
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
   const [localAttributionEnabled, setLocalAttributionEnabled] = useState(attributionEnabled);
+  const [localActionItemsVisible, setLocalActionItemsVisible] = useState(actionItemsVisible ?? true);
   const [showVotingWarning, setShowVotingWarning] = useState(false);
   const [pendingVotingEnabled, setPendingVotingEnabled] = useState<boolean | null>(null);
 
@@ -49,7 +50,8 @@ export function CommandDeck() {
     setLocalNotesLocked(notesLocked);
     setLocalBoardLocked(boardLocked);
     setLocalAttributionEnabled(attributionEnabled);
-  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled]);
+    setLocalActionItemsVisible(actionItemsVisible ?? true);
+  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible]);
 
   // Close on Escape
   useEffect(() => {
@@ -70,6 +72,7 @@ export function CommandDeck() {
         notesLocked: localNotesLocked,
         boardLocked: localBoardLocked,
         attributionEnabled: localAttributionEnabled,
+        actionItemsVisible: localActionItemsVisible,
       });
       setShowVotingWarning(false);
       setPendingVotingEnabled(null);
@@ -89,7 +92,7 @@ export function CommandDeck() {
     startTimer(totalSeconds);
   };
 
-  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean }> = {}) => {
+  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean }> = {}) => {
     updateBoardSettings({
       votingEnabled: overrides.votingEnabled ?? localVotingEnabled,
       votingAllowed: overrides.votingAllowed ?? localVotingAllowed,
@@ -97,6 +100,7 @@ export function CommandDeck() {
       notesLocked: overrides.notesLocked ?? localNotesLocked,
       boardLocked: overrides.boardLocked ?? localBoardLocked,
       attributionEnabled: overrides.attributionEnabled ?? localAttributionEnabled,
+      actionItemsVisible: overrides.actionItemsVisible ?? localActionItemsVisible,
     });
   };
 
@@ -143,6 +147,11 @@ export function CommandDeck() {
     saveSettings({ attributionEnabled: enabled });
   };
 
+  const handleActionItemsVisibleToggle = (visible: boolean) => {
+    setLocalActionItemsVisible(visible);
+    saveSettings({ actionItemsVisible: visible });
+  };
+
   const totalNotes = columns.reduce((sum, c) => sum + c.notes.length, 0);
 
   // ----- MINIMIZED PILL -----
@@ -161,7 +170,7 @@ export function CommandDeck() {
         <RocketIcon size="lg" />
         <span className="hidden sm:inline text-sm font-semibold tracking-wide">Command Deck</span>
         <div className="flex items-center gap-1.5 ml-1">
-          <StatusLED color="green" active={localAttributionEnabled} size="sm" />
+          <StatusLED color="purple" active={localAttributionEnabled} size="sm" />
           <StatusLED color="blue" active={votingEnabled} size="sm" />
           <StatusLED color="amber" active={notesLocked || boardLocked} size="sm" />
           <StatusLED color="red" active={boardLocked} size="sm" />
@@ -196,7 +205,7 @@ export function CommandDeck() {
             Command Deck
           </h3>
           <div className="flex items-center gap-1.5">
-            <StatusLED color="green" active={localAttributionEnabled} size="sm" />
+            <StatusLED color="purple" active={localAttributionEnabled} size="sm" />
             <StatusLED color="blue" active={localVotingEnabled} size="sm" />
             <StatusLED color="amber" active={localNotesLocked || localBoardLocked} size="sm" />
             <StatusLED color="red" active={localBoardLocked} size="sm" />
@@ -297,6 +306,13 @@ export function CommandDeck() {
               label="User Attribution"
               checked={localAttributionEnabled}
               onChange={handleAttributionToggle}
+              ledColor="purple"
+              disabled={localBoardLocked || showVotingWarning}
+            />
+            <CommandDeckToggle
+              label="Action Items"
+              checked={localActionItemsVisible}
+              onChange={handleActionItemsVisibleToggle}
               ledColor="green"
               disabled={localBoardLocked || showVotingWarning}
             />

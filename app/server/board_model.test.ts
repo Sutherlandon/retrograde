@@ -139,7 +139,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_scope");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("notes_locked");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("board_locked");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, false, true, "board-1"]);
   });
 
   it("disables voting", async () => {
@@ -150,7 +150,7 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, "board-1"]);
   });
 
   it("enables notes lock to prevent note editing during voting", async () => {
@@ -161,7 +161,7 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, votingScope: "board", notesLocked: true, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, true, "board-1"]);
   });
 
   it("enables full board lock to prevent all modifications", async () => {
@@ -172,7 +172,7 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: true, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, true, "board-1"]);
   });
 });
 
@@ -405,7 +405,6 @@ describe("createBoardWithColumns", () => {
     expect(inserted).toEqual([
       "What went well?",
       "What can we do better?",
-      "Action items",
     ]);
   });
 

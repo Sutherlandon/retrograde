@@ -86,6 +86,7 @@ describe("board.settings action", () => {
         notesLocked: false,
         boardLocked: false,
         attributionEnabled: false,
+        actionItemsVisible: true,
       });
     });
 

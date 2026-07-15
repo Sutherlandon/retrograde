@@ -87,6 +87,7 @@ export interface BoardDTO {
   notesLocked?: boolean;
   boardLocked?: boolean;
   attributionEnabled?: boolean;
+  actionItemsVisible?: boolean;
   voterCount?: number;
   contributorCount?: number;
   columns: ColumnDTO[];
@@ -160,6 +161,9 @@ export interface BoardClientState {
   // Attribution — when false, note authorship is hidden everywhere.
   // Off by default to preserve retro anonymity.
   attributionEnabled: boolean;
+  // Action Items column — facilitators can hide it from the Command Deck.
+  // Visible by default.
+  actionItemsVisible: boolean;
   // Participation stats
   voterCount: number;
   contributorCount: number;
@@ -180,7 +184,7 @@ export interface BoardActions {
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
-  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean }) => void;
+  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean }) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

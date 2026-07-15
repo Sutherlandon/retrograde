@@ -156,7 +156,6 @@ export default function Board() {
   return (
     <main className="p-4">
       <BoardToolbar title={title} />
-      <ActionItemsPanel />
       <DndContext
         sensors={sensors}
         collisionDetection={rectIntersection}
@@ -181,6 +180,8 @@ export default function Board() {
           {columns.map((col, index) => (
             <Column key={col.id} column={col} noteColor={noteColors[index % noteColors.length]} />
           ))}
+          {/* Mission Objectives — dedicated column pinned to the right */}
+          <ActionItemsPanel />
         </div>
         <DragOverlay dropAnimation={null}>
           {activeDragId && activeNoteData ? (

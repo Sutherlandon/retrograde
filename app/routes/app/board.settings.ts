@@ -26,10 +26,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const notesLocked = data.get("notesLocked") === "true";
       const boardLocked = data.get("boardLocked") === "true";
       const attributionEnabled = data.get("attributionEnabled") === "true";
+      // Absent → keep the column visible (its default); only an explicit "false" hides it.
+      const actionItemsVisible = data.has("actionItemsVisible")
+        ? data.get("actionItemsVisible") === "true"
+        : true;
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
-      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled });
+      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible });
     }
 
     case "POST": {

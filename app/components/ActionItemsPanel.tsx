@@ -1,7 +1,8 @@
 // app/components/ActionItemsPanel.tsx
-// "Mission Objectives" — board-level action items (issue #88).
-// Checkbox list with a completion progress track. Facilitators create/edit/
-// delete; every participant can check items off.
+// "Action Items" — board-level follow-ups (issue #88), rendered as a dedicated
+// column on the right side of the board (replaces the old default "Action items"
+// note column). Facilitators create/edit/delete; every participant can check
+// items off. Facilitators can hide the whole column from the Command Deck.
 
 import { useState } from "react";
 import { useBoard } from "~/context/BoardContext";
@@ -62,7 +63,7 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
         <button
           type="button"
           onClick={() => deleteActionItem(item.id)}
-          title="Delete objective"
+          title="Delete action item"
           className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
         >
           <TrashIcon size="sm" />
@@ -73,15 +74,17 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
 }
 
 export function ActionItemsPanel() {
-  const { actionItems, addActionItem, canFacilitate, boardLocked } = useBoard();
-  const [expanded, setExpanded] = useState(true);
+  const { actionItems, addActionItem, canFacilitate, boardLocked, actionItemsVisible } = useBoard();
   const [draft, setDraft] = useState("");
 
   const total = actionItems.length;
   const done = actionItems.filter((i) => i.completed).length;
   const allDone = total > 0 && done === total;
 
-  // Participants with no objectives to see get nothing at all.
+  // Facilitators can hide the column entirely from the Command Deck.
+  if (actionItemsVisible === false) return null;
+
+  // Participants with no items to see get nothing at all.
   if (!canFacilitate && total === 0) return null;
 
   const add = () => {
@@ -94,72 +97,64 @@ export function ActionItemsPanel() {
   return (
     <section
       data-testid="action-items-panel"
-      className="mb-4 rounded-2xl border border-gray-200 dark:border-gray-700/50
-        bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
+      className="min-w-[300px] w-full md:w-80 shrink-0 min-h-[150px] rounded-md p-3
+        border border-green-400/60 dark:border-green-700/50 shadow-md/20
+        bg-green-50/60 dark:bg-green-950/20"
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer"
-        aria-expanded={expanded}
-      >
+      <div className="flex items-center gap-3 mb-3">
         <StatusLED color={allDone ? "green" : "amber"} active={total > 0} size="sm" />
-        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-500 dark:text-gray-400">
-          Mission Objectives
+        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-green-700 dark:text-green-400">
+          Action Items
         </span>
         {total > 0 && (
           <span
             data-testid="objective-count"
-            className="text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums"
+            className="ml-auto text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums"
           >
             {done}/{total} complete
           </span>
         )}
-        {/* Progress track */}
-        <span className="flex-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden ml-2">
-          <span
-            data-testid="objective-progress"
-            className="block h-full rounded-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
-            style={{ width: total > 0 ? `${(done / total) * 100}%` : "0%" }}
+      </div>
+
+      {/* Progress track */}
+      <div className="h-1 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden mb-3">
+        <span
+          data-testid="objective-progress"
+          className="block h-full rounded-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
+          style={{ width: total > 0 ? `${(done / total) * 100}%` : "0%" }}
+        />
+      </div>
+
+      {total === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-600 mb-2">
+          No action items yet. Capture the follow-ups your crew commits to.
+        </p>
+      ) : (
+        <ul className="space-y-0.5 mb-2">
+          {actionItems.map((item) => (
+            <ObjectiveRow key={item.id} item={item} />
+          ))}
+        </ul>
+      )}
+
+      {canFacilitate && !boardLocked && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+            placeholder="Add a follow-up item…"
+            data-testid="objective-input"
+            className="flex-1 min-w-0 border rounded px-3 py-1.5 text-sm border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
           />
-        </span>
-        <span className="text-gray-400 text-xs">{expanded ? "▾" : "▸"}</span>
-      </button>
-
-      {expanded && (
-        <div className="px-4 pb-3">
-          {total === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-600 mb-2">
-              No objectives yet. Capture the follow-ups your crew commits to.
-            </p>
-          ) : (
-            <ul className="space-y-0.5 mb-2">
-              {actionItems.map((item) => (
-                <ObjectiveRow key={item.id} item={item} />
-              ))}
-            </ul>
-          )}
-
-          {canFacilitate && !boardLocked && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") add(); }}
-                placeholder="Add an objective…"
-                data-testid="objective-input"
-                className="flex-1 border rounded px-3 py-1.5 text-sm border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
-              />
-              <button
-                type="button"
-                onClick={add}
-                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm cursor-pointer flex items-center gap-1"
-              >
-                <PlusIcon size="sm" /> Add
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={add}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm cursor-pointer flex items-center gap-1 shrink-0"
+          >
+            <PlusIcon size="sm" /> Add
+          </button>
         </div>
       )}
     </section>

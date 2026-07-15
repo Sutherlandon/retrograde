@@ -5,7 +5,7 @@ import { StatusLED } from "./StatusLED";
 import { VotingInfoModal } from "./VotingInfoModal";
 
 interface LedConfig {
-  color: "green" | "blue" | "amber" | "red";
+  color: "green" | "blue" | "amber" | "red" | "purple";
   active: boolean;
   label: string;
 }
@@ -26,7 +26,7 @@ export function BoardStatusBar() {
   const votesRemaining = votingAllowed - votesUsed;
 
   const leds: LedConfig[] = [
-    { color: "green", active: attributionEnabled, label: "Attribution" },
+    { color: "purple", active: attributionEnabled, label: "Attribution" },
     { color: "blue", active: votingEnabled, label: "Voting" },
     { color: "amber", active: notesLocked || boardLocked, label: "Notes Locked" },
     { color: "red", active: boardLocked, label: "Board Locked" },
