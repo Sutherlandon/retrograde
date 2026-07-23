@@ -10,7 +10,7 @@ import type { PoolClient } from "pg";
 async function runPersonalTeamBackfill(client: PoolClient) {
   // 1) Find registered users without a personal team.
   const users = await client.query(`
-    SELECT u.id, COALESCE(u.preferred_username, u.name, u.email, 'Personal') AS handle
+    SELECT u.id
     FROM users u
     WHERE u.is_anonymous = FALSE
       AND NOT EXISTS (
@@ -23,7 +23,7 @@ async function runPersonalTeamBackfill(client: PoolClient) {
   for (const row of users.rows) {
     const teamRes = await client.query(
       `INSERT INTO teams (name, is_personal) VALUES ($1, TRUE) RETURNING id`,
-      [`${row.handle}'s Team`]
+      ["Personal"]
     );
     await client.query(
       `INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'owner')
@@ -390,6 +390,13 @@ export async function initializeDatabase() {
     await client.query(`
       ALTER TABLE boards
       ADD COLUMN IF NOT EXISTS action_items_visible BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+
+    // 29 Personal crews are titled "Personal" — the title is the tag. Renames
+    //    the legacy "<handle>'s Team" rows; idempotent by the WHERE guard.
+    await client.query(`
+      UPDATE teams SET name = 'Personal'
+      WHERE is_personal = TRUE AND name <> 'Personal';
     `);
 
     // 24-25 Backfill personal teams for existing registered users + attach

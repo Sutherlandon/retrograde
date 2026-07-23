@@ -19,9 +19,8 @@ export default [
     route("board/claim", "routes/app/board.claim.ts"),
     route("admin/dashboard", "routes/app/admin.dashboard.tsx"),
     route("admin/admins",   "routes/app/admin.admins.ts"),
-    route("account/api-keys", "routes/app/account.api-keys.tsx"),
-    route("teams", "routes/app/teams.tsx"),
-    route("teams/:id", "routes/app/teams.$id.tsx"),
+    route("crews", "routes/app/crews.tsx"),
+    route("crews/:id", "routes/app/crews.$id.tsx"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */

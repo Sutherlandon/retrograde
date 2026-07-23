@@ -4,11 +4,39 @@
 // note column). Facilitators create/edit/delete; every participant can check
 // items off. Facilitators can hide the whole column from the Command Deck.
 
-import { useState } from "react";
+import { useState, useLayoutEffect, useRef } from "react";
 import { useBoard } from "~/context/BoardContext";
-import { TrashIcon, PlusIcon } from "~/images/icons";
+import { TrashIcon, PlusIcon, EditIcon } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
+import Button from "./Button";
 import type { ActionItem } from "~/server/board.types";
+
+// One-line-tall textarea that grows to fit its content. Enter submits (handled
+// by callers); Shift+Enter inserts a newline like a normal textarea.
+function AutoGrowTextarea({
+  value,
+  className = "",
+  ...rest
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { value: string }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      className={`resize-none overflow-hidden ${className}`}
+      {...rest}
+    />
+  );
+}
 
 function ObjectiveRow({ item }: { item: ActionItem }) {
   const { toggleActionItem, updateActionItem, deleteActionItem, canFacilitate, boardLocked } = useBoard();
@@ -22,7 +50,7 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
   };
 
   return (
-    <li className="flex items-center gap-3 group py-1" data-testid="objective-row">
+    <li className="flex items-start gap-3 group py-1" data-testid="objective-row">
       <button
         type="button"
         role="checkbox"
@@ -39,12 +67,12 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
       </button>
 
       {editing ? (
-        <input
+        <AutoGrowTextarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => {
-            if (e.key === "Enter") save();
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
             if (e.key === "Escape") { setText(item.text); setEditing(false); }
           }}
           autoFocus
@@ -59,27 +87,70 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
         </span>
       )}
 
-      {canFacilitate && !boardLocked && (
-        <button
-          type="button"
-          onClick={() => deleteActionItem(item.id)}
-          title="Delete action item"
-          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
-        >
-          <TrashIcon size="sm" />
-        </button>
+      {canFacilitate && !boardLocked && !editing && (
+        <>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            title="Edit action item"
+            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity cursor-pointer"
+          >
+            <EditIcon size="sm" />
+          </button>
+          <button
+            type="button"
+            onClick={() => deleteActionItem(item.id)}
+            title="Delete action item"
+            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"
+          >
+            <TrashIcon size="sm" />
+          </button>
+        </>
       )}
+    </li>
+  );
+}
+
+// A blank row shown after clicking the header "+": an unchecked circle and a
+// focused text field, mirroring the edit affordance. Enter adds and clears for
+// rapid entry; blur commits a pending draft; Escape cancels.
+function DraftRow({ onAdd, onClose }: { onAdd: (text: string) => void; onClose: () => void }) {
+  const [text, setText] = useState("");
+
+  const commit = () => {
+    const trimmed = text.trim();
+    if (trimmed) onAdd(trimmed);
+    setText("");
+  };
+
+  return (
+    <li className="flex items-start gap-3 py-1" data-testid="objective-draft-row">
+      <span className="w-5 h-5 shrink-0 rounded-full border-2 border-gray-300 dark:border-gray-600" />
+      <AutoGrowTextarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => { commit(); onClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
+          if (e.key === "Escape") { setText(""); onClose(); }
+        }}
+        autoFocus
+        placeholder="Add a follow-up item…"
+        data-testid="objective-input"
+        className="flex-1 min-w-0 border rounded px-2 py-0.5 text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+      />
     </li>
   );
 }
 
 export function ActionItemsPanel() {
   const { actionItems, addActionItem, canFacilitate, boardLocked, actionItemsVisible } = useBoard();
-  const [draft, setDraft] = useState("");
+  const [adding, setAdding] = useState(false);
 
   const total = actionItems.length;
   const done = actionItems.filter((i) => i.completed).length;
   const allDone = total > 0 && done === total;
+  const canAdd = canFacilitate && !boardLocked;
 
   // Facilitators can hide the column entirely from the Command Deck.
   if (actionItemsVisible === false) return null;
@@ -87,23 +158,16 @@ export function ActionItemsPanel() {
   // Participants with no items to see get nothing at all.
   if (!canFacilitate && total === 0) return null;
 
-  const add = () => {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    addActionItem(trimmed);
-    setDraft("");
-  };
-
   return (
     <section
       data-testid="action-items-panel"
-      className="min-w-[300px] w-full md:w-80 shrink-0 min-h-[150px] rounded-md p-3
-        border border-green-400/60 dark:border-green-700/50 shadow-md/20
-        bg-green-50/60 dark:bg-green-950/20"
+      className="min-w-[350px] w-full md:max-w-1/2 flex-1 min-h-[150px] rounded-md p-3
+        border border-green-500 dark:border-green-700/50 shadow-md/20
+        dark:bg-slate-800"
     >
       <div className="flex items-center gap-3 mb-3">
         <StatusLED color={allDone ? "green" : "amber"} active={total > 0} size="sm" />
-        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-green-700 dark:text-green-400">
+        <span className="font-bold">
           Action Items
         </span>
         {total > 0 && (
@@ -113,6 +177,17 @@ export function ActionItemsPanel() {
           >
             {done}/{total} complete
           </span>
+        )}
+        {canAdd && (
+          <Button
+            icon={<PlusIcon />}
+            onClick={() => setAdding(true)}
+            aria-label="Add action item"
+            title="Add action item"
+            className={`${total > 0 ? "ml-1" : "ml-auto"} hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500`}
+            variant="text"
+            size="sm"
+          />
         )}
       </div>
 
@@ -125,7 +200,7 @@ export function ActionItemsPanel() {
         />
       </div>
 
-      {total === 0 ? (
+      {total === 0 && !adding ? (
         <p className="text-sm text-gray-400 dark:text-gray-600 mb-2">
           No action items yet. Capture the follow-ups your crew commits to.
         </p>
@@ -134,28 +209,10 @@ export function ActionItemsPanel() {
           {actionItems.map((item) => (
             <ObjectiveRow key={item.id} item={item} />
           ))}
+          {adding && canAdd && (
+            <DraftRow onAdd={addActionItem} onClose={() => setAdding(false)} />
+          )}
         </ul>
-      )}
-
-      {canFacilitate && !boardLocked && (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") add(); }}
-            placeholder="Add a follow-up item…"
-            data-testid="objective-input"
-            className="flex-1 min-w-0 border rounded px-3 py-1.5 text-sm border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
-          />
-          <button
-            type="button"
-            onClick={add}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm cursor-pointer flex items-center gap-1 shrink-0"
-          >
-            <PlusIcon size="sm" /> Add
-          </button>
-        </div>
       )}
     </section>
   );

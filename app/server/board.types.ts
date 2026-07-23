@@ -77,6 +77,7 @@ export interface BoardDTO {
   canFacilitate?: boolean; // owner OR facilitator role OR open_facilitation — see ADR-0006
   openFacilitation?: boolean;
   team_id?: string | null; // null = teamless (trial / grandfathered); see ADR-0003
+  team_name?: string | null; // crew name, null when teamless
   actionItems?: ActionItemDTO[];
   timerRunning: boolean;
   timerStartedAt: string | null;
@@ -92,6 +93,18 @@ export interface BoardDTO {
   contributorCount?: number;
   columns: ColumnDTO[];
   attachments?: AttachmentDTO[];
+}
+
+// A board row as listed on the dashboard / crew boards table (listVisibleBoards).
+export interface DashboardBoardRow {
+  id: string;
+  title: string;
+  team_id: string | null;
+  team_name: string | null;
+  role: string;              // 'owner' | 'facilitator' | 'team'
+  open_action_items: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +144,7 @@ export interface Column extends ColumnDTO {
 export interface BoardClientState {
   id: string;
   title: string;
+  teamName: string | null; // crew this board belongs to, null when teamless
   readonly: boolean;
   isOwner: boolean;
   // Facilitation — owner, granted facilitator, or open_facilitation. Gates the

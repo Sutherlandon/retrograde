@@ -4,7 +4,7 @@
 
 import { pool } from "./db_config";
 import "./db_init";
-import type { BoardDTO } from "./board.types";
+import type { BoardDTO, DashboardBoardRow } from "./board.types";
 
 // ---------------------------------------------------------------------------
 // READ
@@ -17,6 +17,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'id',             b.id,
       'title',          b.title,
       'team_id',        b.team_id,
+      'team_name',      MAX(t.name),
       'readonly',       false,
       'isOwner',        CASE
                           WHEN $2::uuid IS NOT NULL
@@ -116,6 +117,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
     ) AS board
     FROM boards b
     LEFT JOIN columns c ON c.board_id = b.id
+    LEFT JOIN teams t ON t.id = b.team_id
     WHERE b.id = $1
     GROUP BY b.id
     `,
@@ -124,6 +126,44 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
 
   if (res.rowCount === 0) return null;
   return res.rows[0].board as BoardDTO;
+}
+
+/**
+ * List the boards a user can see, as dashboard/crew table rows. A board is
+ * visible when the user is a board member (owner/facilitator) OR the board
+ * belongs to one of the user's crews. Scope to a single crew with `teamId`
+ * (used by the crew page). `order` is a caller-controlled ORDER BY expression
+ * (never user input).
+ */
+export async function listVisibleBoards(
+  userId: string,
+  opts: { teamId?: string; archived?: boolean; order?: string } = {}
+): Promise<DashboardBoardRow[]> {
+  const { teamId, archived = false, order = "updated_at DESC" } = opts;
+  const res = await pool.query(
+    `
+    SELECT * FROM (
+      SELECT DISTINCT ON (b.id)
+        b.*,
+        COALESCE(bm.role, 'team') AS role,
+        t.name AS team_name,
+        (SELECT COUNT(*)::int FROM action_items ai
+          WHERE ai.board_id = b.id AND NOT ai.completed) AS open_action_items
+      FROM boards b
+      LEFT JOIN board_members bm ON bm.board_id = b.id AND bm.user_id = $1
+      LEFT JOIN teams t ON t.id = b.team_id
+      WHERE b.archived_at IS ${archived ? "NOT NULL" : "NULL"}
+        ${teamId
+          ? "AND b.team_id = $2"
+          : `AND (bm.user_id IS NOT NULL
+               OR b.team_id IN (SELECT team_id FROM team_members WHERE user_id = $1))`}
+      ORDER BY b.id
+    ) visible
+    ORDER BY ${order}
+    `,
+    teamId ? [userId, teamId] : [userId]
+  );
+  return res.rows as DashboardBoardRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +599,94 @@ export async function duplicateBoardServer(
 
     await client.query("COMMIT");
     return newId;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Move one or more boards to a team (or to no team with teamId = null).
+ * Permission is enforced in SQL: the caller must own each board, and when
+ * moving TO a team, must be a member of that team. Boards that fail either
+ * guard are silently skipped; the returned ids are the boards actually moved.
+ */
+export async function moveBoardsToTeamServer(
+  boardIds: string[],
+  teamId: string | null,
+  userId: string
+): Promise<string[]> {
+  if (boardIds.length === 0) return [];
+
+  const res = await pool.query<{ id: string }>(
+    `UPDATE boards b SET team_id = $2
+     WHERE b.id = ANY($1)
+       AND EXISTS (
+         SELECT 1 FROM board_members bm
+         WHERE bm.board_id = b.id AND bm.user_id = $3 AND bm.role = 'owner'
+       )
+       AND ($2::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM team_members tm
+         WHERE tm.team_id = $2 AND tm.user_id = $3
+       ))
+     RETURNING b.id`,
+    [boardIds, teamId, userId]
+  );
+  return res.rows.map((r) => r.id);
+}
+
+/**
+ * Count the active, teamless boards the user owns — powers the sidebar's
+ * Unassigned crew entry and the "sort your boards" conversion flow.
+ */
+export async function countUnassignedBoardsForUser(userId: string): Promise<number> {
+  const res = await pool.query<{ count: string | number }>(
+    `SELECT COUNT(*)::int AS count
+     FROM boards b
+     JOIN board_members bm ON bm.board_id = b.id AND bm.user_id = $1 AND bm.role = 'owner'
+     WHERE b.team_id IS NULL AND b.archived_at IS NULL`,
+    [userId]
+  );
+  return Number(res.rows[0]?.count ?? 0);
+}
+
+/**
+ * Delete multiple boards in a single transaction. Only boards the caller
+ * owns are deleted; others in the list are silently skipped. Returns the
+ * ids that were actually deleted.
+ */
+export async function bulkDeleteBoardsServer(
+  boardIds: string[],
+  userId: string
+): Promise<string[]> {
+  if (boardIds.length === 0) return [];
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const owned = await client.query<{ id: string }>(
+      `SELECT b.id FROM boards b
+       JOIN board_members bm ON bm.board_id = b.id
+       WHERE b.id = ANY($1) AND bm.user_id = $2 AND bm.role = 'owner'`,
+      [boardIds, userId]
+    );
+    const ownedIds = owned.rows.map((r) => r.id);
+
+    if (ownedIds.length > 0) {
+      await client.query(
+        `DELETE FROM notes WHERE column_id IN (SELECT id FROM columns WHERE board_id = ANY($1))`,
+        [ownedIds]
+      );
+      await client.query(`DELETE FROM columns WHERE board_id = ANY($1)`, [ownedIds]);
+      await client.query(`DELETE FROM board_members WHERE board_id = ANY($1)`, [ownedIds]);
+      await client.query(`DELETE FROM boards WHERE id = ANY($1)`, [ownedIds]);
+    }
+
+    await client.query("COMMIT");
+    return ownedIds;
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

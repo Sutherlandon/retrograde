@@ -3,6 +3,8 @@ import { useLocation } from "react-router";
 import { Logo } from '~/images/icons';
 import { siteConfig } from '~/config/siteConfig';
 import AccountHub from './AccountHub';
+import Sidebar from './Sidebar';
+import type { TeamSummary } from '~/server/team_model';
 
 interface HeaderProps {
   user?: {
@@ -10,9 +12,11 @@ interface HeaderProps {
     username: string;
   };
   isAdmin?: boolean;
+  teams?: TeamSummary[];
+  unassignedCount?: number;
 }
 
-export default function Header({ user, isAdmin }: HeaderProps) {
+export default function Header({ user, isAdmin, teams, unassignedCount }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -100,7 +104,12 @@ export default function Header({ user, isAdmin }: HeaderProps) {
         <a href="/contact" className="hover:underline">
           Contact
         </a>
-        <AccountHub user={user} isAdmin={isAdmin} />
+        {user && (
+          <a href="/app/dashboard" className="hover:underline">
+            Dashboard
+          </a>
+        )}
+        <AccountHub user={user} />
       </nav>
 
       {/* Hamburger */}
@@ -142,11 +151,17 @@ export default function Header({ user, isAdmin }: HeaderProps) {
       <div
         id="mobile-menu"
         ref={menuRef}
-        className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 overflow-y-auto ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         role="menu"
       >
         <AccountHub user={user} closeMenu={closeMenu} />
+        {user && (
+          <>
+            <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} onNavigate={closeMenu} />
+            <div className="border-t border-gray-200 dark:border-gray-700" />
+          </>
+        )}
         <a href="/about" className="hover:underline" onClick={closeMenu}>
           About
         </a>

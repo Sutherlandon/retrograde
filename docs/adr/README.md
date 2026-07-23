@@ -37,3 +37,5 @@ Don't write an ADR for:
 - [ADR-0004: API keys for agent authentication](0004-api-keys-for-agent-auth.md) — `rk_live_…` keys, team-scoped, hashed at rest, revocable; legacy bearer-as-session-cookie stays for backward compat
 - [ADR-0005: Free-tier ephemerality](0005-free-tier-ephemerality.md) — teamless boards auto-archive after 30 days; existing accounts and team boards exempt
 - [ADR-0006: Board facilitation + action items](0006-board-facilitation-and-action-items.md) — facilitator role on board_members, open_facilitation mode, action_items as first-class board/team records
+- [ADR-0007: Crew page absorbs the dashboard's per-crew filter (GitLab-lite)](0007-crew-page-gitlab-lite.md) — one refined crew page reusing dashboard components; `/app/teams` renamed to `/app/crews` with no back-compat
+- [ADR-0008: API keys are AI crew members](0008-api-keys-are-ai-crew-members.md) — key management moves onto the crew page as an "AI Crew" section; standalone account page retired

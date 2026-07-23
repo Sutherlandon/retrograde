@@ -24,12 +24,12 @@ beforeEach(() => {
 function formRequest(fields: Record<string, string>) {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.append(k, v);
-  return new Request("http://localhost:3000/app/teams", { method: "POST", body: form });
+  return new Request("http://localhost:3000/app/crews", { method: "POST", body: form });
 }
 
 describe("teams loader", () => {
   it("lists the caller's teams", async () => {
-    const { loader } = await import("./teams");
+    const { loader } = await import("./crews");
     mockListTeamsForUser.mockResolvedValueOnce([
       { id: "t1", name: "landon's Team", is_personal: true, member_count: 1, board_count: 0, open_action_items: 0 },
     ]);
@@ -41,18 +41,18 @@ describe("teams loader", () => {
 
 describe("teams action", () => {
   it("creates a team and redirects to it", async () => {
-    const { action } = await import("./teams");
+    const { action } = await import("./crews");
     const res = (await action({
       request: formRequest({ intent: "create", name: "Voyager Crew" }),
       params: {}, context: {},
     } as never)) as Response;
     expect(mockCreateTeam).toHaveBeenCalledWith("Voyager Crew", "user-1");
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/app/teams/team-new");
+    expect(res.headers.get("Location")).toBe("/app/crews/team-new");
   });
 
   it("rejects an empty name", async () => {
-    const { action } = await import("./teams");
+    const { action } = await import("./crews");
     const result = await action({
       request: formRequest({ intent: "create", name: "  " }),
       params: {}, context: {},

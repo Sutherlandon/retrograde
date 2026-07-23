@@ -15,7 +15,7 @@ const MENU_ITEMS: MenuItem[] = [
   // Add more items here as needed
 ];
 
-export function NewButton({ claimOpen, setClaimOpen }: { claimOpen: boolean; setClaimOpen: (open: boolean) => void }) {
+export function NewButton({ claimOpen, setClaimOpen, teamId }: { claimOpen: boolean; setClaimOpen: (open: boolean) => void; teamId?: string }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -42,8 +42,11 @@ export function NewButton({ claimOpen, setClaimOpen }: { claimOpen: boolean; set
 
   return (
     <>
-      {/* Hidden form that submits to the dashboard action (creates a new board) */}
-      <Form method="post" ref={formRef} />
+      {/* Hidden form that submits to the dashboard action (creates a new board).
+          When a crew is selected in the sidebar, the new board joins it. */}
+      <Form method="post" ref={formRef}>
+        {teamId && <input type="hidden" name="teamId" value={teamId} />}
+      </Form>
 
       <div className="relative" ref={menuRef}>
         <Button

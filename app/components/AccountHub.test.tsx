@@ -27,32 +27,29 @@ describe("AccountHub", () => {
     vi.clearAllMocks();
   });
 
-  it("shows admin dashboard link when isAdmin is true", () => {
-    render(<AccountHub user={user} isAdmin={true} />);
-    // Open the dropdown
-    fireEvent.click(screen.getByText("testuser"));
-    expect(screen.getByText("Admin Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Admin Dashboard").closest("a")).toHaveAttribute(
-      "href",
-      "/app/admin/dashboard"
-    );
-  });
-
-  it("does not show admin dashboard link when isAdmin is false", () => {
-    render(<AccountHub user={user} isAdmin={false} />);
-    fireEvent.click(screen.getByText("testuser"));
-    expect(screen.queryByText("Admin Dashboard")).not.toBeInTheDocument();
-  });
-
-  it("does not show admin dashboard link when isAdmin is not provided", () => {
+  it("shows the theme switcher when opened", () => {
     render(<AccountHub user={user} />);
     fireEvent.click(screen.getByText("testuser"));
+    expect(screen.getByText("Theme")).toBeInTheDocument();
+  });
+
+  it("shows a logout link when opened", () => {
+    render(<AccountHub user={user} />);
+    fireEvent.click(screen.getByText("testuser"));
+    expect(screen.getByText("Logout").closest("a")).toHaveAttribute("href", "/auth/logout");
+  });
+
+  it("does not show navigation links — those live in the Sidebar now", () => {
+    render(<AccountHub user={user} />);
+    fireEvent.click(screen.getByText("testuser"));
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Teams")).not.toBeInTheDocument();
+    expect(screen.queryByText("API Keys")).not.toBeInTheDocument();
     expect(screen.queryByText("Admin Dashboard")).not.toBeInTheDocument();
   });
 
-  it("shows dashboard link regardless of admin status", () => {
-    render(<AccountHub user={user} isAdmin={false} />);
-    fireEvent.click(screen.getByText("testuser"));
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+  it("shows a login button when no user is present", () => {
+    render(<AccountHub />);
+    expect(screen.getByText("Log In").closest("a")).toHaveAttribute("href", "/auth/login");
   });
 });

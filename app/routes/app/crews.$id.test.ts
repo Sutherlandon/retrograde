@@ -1,0 +1,295 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockRequireRegisteredUser = vi.fn();
+vi.mock("~/hooks/useAuth", () => ({
+  requireRegisteredUser: (...args: unknown[]) => mockRequireRegisteredUser(...args),
+}));
+
+const mockGetTeamWithMembers = vi.fn();
+const mockTeamRole = vi.fn();
+const mockAddTeamMember = vi.fn();
+const mockRemoveTeamMember = vi.fn();
+const mockRenameTeam = vi.fn();
+const mockDeleteTeamServer = vi.fn();
+const mockListTeamsForUser = vi.fn();
+vi.mock("~/server/team_model", () => ({
+  getTeamWithMembers: (...args: unknown[]) => mockGetTeamWithMembers(...args),
+  teamRole: (...args: unknown[]) => mockTeamRole(...args),
+  addTeamMember: (...args: unknown[]) => mockAddTeamMember(...args),
+  removeTeamMember: (...args: unknown[]) => mockRemoveTeamMember(...args),
+  renameTeam: (...args: unknown[]) => mockRenameTeam(...args),
+  deleteTeamServer: (...args: unknown[]) => mockDeleteTeamServer(...args),
+  listTeamsForUser: (...args: unknown[]) => mockListTeamsForUser(...args),
+}));
+
+const mockListOpenActionItemsForTeam = vi.fn();
+const mockCreateTeamActionItem = vi.fn();
+const mockSetTeamActionItemCompleted = vi.fn();
+const mockUpdateTeamActionItemText = vi.fn();
+const mockDeleteTeamActionItem = vi.fn();
+vi.mock("~/server/action_item_model", () => ({
+  listOpenActionItemsForTeam: (...args: unknown[]) => mockListOpenActionItemsForTeam(...args),
+  createTeamActionItem: (...args: unknown[]) => mockCreateTeamActionItem(...args),
+  setTeamActionItemCompleted: (...args: unknown[]) => mockSetTeamActionItemCompleted(...args),
+  updateTeamActionItemText: (...args: unknown[]) => mockUpdateTeamActionItemText(...args),
+  deleteTeamActionItem: (...args: unknown[]) => mockDeleteTeamActionItem(...args),
+}));
+
+const mockCreateBoard = vi.fn();
+const mockListVisibleBoards = vi.fn();
+vi.mock("~/server/board_model", () => ({
+  createBoard: (...args: unknown[]) => mockCreateBoard(...args),
+  listVisibleBoards: (...args: unknown[]) => mockListVisibleBoards(...args),
+}));
+
+const mockHandleBoardMutation = vi.fn();
+vi.mock("~/server/board_actions", () => ({
+  handleBoardMutation: (...args: unknown[]) => mockHandleBoardMutation(...args),
+}));
+
+const mockListApiKeysForTeam = vi.fn();
+const mockMintApiKey = vi.fn();
+const mockRevokeApiKey = vi.fn();
+vi.mock("~/server/api_key", () => ({
+  listApiKeysForTeam: (...args: unknown[]) => mockListApiKeysForTeam(...args),
+  mintApiKey: (...args: unknown[]) => mockMintApiKey(...args),
+  revokeApiKey: (...args: unknown[]) => mockRevokeApiKey(...args),
+}));
+
+const mockFindUser = vi.fn();
+vi.mock("~/server/admin_model", () => ({
+  findRegisteredUserByUsername: (...args: unknown[]) => mockFindUser(...args),
+}));
+
+// The page module imports the refined components at the top level, but they
+// never render in these loader/action tests. Real icons/StatusLED load fine in
+// node (they're plain components, never invoked here).
+vi.mock("~/components/StatusLED", () => ({ StatusLED: () => null }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRequireRegisteredUser.mockResolvedValue({ id: "user-1", username: "landon" });
+  mockGetTeamWithMembers.mockResolvedValue({
+    team: { id: "team-1", name: "Voyager", is_personal: false, created_at: "x" },
+    members: [{ user_id: "user-1", username: "landon", role: "owner", created_at: "x" }],
+  });
+  mockTeamRole.mockResolvedValue("owner");
+  mockListVisibleBoards.mockResolvedValue([]);
+  mockListOpenActionItemsForTeam.mockResolvedValue([]);
+  mockListTeamsForUser.mockResolvedValue([]);
+  mockHandleBoardMutation.mockResolvedValue({ handled: false });
+  mockCreateBoard.mockResolvedValue("board-new");
+  mockListApiKeysForTeam.mockResolvedValue([]);
+  mockMintApiKey.mockResolvedValue({ key: "rk_live_secret", apiKey: { display_name: "Claude" } });
+});
+
+function formRequest(fields: Record<string, string>) {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  return new Request("http://localhost:3000/app/crews/team-1", { method: "POST", body: form });
+}
+
+describe("teams.$id loader", () => {
+  it("returns 403 for non-members", async () => {
+    const { loader } = await import("./crews.$id");
+    mockTeamRole.mockResolvedValueOnce(null);
+    try {
+      await loader({ request: new Request("http://x"), params: { id: "team-1" }, context: {} } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+  });
+
+  it("returns team data with owner flag, crew-scoped boards, open items, and crews", async () => {
+    const { loader } = await import("./crews.$id");
+    mockListVisibleBoards.mockResolvedValueOnce([{ id: "b1", title: "Retro", role: "owner" }]);
+    mockListOpenActionItemsForTeam.mockResolvedValueOnce([{ id: "ai1", text: "Do it" }]);
+    mockListTeamsForUser.mockResolvedValueOnce([{ id: "team-1", name: "Voyager" }]);
+    mockListApiKeysForTeam.mockResolvedValueOnce([{ id: "key-1", display_name: "Claude" }]);
+
+    const result = await loader({
+      request: new Request("http://x"), params: { id: "team-1" }, context: {},
+    } as never);
+
+    expect(result.team.name).toBe("Voyager");
+    expect(result.isTeamOwner).toBe(true);
+    expect(result.boards).toHaveLength(1);
+    expect(result.openItems).toHaveLength(1);
+    expect(result.teams).toHaveLength(1);
+    expect(result.keys).toHaveLength(1);
+    // Boards are scoped to this crew; open items and AI keys to this crew.
+    expect(mockListVisibleBoards).toHaveBeenCalledWith("user-1", { teamId: "team-1" });
+    expect(mockListOpenActionItemsForTeam).toHaveBeenCalledWith("team-1", "user-1");
+    expect(mockListApiKeysForTeam).toHaveBeenCalledWith("team-1");
+  });
+});
+
+describe("crews.$id action — AI crewmates (API keys)", () => {
+  it("mints a key for the crew owner", async () => {
+    const { action } = await import("./crews.$id");
+    const result = await action({
+      request: formRequest({ intent: "mintKey", display_name: "Claude (roadmap)" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockMintApiKey).toHaveBeenCalledWith("team-1", "Claude (roadmap)", "user-1");
+    expect((result as { mintedKey?: string }).mintedKey).toBe("rk_live_secret");
+  });
+
+  it("forbids non-owners from minting", async () => {
+    const { action } = await import("./crews.$id");
+    mockTeamRole.mockResolvedValueOnce("member");
+    try {
+      await action({
+        request: formRequest({ intent: "mintKey", display_name: "X" }),
+        params: { id: "team-1" }, context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockMintApiKey).not.toHaveBeenCalled();
+  });
+
+  it("allows minting on a personal crew (unlike human addMember)", async () => {
+    const { action } = await import("./crews.$id");
+    mockGetTeamWithMembers.mockResolvedValue({
+      team: { id: "team-1", name: "landon's Team", is_personal: true, created_at: "x" },
+      members: [],
+    });
+    const result = await action({
+      request: formRequest({ intent: "mintKey", display_name: "Solo Agent" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockMintApiKey).toHaveBeenCalledWith("team-1", "Solo Agent", "user-1");
+    expect((result as { mintedKey?: string }).mintedKey).toBe("rk_live_secret");
+  });
+
+  it("revokes a key scoped to the crew", async () => {
+    const { action } = await import("./crews.$id");
+    const result = await action({
+      request: formRequest({ intent: "revokeKey", api_key_id: "key-1" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockRevokeApiKey).toHaveBeenCalledWith("key-1", "team-1");
+    expect((result as { revokedId?: string }).revokedId).toBe("key-1");
+  });
+});
+
+describe("crews.$id action — shared board mutations", () => {
+  it("delegates board intents to handleBoardMutation and returns its result", async () => {
+    const { action } = await import("./crews.$id");
+    mockHandleBoardMutation.mockResolvedValueOnce({ handled: true, result: { moved: 2 } });
+
+    const result = await action({
+      request: formRequest({ intent: "bulkMove", boardIds: "b1,b2", teamId: "team-9" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+
+    expect(mockHandleBoardMutation).toHaveBeenCalled();
+    expect(result).toEqual({ moved: 2 });
+    // Short-circuits before crew-membership work.
+    expect(mockGetTeamWithMembers).not.toHaveBeenCalled();
+  });
+});
+
+describe("teams.$id action — owner guards", () => {
+  it("rename requires owner", async () => {
+    const { action } = await import("./crews.$id");
+    mockTeamRole.mockResolvedValueOnce("member");
+    try {
+      await action({
+        request: formRequest({ intent: "rename", name: "X" }),
+        params: { id: "team-1" }, context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockRenameTeam).not.toHaveBeenCalled();
+  });
+
+  it("rename + delete are forbidden on personal teams even for the owner", async () => {
+    const { action } = await import("./crews.$id");
+    mockGetTeamWithMembers.mockResolvedValue({
+      team: { id: "team-1", name: "landon's Team", is_personal: true, created_at: "x" },
+      members: [],
+    });
+    for (const intent of ["rename", "deleteTeam"]) {
+      try {
+        await action({
+          request: formRequest({ intent, name: "X" }),
+          params: { id: "team-1" }, context: {},
+        } as never);
+        expect.unreachable("should have thrown");
+      } catch (response: unknown) {
+        expect((response as Response).status).toBe(403);
+      }
+    }
+  });
+
+  it("addMember looks up by username and adds", async () => {
+    const { action } = await import("./crews.$id");
+    mockFindUser.mockResolvedValueOnce({ id: "user-7", username: "sam" });
+    const result = await action({
+      request: formRequest({ intent: "addMember", username: "sam" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockAddTeamMember).toHaveBeenCalledWith("team-1", "user-7");
+    expect((result as { addedUsername?: string }).addedUsername).toBe("sam");
+  });
+
+  it("deleteTeam redirects to /app/crews", async () => {
+    const { action } = await import("./crews.$id");
+    const res = (await action({
+      request: formRequest({ intent: "deleteTeam" }),
+      params: { id: "team-1" }, context: {},
+    } as never)) as Response;
+    expect(mockDeleteTeamServer).toHaveBeenCalledWith("team-1");
+    expect(res.headers.get("Location")).toBe("/app/crews");
+  });
+});
+
+describe("teams.$id action — member abilities", () => {
+  beforeEach(() => {
+    mockTeamRole.mockResolvedValue("member");
+  });
+
+  it("members can create a board under the team", async () => {
+    const { action } = await import("./crews.$id");
+    const res = (await action({
+      request: formRequest({ intent: "createBoard", title: "Sprint 13" }),
+      params: { id: "team-1" }, context: {},
+    } as never)) as Response;
+    expect(mockCreateBoard).toHaveBeenCalledWith("Sprint 13", "user-1", "team-1");
+    expect(res.headers.get("Location")).toBe("/app/board/board-new");
+  });
+
+  it("members can add, toggle, and delete team objectives", async () => {
+    const { action } = await import("./crews.$id");
+
+    await action({
+      request: formRequest({ intent: "addItem", text: "Do the thing" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockCreateTeamActionItem).toHaveBeenCalledWith("team-1", "Do the thing", "user-1");
+
+    await action({
+      request: formRequest({ intent: "toggleItem", itemId: "i1", completed: "true" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockSetTeamActionItemCompleted).toHaveBeenCalledWith("team-1", "i1", true);
+
+    await action({
+      request: formRequest({ intent: "updateItem", itemId: "i1", text: "Sharper wording" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockUpdateTeamActionItemText).toHaveBeenCalledWith("team-1", "i1", "Sharper wording");
+
+    await action({
+      request: formRequest({ intent: "deleteItem", itemId: "i1" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockDeleteTeamActionItem).toHaveBeenCalledWith("team-1", "i1");
+  });
+});

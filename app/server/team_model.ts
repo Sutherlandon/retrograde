@@ -16,13 +16,14 @@ interface TeamRow {
  * existing personal team id if one already exists, otherwise creates one
  * and adds the user as owner.
  *
+ * Personal teams are always named "Personal" — the title is the tag. There's
+ * exactly one per user and only they can see it, so a possessive name adds
+ * nothing.
+ *
  * Called from the OAuth callback (so new users get one on first login) and
  * from the one-time backfill in db_init.ts (so existing users are covered).
  */
-export async function ensurePersonalTeam(
-  userId: string,
-  handle: string
-): Promise<string> {
+export async function ensurePersonalTeam(userId: string): Promise<string> {
   // Check for an existing personal team this user owns.
   const existing = await pool.query<{ team_id: string }>(
     `SELECT tm.team_id FROM team_members tm
@@ -41,7 +42,7 @@ export async function ensurePersonalTeam(
     await client.query("BEGIN");
     const teamRes = await client.query<{ id: string }>(
       `INSERT INTO teams (name, is_personal) VALUES ($1, TRUE) RETURNING id`,
-      [`${handle}'s Team`]
+      ["Personal"]
     );
     const teamId = teamRes.rows[0].id;
     await client.query(

@@ -4,7 +4,7 @@ import TimerDisplay from "./TimerDisplay";
 import { BoardStatusBar } from "./BoardStatusBar";
 
 export default function BoardToolbar({ title }: { title: string }) {
-  const { updateTitle, canFacilitate, boardLocked } = useBoard();
+  const { updateTitle, canFacilitate, boardLocked, teamName } = useBoard();
   const [editing, setEditing] = useState(false);
   const [localTitle, setLocalTitle] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +39,7 @@ export default function BoardToolbar({ title }: { title: string }) {
 
   return (
     <div className="flex items-baseline py-4 gap-2 sm:gap-4">
-      <div className="min-w-0 flex-shrink">
+      <div className="min-w-0 flex-shrink flex items-baseline gap-2">
         {editing ? (
           <input
             ref={inputRef}
@@ -57,6 +57,14 @@ export default function BoardToolbar({ title }: { title: string }) {
           >
             {localTitle}
           </h1>
+        )}
+        {teamName && !editing && (
+          <span
+            data-testid="board-crew-tag"
+            className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300"
+          >
+            {teamName}
+          </span>
         )}
       </div>
       <div className="flex-grow text-center">

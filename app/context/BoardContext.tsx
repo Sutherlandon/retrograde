@@ -84,6 +84,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const isReadOnly = loaderData.readonly;
 
   const [title, setTitle] = useState(loaderData.title);
+  const teamName = (loaderData.team_name as string | null | undefined) ?? null;
 
   // Separate fetchers per concern — each gets its own pending/error state
   const columnFetcher = useFetcher();
@@ -683,6 +684,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const value: Board = {
     id: boardId,
     title,
+    teamName,
     updateTitle,
     readonly: isReadOnly,
     isOwner,

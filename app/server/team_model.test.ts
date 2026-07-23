@@ -29,14 +29,14 @@ describe("ensurePersonalTeam", () => {
       rows: [{ team_id: "team-existing" }],
     });
 
-    const id = await ensurePersonalTeam("user-1", "landon");
+    const id = await ensurePersonalTeam("user-1");
 
     expect(id).toBe("team-existing");
     // No transaction opened
     expect(mockClientQuery).not.toHaveBeenCalled();
   });
 
-  it("creates a new team + membership when none exists", async () => {
+  it("creates a new team named 'Personal' + membership when none exists", async () => {
     const { ensurePersonalTeam } = await import("./team_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // no existing
@@ -46,11 +46,11 @@ describe("ensurePersonalTeam", () => {
     mockClientQuery.mockResolvedValueOnce({}); // INSERT member
     mockClientQuery.mockResolvedValueOnce({}); // COMMIT
 
-    const id = await ensurePersonalTeam("user-2", "landon");
+    const id = await ensurePersonalTeam("user-2");
 
     expect(id).toBe("team-new");
     expect(mockClientQuery.mock.calls[1][0]).toContain("INSERT INTO teams");
-    expect(mockClientQuery.mock.calls[1][1]).toEqual(["landon's Team"]);
+    expect(mockClientQuery.mock.calls[1][1]).toEqual(["Personal"]);
     expect(mockClientQuery.mock.calls[2][0]).toContain("INSERT INTO team_members");
     expect(mockClientQuery.mock.calls[2][1]).toEqual(["team-new", "user-2"]);
     expect(mockRelease).toHaveBeenCalled();
@@ -66,7 +66,7 @@ describe("ensurePersonalTeam", () => {
     mockClientQuery.mockResolvedValueOnce({}); // ROLLBACK
 
     await expect(
-      ensurePersonalTeam("user-3", "landon")
+      ensurePersonalTeam("user-3")
     ).rejects.toThrow("dup key");
 
     expect(mockClientQuery.mock.calls.some((c) => c[0] === "ROLLBACK")).toBe(true);

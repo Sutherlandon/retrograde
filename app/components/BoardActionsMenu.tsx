@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { EllipsisIcon, CopyIcon, TrashIcon, ArchiveIcon } from "~/images/icons";
+import { EllipsisIcon, CopyIcon, TrashIcon, ArchiveIcon, AstronautIcon } from "~/images/icons";
+import type { TeamSummary } from "~/server/team_model";
 
 interface BoardActionsMenuProps {
   boardId: string;
   boardTitle: string;
   isOwner: boolean;
   isArchived: boolean;
+  /** When provided (dashboard), owners get a "Move to Team" submenu. */
+  teams?: TeamSummary[];
+  currentTeamId?: string | null;
 }
 
-export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: BoardActionsMenuProps) {
+export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, teams, currentTeamId }: BoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showTeamList, setShowTeamList] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const fetcher = useFetcher();
 
@@ -42,6 +47,16 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: B
     setOpen(false);
     fetcher.submit(
       { intent: "duplicate", boardId },
+      { method: "post" }
+    );
+  }
+
+  function handleMoveToTeam(e: React.MouseEvent, teamId: string) {
+    e.stopPropagation();
+    setOpen(false);
+    setShowTeamList(false);
+    fetcher.submit(
+      { intent: "moveBoard", boardId, teamId },
       { method: "post" }
     );
   }
@@ -79,17 +94,50 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: B
     <div className="relative" ref={menuRef}>
       <button
         type="button"
+        aria-label="Board actions"
         onClick={(e) => {
           e.stopPropagation();
           setOpen((o) => !o);
           setConfirmDelete(false);
+          setShowTeamList(false);
         }}
         className="p-1 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors cursor-pointer"
       >
         <EllipsisIcon size="md" />
       </button>
 
-      {open && (
+      {open && showTeamList && teams && (
+        <div className="absolute right-0 mt-1 w-52 rounded-md border bg-white dark:bg-gray-800 border-blue-500 shadow-lg z-50 overflow-hidden">
+          <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500">
+            Move to
+          </p>
+          {teams.filter((t) => t.id !== currentTeamId).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={(e) => handleMoveToTeam(e, t.id)}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            >
+              <span className="text-gray-500 dark:text-gray-400"><AstronautIcon size="sm" /></span>
+              {t.name}
+            </button>
+          ))}
+          {currentTeamId && (
+            <>
+              <hr className="border-gray-200 dark:border-gray-700" />
+              <button
+                type="button"
+                onClick={(e) => handleMoveToTeam(e, "none")}
+                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left text-amber-600 dark:text-amber-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+              >
+                Remove from crew
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {open && !showTeamList && (
         <div className="absolute right-0 mt-1 w-52 rounded-md border bg-white dark:bg-gray-800 border-blue-500 shadow-lg z-50 overflow-hidden">
           <button
             type="button"
@@ -99,6 +147,19 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived }: B
             <span className="text-gray-500 dark:text-gray-400"><CopyIcon size="sm" /></span>
             Duplicate Board
           </button>
+          {isOwner && teams && !isArchived && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTeamList(true);
+              }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+            >
+              <span className="text-gray-500 dark:text-gray-400"><AstronautIcon size="sm" /></span>
+              Move to Crew
+            </button>
+          )}
           {isOwner && (
             <button
               type="button"

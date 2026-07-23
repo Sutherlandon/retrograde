@@ -43,6 +43,46 @@ describe("ActionItemsPanel", () => {
     expect(screen.getAllByTestId("objective-row")).toHaveLength(2);
   });
 
+  it("edits an objective via the hover edit button", () => {
+    const updateActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      updateActionItem,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action item" }));
+    const input = screen.getByDisplayValue("Ship it");
+    fireEvent.change(input, { target: { value: "Ship it now" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(updateActionItem).toHaveBeenCalledWith("1", "Ship it now");
+  });
+
+  it("does not save on Shift+Enter (newline instead)", () => {
+    const updateActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      updateActionItem,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Edit action item" }));
+    const field = screen.getByDisplayValue("Ship it");
+    expect(field.tagName).toBe("TEXTAREA");
+    fireEvent.keyDown(field, { key: "Enter", shiftKey: true });
+    expect(updateActionItem).not.toHaveBeenCalled();
+  });
+
+  it("hides the edit button from non-facilitators", () => {
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      canFacilitate: false,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    expect(screen.queryByRole("button", { name: "Edit action item" })).toBeNull();
+  });
+
   it("toggles an objective through the checkbox", () => {
     const toggleActionItem = vi.fn();
     mockUseBoard.mockReturnValue({
@@ -55,24 +95,73 @@ describe("ActionItemsPanel", () => {
     expect(toggleActionItem).toHaveBeenCalledWith("1", true);
   });
 
-  it("adds an objective via the input for facilitators", () => {
+  it("reveals a draft row with a check circle and text field when the add button is clicked", () => {
+    render(<ActionItemsPanel />);
+    // No draft input until the plus is clicked
+    expect(screen.queryByTestId("objective-input")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
+    const input = screen.getByTestId("objective-input");
+    expect(input).toBeInTheDocument();
+    // The draft row carries an (unchecked) check circle like a real item
+    expect(screen.getByTestId("objective-draft-row")).toBeInTheDocument();
+  });
+
+  it("adds an objective from the draft row on Enter and stays open for rapid entry", () => {
     const addActionItem = vi.fn();
     mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
     render(<ActionItemsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
     const input = screen.getByTestId("objective-input");
     fireEvent.change(input, { target: { value: "New follow-up" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(addActionItem).toHaveBeenCalledWith("New follow-up");
+    // Draft row stays open (cleared) so another item can be added
+    expect(screen.getByTestId("objective-input")).toHaveValue("");
   });
 
-  it("hides the add form from non-facilitators", () => {
+  it("commits a pending draft on blur", () => {
+    const addActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
+    render(<ActionItemsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
+    const input = screen.getByTestId("objective-input");
+    fireEvent.change(input, { target: { value: "Wrap up" } });
+    fireEvent.blur(input);
+    expect(addActionItem).toHaveBeenCalledWith("Wrap up");
+    expect(screen.queryByTestId("objective-input")).toBeNull();
+  });
+
+  it("cancels the draft on Escape without adding", () => {
+    const addActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
+    render(<ActionItemsPanel />);
+    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
+    const input = screen.getByTestId("objective-input");
+    fireEvent.change(input, { target: { value: "Never mind" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(addActionItem).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("objective-input")).toBeNull();
+  });
+
+  it("hides the add button and draft from non-facilitators", () => {
     mockUseBoard.mockReturnValue({
       ...baseBoard,
       canFacilitate: false,
       actionItems: [item("1", "Ship it")],
     });
     render(<ActionItemsPanel />);
+    expect(screen.queryByRole("button", { name: "Add action item" })).toBeNull();
     expect(screen.queryByTestId("objective-input")).toBeNull();
+  });
+
+  it("hides the add button when the board is locked", () => {
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      boardLocked: true,
+      actionItems: [item("1", "Ship it")],
+    });
+    render(<ActionItemsPanel />);
+    expect(screen.queryByRole("button", { name: "Add action item" })).toBeNull();
   });
 
   it("renders nothing at all for non-facilitators with zero objectives", () => {

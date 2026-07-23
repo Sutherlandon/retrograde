@@ -144,6 +144,17 @@ export async function createTeamActionItem(
   );
 }
 
+export async function updateTeamActionItemText(
+  teamId: string,
+  itemId: string,
+  text: string
+): Promise<void> {
+  await pool.query(
+    `UPDATE action_items SET text = $1 WHERE id = $2 AND team_id = $3`,
+    [text, itemId, teamId]
+  );
+}
+
 export async function setTeamActionItemCompleted(
   teamId: string,
   itemId: string,
@@ -165,4 +176,103 @@ export async function deleteTeamActionItem(
     `DELETE FROM action_items WHERE id = $1 AND team_id = $2`,
     [itemId, teamId]
   );
+}
+
+// ---------------------------------------------------------------------------
+// User-level (dashboard rollup)
+// ---------------------------------------------------------------------------
+
+export interface UserActionItemRow {
+  id: string;
+  text: string;
+  created_at: string;
+  team_id: string | null;       // set for team-level items
+  team_name: string | null;
+  board_id: string | null;      // set for board-level items
+  board_title: string | null;
+  board_team_id: string | null;   // the board's team (null = unassigned board)
+  board_team_name: string | null; // that team's name, for the crew pill
+  can_manage: boolean;          // may the user edit/delete (vs. just toggle)?
+}
+
+/**
+ * Every open action item the user can see from the dashboard: team-level
+ * items on their teams, plus board-level items on boards that either belong
+ * to one of their teams or that they own directly (covers unassigned boards).
+ *
+ * `can_manage` mirrors the mutation rules: team items are managed by any
+ * team member; board items follow board facilitation (owner, facilitator,
+ * or open facilitation). Anyone who can see an item may toggle it.
+ */
+export async function listOpenActionItemsForUser(
+  userId: string
+): Promise<UserActionItemRow[]> {
+  const res = await pool.query(
+    `SELECT ai.id, ai.text, ai.created_at,
+            ai.team_id, t.name AS team_name,
+            ai.board_id, b.title AS board_title, b.team_id AS board_team_id,
+            bt.name AS board_team_name,
+            CASE
+              WHEN ai.team_id IS NOT NULL THEN TRUE
+              ELSE b.open_facilitation OR EXISTS (
+                SELECT 1 FROM board_members bmf
+                WHERE bmf.board_id = b.id AND bmf.user_id = $1
+                  AND bmf.role IN ('owner', 'facilitator')
+              )
+            END AS can_manage
+     FROM action_items ai
+     LEFT JOIN teams t ON t.id = ai.team_id
+     LEFT JOIN boards b ON b.id = ai.board_id
+     LEFT JOIN teams bt ON bt.id = b.team_id
+     WHERE NOT ai.completed
+       AND (b.id IS NULL OR b.archived_at IS NULL)
+       AND (
+         ai.team_id IN (SELECT team_id FROM team_members WHERE user_id = $1)
+         OR b.team_id IN (SELECT team_id FROM team_members WHERE user_id = $1)
+         OR EXISTS (
+           SELECT 1 FROM board_members bm
+           WHERE bm.board_id = ai.board_id AND bm.user_id = $1 AND bm.role = 'owner'
+         )
+       )
+     ORDER BY ai.created_at DESC`,
+    [userId]
+  );
+  return res.rows as UserActionItemRow[];
+}
+
+/**
+ * Every open action item for a single crew, in the same shape the crew page's
+ * (reused dashboard) list expects: the crew's own team-level items, plus open
+ * items on the crew's boards. `userId` drives `can_manage` for board items
+ * (team items are managed by any crew member — the page already guards
+ * membership).
+ */
+export async function listOpenActionItemsForTeam(
+  teamId: string,
+  userId: string
+): Promise<UserActionItemRow[]> {
+  const res = await pool.query(
+    `SELECT ai.id, ai.text, ai.created_at,
+            ai.team_id, t.name AS team_name,
+            ai.board_id, b.title AS board_title, b.team_id AS board_team_id,
+            bt.name AS board_team_name,
+            CASE
+              WHEN ai.team_id IS NOT NULL THEN TRUE
+              ELSE b.open_facilitation OR EXISTS (
+                SELECT 1 FROM board_members bmf
+                WHERE bmf.board_id = b.id AND bmf.user_id = $2
+                  AND bmf.role IN ('owner', 'facilitator')
+              )
+            END AS can_manage
+     FROM action_items ai
+     LEFT JOIN teams t ON t.id = ai.team_id
+     LEFT JOIN boards b ON b.id = ai.board_id
+     LEFT JOIN teams bt ON bt.id = b.team_id
+     WHERE NOT ai.completed
+       AND (b.id IS NULL OR b.archived_at IS NULL)
+       AND (ai.team_id = $1 OR b.team_id = $1)
+     ORDER BY ai.created_at DESC`,
+    [teamId, userId]
+  );
+  return res.rows as UserActionItemRow[];
 }

@@ -110,6 +110,15 @@ describe("team-level items", () => {
     expect(call[1]).toEqual(["team-1", "Team objective", "user-1"]);
   });
 
+  it("updates a team item's text scoped to team", async () => {
+    const { updateTeamActionItemText } = await import("./action_item_model");
+    await updateTeamActionItemText("team-1", "item-9", "Refined follow-up");
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("UPDATE action_items");
+    expect(sql).toContain("team_id");
+    expect(params).toEqual(["Refined follow-up", "item-9", "team-1"]);
+  });
+
   it("toggles a team item scoped to team", async () => {
     const { setTeamActionItemCompleted } = await import("./action_item_model");
     await setTeamActionItemCompleted("team-1", "item-9", true);
@@ -125,5 +134,54 @@ describe("team-level items", () => {
     expect(mockPoolQuery.mock.calls[0][0]).toContain("JOIN boards b ON b.id = ai.board_id");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("NOT ai.completed");
     expect(rows[0].board_title).toBe("Sprint 12");
+  });
+});
+
+describe("listOpenActionItemsForUser", () => {
+  it("lists open items across the user's teams and owned boards with context", async () => {
+    const { listOpenActionItemsForUser } = await import("./action_item_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "1", text: "Team-level item", team_id: "t1", team_name: "Design", board_id: null, board_title: null, board_team_id: null, board_team_name: null },
+        { id: "2", text: "Board item", team_id: null, team_name: null, board_id: "b1", board_title: "Sprint 12", board_team_id: "t1", board_team_name: "Design" },
+      ],
+    });
+
+    const rows = await listOpenActionItemsForUser("user-1");
+
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("NOT ai.completed");
+    expect(sql).toContain("team_members");
+    expect(sql).toContain("board_members");
+    expect(sql).toContain("can_manage");
+    expect(sql).toContain("bt.name AS board_team_name");
+    expect(sql).toContain("LEFT JOIN teams bt ON bt.id = b.team_id");
+    expect(params).toEqual(["user-1"]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].team_name).toBe("Design");
+    expect(rows[1].board_title).toBe("Sprint 12");
+    expect(rows[1].board_team_name).toBe("Design");
+  });
+});
+
+describe("listOpenActionItemsForTeam", () => {
+  it("lists the crew's open team + board items, scoped to the crew", async () => {
+    const { listOpenActionItemsForTeam } = await import("./action_item_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [
+        { id: "1", text: "Crew item", team_id: "t1", team_name: "Design", board_id: null, board_title: null, board_team_id: null, board_team_name: null, can_manage: true },
+        { id: "2", text: "Board item", team_id: null, team_name: null, board_id: "b1", board_title: "Sprint 12", board_team_id: "t1", board_team_name: "Design", can_manage: false },
+      ],
+    });
+
+    const rows = await listOpenActionItemsForTeam("t1", "user-1");
+
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("NOT ai.completed");
+    expect(sql).toContain("ai.team_id = $1 OR b.team_id = $1");
+    expect(sql).not.toContain("team_members");                 // crew-scoped, not user-wide
+    expect(sql).toContain("bmf.user_id = $2");                  // can_manage uses the viewer
+    expect(params).toEqual(["t1", "user-1"]);
+    expect(rows).toHaveLength(2);
   });
 });

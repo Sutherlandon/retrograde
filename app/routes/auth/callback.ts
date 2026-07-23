@@ -89,8 +89,7 @@ export async function loader({ request }: { request: Request }) {
 
     // Ensure the user has a personal team (ADR-0003). Idempotent on returning
     // logins; only does work for brand-new users not covered by the backfill.
-    const handle = profile.nickname || profile.preferred_username || profile.name || profile.email || "Personal";
-    await ensurePersonalTeam(userId, handle);
+    await ensurePersonalTeam(userId);
   } finally {
     client.release();
   }

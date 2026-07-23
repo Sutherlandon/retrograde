@@ -8,16 +8,35 @@
 /* NOTE: This makes “dark:” work based on .dark on an ancestor */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Fills across a container to count down the undo grace period on the
+   dashboard's Open Action Items (see DashboardActionItems.tsx). */
+@keyframes ai-undo-countdown {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
 @layer base {
 
   html,
   body {
     /* @apply bg-white dark:bg-gray-900; */
     @apply dark:bg-gray-900 dark:text-gray-100 text-gray-900 bg-white min-w-[380px];
+  }
 
-    @media (prefers-color-scheme: dark) {
-      color-scheme: dark;
-    }
+  /* Tied to the app's own .dark class (set by useTheme) via inheritance from
+     <html>, not the OS preference directly — otherwise native controls
+     (checkboxes, etc.) render with the wrong theme whenever the user's
+     explicit choice differs from what their OS/browser prefers. Declared
+     only on html (not body) so body inherits it rather than fighting it —
+     a value declared directly on an element always wins over one inherited
+     from an ancestor, so setting it on both would make .dark on <html>
+     alone unable to override body's own copy. */
+  html {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
   }
 
   h1 {
