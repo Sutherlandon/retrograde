@@ -6,7 +6,7 @@ Accepted (2026-06-22)
 
 ## Context
 
-The agent-collaboration MVP (see `docs/plans/agent-collaboration-mvp.md`, shipped earlier) introduced agent authentication by returning the user's session cookie value as `agent_token` from `POST /api/v1/boards`. The agent uses it as `Authorization: Bearer <agent_token>` on subsequent requests. This works as a foothold but has real shortcomings:
+The agent-collaboration MVP (see `docs/plans/0001-agent-collaboration-mvp.md`, shipped earlier) introduced agent authentication by returning the user's session cookie value as `agent_token` from `POST /api/v1/boards`. The agent uses it as `Authorization: Bearer <agent_token>` on subsequent requests. This works as a foothold but has real shortcomings:
 
 - **No revocation.** The token is the session cookie; killing it requires deleting the user.
 - **No expiry.** It's an unlimited-TTL bearer.

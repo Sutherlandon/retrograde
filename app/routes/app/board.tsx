@@ -8,6 +8,7 @@ import Board from "~/components/Board";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
 import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
+import { requireBoardAccess } from "~/server/board_permissions";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
 
@@ -26,6 +27,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Example / read-only boards — no DB needed
   if (board_id === "example-board") return exampleBoardTutorial;
   if (board_id === "example-board-real-world") return exampleBoardRealWorld;
+
+  // Members-only crews restrict who can open their boards. Anonymous callers who
+  // might be members are sent to log in; registered non-members get a 403.
+  await requireBoardAccess(request, board_id, { loginRedirect: true });
 
   const user = await getOptionalUser(request);
   const board = await getBoardServer(board_id, user?.id);

@@ -47,6 +47,18 @@ describe("DashboardActionItems", () => {
     expect(screen.queryByText("Fix the deploy pipeline")).toBeNull();
   });
 
+  it("shows an amber status dot when items are still outstanding", () => {
+    render(<DashboardActionItems items={[boardItem]} />);
+    const dot = screen.getByRole("button", { name: /Open Action Items/ }).querySelector("span.rounded-full");
+    expect(dot).toHaveClass("bg-amber-400");
+  });
+
+  it("shows a green status dot when there are no outstanding items", () => {
+    render(<DashboardActionItems items={[]} onAddItem={vi.fn()} />);
+    const dot = screen.getByRole("button", { name: /Open Action Items/ }).querySelector("span.rounded-full");
+    expect(dot).toHaveClass("bg-green-400");
+  });
+
   it("expands to reveal every item when the header is clicked", () => {
     render(<DashboardActionItems items={[boardItem, teamItem]} />);
     expand();
@@ -258,9 +270,12 @@ describe("DashboardActionItems", () => {
     expect(screen.getByRole("checkbox")).toBeEnabled();
   });
 
-  it("renders nothing when there are no open items", () => {
-    const { container } = render(<DashboardActionItems items={[]} />);
-    expect(container.firstChild).toBeNull();
+  it("stays visible showing zero when there are no open items, and isn't expandable", () => {
+    render(<DashboardActionItems items={[]} />);
+    expect(screen.getByTestId("dashboard-action-items")).toBeInTheDocument();
+    expect(screen.getByTestId("open-items-count").textContent).toBe("0");
+    // Static header, not a toggle — no button role, no expand affordance.
+    expect(screen.queryByRole("button", { name: /Open Action Items/ })).toBeNull();
   });
 });
 
@@ -339,7 +354,7 @@ describe("DashboardActionItems — smooth removal", () => {
     }
   });
 
-  it("stays mounted through the last item's exit animation instead of unmounting instantly", () => {
+  it("stays mounted through the last item's exit animation, then settles into the static zero state", () => {
     vi.useFakeTimers();
     try {
       const { rerender } = render(<DashboardActionItems items={[boardItem]} />);
@@ -351,7 +366,10 @@ describe("DashboardActionItems — smooth removal", () => {
       expect(screen.getByText("Fix the deploy pipeline")).toBeInTheDocument();
 
       act(() => { vi.advanceTimersByTime(300); });
-      expect(screen.queryByTestId("dashboard-action-items")).toBeNull();
+      // Section stays mounted, showing zero, no longer expandable.
+      expect(screen.getByTestId("dashboard-action-items")).toBeInTheDocument();
+      expect(screen.getByTestId("open-items-count").textContent).toBe("0");
+      expect(screen.queryByRole("button", { name: /Open Action Items/ })).toBeNull();
     } finally {
       vi.useRealTimers();
     }

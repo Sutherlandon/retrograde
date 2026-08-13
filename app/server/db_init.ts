@@ -1,53 +1,4 @@
 import { pool } from "./db_config.js";
-import type { PoolClient } from "pg";
-
-/**
- * Backfill personal teams for every existing registered (non-anonymous) user
- * who doesn't already have one, then link each registered user's owned boards
- * to their personal team. Idempotent: re-running is a no-op once the data is
- * in place. See ADR-0003.
- */
-async function runPersonalTeamBackfill(client: PoolClient) {
-  // 1) Find registered users without a personal team.
-  const users = await client.query(`
-    SELECT u.id
-    FROM users u
-    WHERE u.is_anonymous = FALSE
-      AND NOT EXISTS (
-        SELECT 1 FROM team_members tm
-        JOIN teams t ON t.id = tm.team_id
-        WHERE tm.user_id = u.id AND t.is_personal = TRUE
-      )
-  `);
-
-  for (const row of users.rows) {
-    const teamRes = await client.query(
-      `INSERT INTO teams (name, is_personal) VALUES ($1, TRUE) RETURNING id`,
-      ["Personal"]
-    );
-    await client.query(
-      `INSERT INTO team_members (team_id, user_id, role) VALUES ($1, $2, 'owner')
-       ON CONFLICT (team_id, user_id) DO NOTHING`,
-      [teamRes.rows[0].id, row.id]
-    );
-  }
-
-  // 2) For boards with NULL team_id whose owner has a personal team, attach.
-  //    Anonymous-flow boards (owner is_anonymous=TRUE) stay teamless.
-  await client.query(`
-    UPDATE boards b
-    SET team_id = (
-      SELECT tm.team_id
-      FROM board_members bm
-      JOIN users u ON u.id = bm.user_id
-      JOIN team_members tm ON tm.user_id = u.id
-      JOIN teams t ON t.id = tm.team_id AND t.is_personal = TRUE
-      WHERE bm.board_id = b.id AND bm.role = 'owner' AND u.is_anonymous = FALSE
-      LIMIT 1
-    )
-    WHERE b.team_id IS NULL
-  `);
-}
 
 /**
  * Database initialization function, only run initial startup of the application. If th
@@ -392,6 +343,25 @@ export async function initializeDatabase() {
       ADD COLUMN IF NOT EXISTS action_items_visible BOOLEAN NOT NULL DEFAULT TRUE;
     `);
 
+    // 30 Blind brainstorm: when true, each participant sees only the notes they
+    //    authored (filtered server-side in getBoardServer). Off by default.
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS hide_others_notes BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    // 31 Crew board access: when true, only crew members can open the crew's
+    //    boards. Defaults on for every crew; personal crews are forced off so
+    //    their boards keep the anyone-with-the-link trial behavior. Re-running
+    //    the personal reset is safe — personal crews never expose the toggle.
+    await client.query(`
+      ALTER TABLE teams
+      ADD COLUMN IF NOT EXISTS restrict_board_access BOOLEAN NOT NULL DEFAULT TRUE;
+    `);
+    await client.query(`
+      UPDATE teams SET restrict_board_access = FALSE WHERE is_personal = TRUE;
+    `);
+
     // 29 Personal crews are titled "Personal" — the title is the tag. Renames
     //    the legacy "<handle>'s Team" rows; idempotent by the WHERE guard.
     await client.query(`
@@ -399,10 +369,37 @@ export async function initializeDatabase() {
       WHERE is_personal = TRUE AND name <> 'Personal';
     `);
 
-    // 24-25 Backfill personal teams for existing registered users + attach
-    //       their existing boards. Server-side and transactional — runs once
-    //       inside this same transaction so a failure rolls back cleanly.
-    await runPersonalTeamBackfill(client);
+    // 24 Personal teams are created per-user at login (ensurePersonalTeam,
+    //    see auth/callback.ts) — every registered user gets one the next
+    //    time they sign in, so no startup backfill is needed for that part.
+    //
+    // 25 Boards, however, must NOT be auto-attached to a team on our behalf.
+    //    Teams/crews are still pre-launch (ADR-0007/0008), so any team_id a
+    //    board picked up from the old startup backfill doesn't reflect a
+    //    real choice — it was silently re-applied on every server restart,
+    //    which also fought the crew-deletion flow (a deliberately-unassigned
+    //    board would get re-claimed the next time the server booted). Reset
+    //    every board to Unassigned exactly once so owners land on the
+    //    dashboard's "N boards haven't joined a crew yet" guide
+    //    (SortBoardsBanner) and choose deliberately. Gated by a flag column
+    //    so this never re-runs against a board once it's been through it —
+    //    including future boards, which always get an explicit team_id at
+    //    creation time and so are exempt via the flipped column default.
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS team_assignment_finalized BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await client.query(`
+      UPDATE boards
+      SET team_id = NULL, team_assignment_finalized = TRUE
+      WHERE NOT team_assignment_finalized;
+    `);
+
+    await client.query(`
+      ALTER TABLE boards
+      ALTER COLUMN team_assignment_finalized SET DEFAULT TRUE;
+    `);
 
     console.log("Done");
     console.log("Inserting dev data...");

@@ -104,6 +104,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
   const [attributionEnabled, setAttributionEnabled] = useState(loaderData.attributionEnabled ?? false);
   const [actionItemsVisible, setActionItemsVisible] = useState(loaderData.actionItemsVisible ?? true);
+  const [hideOthersNotes, setHideOthersNotes] = useState(loaderData.hideOthersNotes ?? false);
   const [canFacilitate, setCanFacilitate] = useState(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
   const [openFacilitation, setOpenFacilitation] = useState(loaderData.openFacilitation ?? false);
   const [actionItems, setActionItems] = useState<ActionItem[]>((loaderData.actionItems as ActionItem[]) ?? []);
@@ -144,7 +145,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setLocked(loaderData.boardLocked ?? false);
     setAttributionEnabled(loaderData.attributionEnabled ?? false);
     setActionItemsVisible(loaderData.actionItemsVisible ?? true);
-  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled, loaderData.actionItemsVisible]);
+    setHideOthersNotes(loaderData.hideOthersNotes ?? false);
+  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled, loaderData.actionItemsVisible, loaderData.hideOthersNotes]);
 
   useEffect(() => {
     setActionItems((loaderData.actionItems as ActionItem[]) ?? []);
@@ -199,6 +201,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       setLocked(data.boardLocked ?? false);
       setAttributionEnabled(data.attributionEnabled ?? false);
       setActionItemsVisible(data.actionItemsVisible ?? true);
+      setHideOthersNotes(data.hideOthersNotes ?? false);
     }
   }, [settingsFetcher.data]);
 
@@ -232,6 +235,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setNotesLocked(data.notesLocked ?? false);
         setLocked(data.boardLocked ?? false);
         setActionItemsVisible(data.actionItemsVisible ?? true);
+        setHideOthersNotes(data.hideOthersNotes ?? false);
         if (data.voterCount !== undefined) setVoterCount(data.voterCount);
         if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
         if (data.attachments) setAttachments(data.attachments);
@@ -557,7 +561,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean }) => {
+  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }) => {
     if (isReadOnly) return;
     setVotingEnabled(settings.votingEnabled);
     setVotingAllowed(settings.votingAllowed);
@@ -566,6 +570,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setLocked(settings.boardLocked);
     setAttributionEnabled(settings.attributionEnabled);
     setActionItemsVisible(settings.actionItemsVisible);
+    setHideOthersNotes(settings.hideOthersNotes);
     settingsFetcher.submit(
       {
         votingEnabled: String(settings.votingEnabled),
@@ -575,6 +580,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         boardLocked: String(settings.boardLocked),
         attributionEnabled: String(settings.attributionEnabled),
         actionItemsVisible: String(settings.actionItemsVisible),
+        hideOthersNotes: String(settings.hideOthersNotes),
       },
       { method: "PATCH", action: `/app/board/${boardId}/settings` }
     );
@@ -725,6 +731,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     stopTimer,
     attributionEnabled,
     actionItemsVisible,
+    hideOthersNotes,
     canFacilitate,
     openFacilitation,
     actionItems,

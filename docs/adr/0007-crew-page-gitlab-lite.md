@@ -121,6 +121,6 @@ triage filter, since Unassigned isn't a crew entity.
   (`listOpenActionItemsForTeam`), `app/routes/app/crews.$id.tsx`,
   `app/components/Sidebar.tsx`, `app/components/DashboardActionItems.tsx`,
   `app/components/DashboardBoardsTable.tsx`.
-- `docs/plans/dashboard-team-view.md` — prior state of the dashboard's crew
+- `docs/plans/0004-dashboard-team-view.md` — prior state of the dashboard's crew
   filter, superseded by this ADR for the per-crew case (Unassigned filtering
   is unaffected).

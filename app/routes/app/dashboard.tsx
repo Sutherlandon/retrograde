@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react";
-import { Form, useLoaderData, useSearchParams, useFetcher, redirect, type ActionFunctionArgs, type MetaArgs, useNavigate } from "react-router";
+import { Form, useLoaderData, useSearchParams, useFetcher, redirect, type ActionFunctionArgs, type MetaArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { createBoard, listVisibleBoards } from "~/server/board_model";
 import { handleBoardMutation } from "~/server/board_actions";
 import { getPersonalTeamForUser, listTeamsForUser, userIsTeamMember } from "~/server/team_model";
 import { listOpenActionItemsForUser } from "~/server/action_item_model";
-import { PlusIcon, CheckIcon, SearchIcon } from "~/images/icons";
+import { PlusIcon, CheckIcon, SearchIcon, ColumnsIcon, ArchiveIcon, CloseIcon } from "~/images/icons";
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
 import pkg from "~/../package.json";
 import { NewButton } from "~/components/NewButton";
 import { ClaimModal } from "~/components/ClaimModal";
-import { BoardActionsMenu } from "~/components/BoardActionsMenu";
+import { SectionLabel } from "~/components/SectionLabel";
 import { DashboardActionItems } from "~/components/DashboardActionItems";
 import { SortBoardsBanner } from "~/components/SortBoardsBanner";
 import { BulkActionsBar } from "~/components/BulkActionsBar";
@@ -123,10 +123,17 @@ function EmptyBoardsState({ onClaim }: { onClaim: () => void }) {
   );
 }
 
-function BoardsToolbar({ sort, onSort, filter, onFilter, claimOpen, setClaimOpen }: {
+// Muted, low-emphasis gray button — used for the archive show/hide toggles.
+const mutedButton =
+  "inline-flex items-center gap-2 px-4 py-2 rounded border border-gray-300 dark:border-gray-700 " +
+  "text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 " +
+  "hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer";
+
+function BoardsToolbar({ sort, onSort, sortOptions, filter, onFilter, right }: {
   sort: string; onSort: (v: string) => void;
+  sortOptions: { value: string; label: string }[];
   filter: string; onFilter: (v: string) => void;
-  claimOpen: boolean; setClaimOpen: (open: boolean) => void;
+  right: React.ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
@@ -139,9 +146,9 @@ function BoardsToolbar({ sort, onSort, filter, onFilter, claimOpen, setClaimOpen
           onChange={(e) => onSort(e.target.value)}
           className="border rounded px-2 py-1 border-blue-400 dark:border-blue-800 bg-blue-100 dark:bg-blue-950 cursor-pointer"
         >
-          <option value="updated">Recently Updated</option>
-          <option value="created">Recently Created</option>
-          <option value="title">Title (A–Z)</option>
+          {sortOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
         <div className="relative flex items-center">
           <SearchIcon size="sm" className="absolute left-2 text-gray-400 pointer-events-none" />
@@ -154,75 +161,65 @@ function BoardsToolbar({ sort, onSort, filter, onFilter, claimOpen, setClaimOpen
           />
         </div>
       </div>
-      <NewButton claimOpen={claimOpen} setClaimOpen={setClaimOpen} />
+      {right}
     </div>
   );
 }
 
-function ArchivedBoardsSection({ archivedBoards }: {
+function ArchivedBoardsSection({ archivedBoards, teams }: {
   archivedBoards: (DashboardBoardRow & { archived_at: string })[];
+  teams: TeamSummary[];
 }) {
   const [showArchived, setShowArchived] = useState(false);
-  const navigate = useNavigate();
+  const [filter, setFilter] = useState("");
+  const [sort, setSort] = useState("archived");
 
   if (archivedBoards.length === 0) return null;
 
-  return (
-    <div className="mt-8">
-      <button
-        type="button"
-        onClick={() => setShowArchived((v) => !v)}
-        className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors cursor-pointer mb-3"
-      >
-        <span>{showArchived ? "▾" : "▸"}</span>
-        Archived ({archivedBoards.length})
-      </button>
+  // Collapsed: just a muted button that reveals the section.
+  if (!showArchived) {
+    return (
+      <div className="mb-16">
+        <button type="button" onClick={() => setShowArchived(true)} className={mutedButton}>
+          <ArchiveIcon size="sm" />
+          View Archive
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full tabular-nums leading-none bg-gray-200/80 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+            {archivedBoards.length}
+          </span>
+        </button>
+      </div>
+    );
+  }
 
-      {showArchived && (
-        <div className="border rounded-lg w-full opacity-75">
-          <table className="table-auto w-full">
-            <thead>
-              <tr>
-                {["Title", "Role", "Archived"].map((field) => (
-                  <th key={field} className="text-left border-b-2 px-4 py-2">
-                    {field}
-                  </th>
-                ))}
-                <th className="border-b-2 px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {archivedBoards.map((board) => (
-                <tr
-                  key={board.id}
-                  className="hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer"
-                  onClick={() => navigate(`/app/board/${board.id}`)}
-                >
-                  <td className="border-b dark:border-gray-600 px-4 py-4 min-w-[200px]">
-                    <a href={`/app/board/${board.id}`}>
-                      {board.title}
-                    </a>
-                  </td>
-                  <td className="border-b dark:border-gray-600 px-4 py-4">
-                    {board.role}
-                  </td>
-                  <td className="border-b dark:border-gray-600 px-4 py-4">
-                    {new Date(board.archived_at).toLocaleDateString()}
-                  </td>
-                  <td className="border-b dark:border-gray-600 px-4 py-2 text-right">
-                    <BoardActionsMenu
-                      boardId={board.id}
-                      boardTitle={board.title}
-                      isOwner={board.role === "owner"}
-                      isArchived={true}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+  // Client-side sort + filter, mirroring the active board controls.
+  const sorted = [...archivedBoards].sort((a, b) => {
+    if (sort === "created") return +new Date(b.created_at) - +new Date(a.created_at);
+    if (sort === "title") return a.title.localeCompare(b.title);
+    return +new Date(b.archived_at) - +new Date(a.archived_at);
+  });
+  const visible = filter ? sorted.filter((b) => fuzzyMatch(b.title, filter)) : sorted;
+
+  return (
+    <div className="mb-16">
+      <SectionLabel icon={ArchiveIcon}>Archived</SectionLabel>
+      <BoardsToolbar
+        sort={sort}
+        onSort={setSort}
+        sortOptions={[
+          { value: "archived", label: "Recently Archived" },
+          { value: "created", label: "Recently Created" },
+          { value: "title", label: "Title (A–Z)" },
+        ]}
+        filter={filter}
+        onFilter={setFilter}
+        right={
+          <button type="button" onClick={() => setShowArchived(false)} className={mutedButton}>
+            <CloseIcon size="sm" />
+            Hide Archive
+          </button>
+        }
+      />
+      <DashboardBoardsTable boards={visible} teams={teams} archived />
     </div>
   );
 }
@@ -283,9 +280,15 @@ export default function AppDashboard() {
 
   return (
     <div className="px-8 mx-auto w-full sm:w-[80%]">
-      <h1 className="text-3xl font-semibold mb-4">
+      <h1 className="text-3xl font-semibold mb-1">
         {unassignedOnly ? "Unassigned Boards" : "Dashboard"}
       </h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-10">
+        {unassignedOnly
+          ? "These boards haven't found a crew yet — move them into one whenever you're ready."
+          : "Here's everything you're part of: your boards, your crews' boards, and whatever's still open across them. Archived boards are hiding out below if you need them."}
+      </p>
+
       <WelcomeBanner
         id={`initial-welcome`}
         title="Welcome to your Retrograde dashboard!"
@@ -300,50 +303,60 @@ export default function AppDashboard() {
 
       <SortBoardsBanner count={unassignedCount} onSort={showUnassigned} />
 
-      <DashboardActionItems items={visibleItems} />
+      <div className="mb-6">
+        <DashboardActionItems items={visibleItems} />
+      </div>
 
-      {boards.length === 0 ? (
-        <EmptyBoardsState onClaim={() => setClaimOpen(true)} />
-      ) : (
-        <>
-          <BoardsToolbar
-            sort={sort}
-            onSort={updateSort}
-            filter={filter}
-            onFilter={setFilter}
-            claimOpen={claimOpen}
-            setClaimOpen={setClaimOpen}
-          />
+      <div className="mb-16">
+        <SectionLabel icon={ColumnsIcon}>Boards</SectionLabel>
 
-          <DashboardBoardsTable
-            boards={visibleBoards}
-            teams={teams}
-            selected={selected}
-            onToggle={toggleSelected}
-            onSelectAll={(ids) => setSelected(new Set(ids))}
-          />
+        {boards.length === 0 ? (
+          <EmptyBoardsState onClaim={() => setClaimOpen(true)} />
+        ) : (
+          <>
+            <BoardsToolbar
+              sort={sort}
+              onSort={updateSort}
+              sortOptions={[
+                { value: "updated", label: "Recently Updated" },
+                { value: "created", label: "Recently Created" },
+                { value: "title", label: "Title (A–Z)" },
+              ]}
+              filter={filter}
+              onFilter={setFilter}
+              right={<NewButton claimOpen={claimOpen} setClaimOpen={setClaimOpen} />}
+            />
 
-          <BulkActionsBar
-            count={selected.size}
-            teams={teams}
-            onMove={(teamId) =>
-              bulkFetcher.submit(
-                { intent: "bulkMove", boardIds: [...selected].join(","), teamId },
-                { method: "post" }
-              )
-            }
-            onDelete={() =>
-              bulkFetcher.submit(
-                { intent: "bulkDelete", boardIds: [...selected].join(",") },
-                { method: "post" }
-              )
-            }
-            onClear={() => setSelected(new Set())}
-          />
+            <DashboardBoardsTable
+              boards={visibleBoards}
+              teams={teams}
+              selected={selected}
+              onToggle={toggleSelected}
+              onSelectAll={(ids) => setSelected(new Set(ids))}
+            />
 
-          <ArchivedBoardsSection archivedBoards={archivedBoards} />
-        </>
-      )}
+            <BulkActionsBar
+              count={selected.size}
+              teams={teams}
+              onMove={(teamId) =>
+                bulkFetcher.submit(
+                  { intent: "bulkMove", boardIds: [...selected].join(","), teamId },
+                  { method: "post" }
+                )
+              }
+              onDelete={() =>
+                bulkFetcher.submit(
+                  { intent: "bulkDelete", boardIds: [...selected].join(",") },
+                  { method: "post" }
+                )
+              }
+              onClear={() => setSelected(new Set())}
+            />
+          </>
+        )}
+      </div>
+
+      <ArchivedBoardsSection archivedBoards={archivedBoards} teams={teams} />
 
       <ClaimModal open={claimOpen} onClose={() => setClaimOpen(false)} />
     </div>

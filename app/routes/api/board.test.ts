@@ -10,8 +10,15 @@ vi.mock("~/hooks/useAuth", () => ({
   getApiUser: (...args: unknown[]) => mockGetApiUser(...args),
 }));
 
+const mockGetBoardAccess = vi.fn();
+vi.mock("~/server/board_permissions", () => ({
+  getBoardAccess: (...args: unknown[]) => mockGetBoardAccess(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: board exists and is openly accessible.
+  mockGetBoardAccess.mockResolvedValue({ exists: true, allowed: true, userIsRegistered: true });
 });
 
 describe("GET /api/v1/boards/:id", () => {
@@ -64,7 +71,7 @@ describe("GET /api/v1/boards/:id", () => {
     const { loader } = await import("./board");
 
     mockGetApiUser.mockResolvedValueOnce(null);
-    mockGetBoardServer.mockResolvedValueOnce(null);
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: false, allowed: false, userIsRegistered: false });
 
     const response = (await loader({
       request: new Request("http://localhost:3000/api/v1/boards/missing"),
@@ -75,5 +82,24 @@ describe("GET /api/v1/boards/:id", () => {
     expect(response.status).toBe(404);
     const body = (await response.json()) as { error: { code: string } };
     expect(body.error.code).toBe("NOT_FOUND");
+    expect(mockGetBoardServer).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when the board is restricted to its crew", async () => {
+    const { loader } = await import("./board");
+
+    mockGetApiUser.mockResolvedValueOnce({ id: "outsider" });
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: true, allowed: false, userIsRegistered: true });
+
+    const response = (await loader({
+      request: new Request("http://localhost:3000/api/v1/boards/board-1"),
+      params: { id: "board-1" },
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("FORBIDDEN");
+    expect(mockGetBoardServer).not.toHaveBeenCalled();
   });
 });

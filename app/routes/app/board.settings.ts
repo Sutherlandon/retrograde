@@ -19,7 +19,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   switch (request.method.toUpperCase()) {
     case "PATCH": {
-      await requireFacilitator(request, boardId);
+      // The facilitator's id scopes the returned board in blind-brainstorm mode.
+      const viewerId = (await requireFacilitator(request, boardId))?.id;
       const votingEnabled = data.get("votingEnabled") === "true";
       const votingAllowed = Number(data.get("votingAllowed"));
       const votingScope = (data.get("votingScope") as string) || "board";
@@ -30,17 +31,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const actionItemsVisible = data.has("actionItemsVisible")
         ? data.get("actionItemsVisible") === "true"
         : true;
+      const hideOthersNotes = data.get("hideOthersNotes") === "true";
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
-      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible });
+      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, hideOthersNotes }, viewerId);
     }
 
     case "POST": {
       // Clear all votes/likes — called when enabling voting to wipe existing likes
-      await requireFacilitator(request, boardId);
+      const viewerId = (await requireFacilitator(request, boardId))?.id;
       await clearBoardVotesServer(boardId);
-      return getBoardServer(boardId);
+      return getBoardServer(boardId, viewerId);
     }
 
     default:

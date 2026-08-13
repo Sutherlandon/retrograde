@@ -9,6 +9,7 @@ interface TeamRow {
   name: string;
   is_personal: boolean;
   created_at: string;
+  restrict_board_access?: boolean;
 }
 
 /**
@@ -40,8 +41,10 @@ export async function ensurePersonalTeam(userId: string): Promise<string> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Personal crews are never members-only — their boards keep the
+    // anyone-with-the-link behavior (the column default is TRUE for named crews).
     const teamRes = await client.query<{ id: string }>(
-      `INSERT INTO teams (name, is_personal) VALUES ($1, TRUE) RETURNING id`,
+      `INSERT INTO teams (name, is_personal, restrict_board_access) VALUES ($1, TRUE, FALSE) RETURNING id`,
       ["Personal"]
     );
     const teamId = teamRes.rows[0].id;
@@ -171,7 +174,7 @@ export async function getTeamWithMembers(teamId: string): Promise<{
   members: TeamMemberDTO[];
 } | null> {
   const teamRes = await pool.query<TeamRow>(
-    `SELECT id, name, is_personal, created_at FROM teams WHERE id = $1`,
+    `SELECT id, name, is_personal, created_at, restrict_board_access FROM teams WHERE id = $1`,
     [teamId]
   );
   if (teamRes.rowCount === 0) return null;
@@ -188,9 +191,23 @@ export async function getTeamWithMembers(teamId: string): Promise<{
 
   const t = teamRes.rows[0];
   return {
-    team: { id: t.id, name: t.name, is_personal: t.is_personal, created_at: t.created_at },
+    team: {
+      id: t.id, name: t.name, is_personal: t.is_personal, created_at: t.created_at,
+      restrict_board_access: t.restrict_board_access,
+    },
     members: memberRes.rows as TeamMemberDTO[],
   };
+}
+
+/**
+ * Toggle members-only access for a crew's boards. Personal crews are never
+ * members-only, so the update is scoped to non-personal crews.
+ */
+export async function setTeamBoardRestriction(teamId: string, restricted: boolean): Promise<void> {
+  await pool.query(
+    `UPDATE teams SET restrict_board_access = $1 WHERE id = $2 AND is_personal = FALSE`,
+    [restricted, teamId]
+  );
 }
 
 export async function addTeamMember(teamId: string, userId: string): Promise<void> {

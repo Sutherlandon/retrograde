@@ -354,22 +354,23 @@ export function DashboardActionItems({
     });
   };
 
-  // With an add affordance (crew page) the section stays put even when empty,
-  // so you can add the first item.
-  if (state.list.length === 0 && !onAddItem) return null;
+  // Nothing to show or add — the header is a static "all clear" state rather
+  // than a toggle (there's no content to expand into).
+  const expandable = state.list.length > 0 || !!onAddItem;
+  const HeaderTag = expandable ? "button" : "div";
 
   return (
     <section
       data-testid="dashboard-action-items"
       className="mb-6 rounded-lg border-2 border-green-500 dark:border-green-700/40"
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer"
+      <HeaderTag
+        {...(expandable
+          ? { type: "button", onClick: () => setExpanded((v) => !v), "aria-expanded": expanded }
+          : {})}
+        className={`w-full flex items-center gap-3 px-4 py-2.5 ${expandable ? "cursor-pointer" : ""}`}
       >
-        <StatusLED color="green" active size="sm" />
+        <StatusLED color={items.length === 0 ? "green" : "amber"} active size="sm" />
         <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-green-700 dark:text-green-400">
           Open Action Items
         </span>
@@ -381,10 +382,10 @@ export function DashboardActionItems({
           {items.length}
         </span>
         <span className="flex-1" />
-        <span className="text-gray-400 text-lg leading-none">{expanded ? "▾" : "▸"}</span>
-      </button>
+        {expandable && <span className="text-gray-400 text-lg leading-none">{expanded ? "▾" : "▸"}</span>}
+      </HeaderTag>
 
-      {expanded && (
+      {expandable && expanded && (
         <ul className="px-4 pb-3 divide-y divide-green-200/40 dark:divide-green-900/40">
           {state.list.map((item) => (
             <ExitableRow

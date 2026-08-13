@@ -5,7 +5,7 @@ import { StatusLED } from "./StatusLED";
 import { VotingInfoModal } from "./VotingInfoModal";
 
 interface LedConfig {
-  color: "green" | "blue" | "amber" | "red" | "purple";
+  color: "green" | "blue" | "amber" | "red" | "purple" | "cyan";
   active: boolean;
   label: string;
 }
@@ -13,7 +13,7 @@ interface LedConfig {
 export function BoardStatusBar() {
   const {
     attributionEnabled, votingEnabled, votingAllowed, votingScope,
-    notesLocked, boardLocked, columns,
+    notesLocked, boardLocked, hideOthersNotes, columns,
   } = useBoard();
 
   const [legendOpen, setLegendOpen] = useState(false);
@@ -27,9 +27,9 @@ export function BoardStatusBar() {
 
   const leds: LedConfig[] = [
     { color: "purple", active: attributionEnabled, label: "Attribution" },
-    { color: "blue", active: votingEnabled, label: "Voting" },
+    { color: "cyan", active: hideOthersNotes, label: "Hide Others' Notes" },
     { color: "amber", active: notesLocked || boardLocked, label: "Notes Locked" },
-    { color: "red", active: boardLocked, label: "Board Locked" },
+    { color: "blue", active: votingEnabled, label: "Voting" },
   ];
 
   // Close legend when clicking anywhere outside

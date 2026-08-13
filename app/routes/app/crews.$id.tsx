@@ -17,6 +17,7 @@ import {
   renameTeam,
   deleteTeamServer,
   listTeamsForUser,
+  setTeamBoardRestriction,
   type TeamSummary,
 } from "~/server/team_model";
 import { createBoard, listVisibleBoards } from "~/server/board_model";
@@ -33,10 +34,12 @@ import { listApiKeysForTeam, mintApiKey, revokeApiKey } from "~/server/api_key";
 import { findRegisteredUserByUsername } from "~/server/admin_model";
 import type { TeamDTO, TeamMemberDTO, DashboardBoardRow, ApiKeyDTO } from "~/server/board.types";
 import { StatusLED } from "~/components/StatusLED";
+import { SectionLabel } from "~/components/SectionLabel";
+import { CommandDeckToggle } from "~/components/CommandDeckToggle";
 import { DashboardActionItems } from "~/components/DashboardActionItems";
 import { DashboardBoardsTable } from "~/components/DashboardBoardsTable";
 import { BulkActionsBar } from "~/components/BulkActionsBar";
-import { PlusIcon } from "~/images/icons";
+import { PlusIcon, ColumnsIcon, UserIcon, RobotIcon, SettingsIcon } from "~/images/icons";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await requireRegisteredUser(request);
@@ -101,6 +104,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!isOwner || result.team.is_personal) throw new Response("Forbidden", { status: 403 });
     await deleteTeamServer(teamId);
     return redirect("/app/crews");
+  }
+
+  if (intent === "setRestrictAccess") {
+    if (!isOwner || result.team.is_personal) throw new Response("Forbidden", { status: 403 });
+    await setTeamBoardRestriction(teamId, form.get("restrict") === "true");
+    return { success: true };
   }
 
   if (intent === "addMember") {
@@ -184,23 +193,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
 // Sections
 // ---------------------------------------------------------------------------
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
-      {children}
-    </p>
-  );
-}
-
 function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
   members: TeamMemberDTO[]; isTeamOwner: boolean; isPersonal: boolean; currentUserId: string;
 }) {
   const addFetcher = useFetcher<{ error?: string; addedUsername?: string }>();
   const removeFetcher = useFetcher();
+  const addFormRef = useRef<HTMLFormElement>(null);
+
+  // Clear the username field once a member is successfully added.
+  useEffect(() => {
+    if (addFetcher.data?.addedUsername) addFormRef.current?.reset();
+  }, [addFetcher.data]);
 
   return (
-    <div className="mb-10">
-      <SectionLabel>Crew Roster</SectionLabel>
+    <div className="mb-16">
+      <SectionLabel icon={UserIcon}>Crew Roster</SectionLabel>
       <div className="overflow-x-auto border rounded-lg mb-4">
         <table className="table-auto w-full">
           <thead>
@@ -253,7 +260,7 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
       </div>
 
       {isTeamOwner && !isPersonal && (
-        <addFetcher.Form method="post" className="flex gap-2 items-start flex-wrap">
+        <addFetcher.Form ref={addFormRef} method="post" className="flex gap-2 items-start flex-wrap">
           <input type="hidden" name="intent" value="addMember" />
           <div className="flex flex-col gap-1">
             <input
@@ -292,8 +299,8 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
   }, [mintFetcher.data]);
 
   return (
-    <div className="mb-10">
-      <SectionLabel>AI Crew</SectionLabel>
+    <div className="mb-16">
+      <SectionLabel icon={RobotIcon}>AI Crew</SectionLabel>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         API keys are AI crewmates. Each key lets an agent act in this crew, and its
         display name is what humans see on the notes it creates. Keys are shown once
@@ -410,10 +417,10 @@ function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: Tea
   }
 
   return (
-    <div className="mb-10">
-      <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
-        <SectionLabel>Boards</SectionLabel>
-        <createFetcher.Form method="post" className="flex gap-2 items-center -mt-3">
+    <div className="mb-16">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-5">
+        <SectionLabel icon={ColumnsIcon} noMargin>Boards</SectionLabel>
+        <createFetcher.Form method="post" className="flex gap-2 items-center">
           <input type="hidden" name="intent" value="createBoard" />
           <input
             type="text"
@@ -461,6 +468,75 @@ function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: Tea
   );
 }
 
+function CrewAccessSetting({ restricted }: { restricted: boolean }) {
+  const fetcher = useFetcher();
+  const [on, setOn] = useState(restricted);
+
+  // Keep local state in sync if the loader revalidates to a new value.
+  useEffect(() => { setOn(restricted); }, [restricted]);
+
+  const toggle = (next: boolean) => {
+    setOn(next);
+    fetcher.submit({ intent: "setRestrictAccess", restrict: String(next) }, { method: "post" });
+  };
+
+  return (
+    <div className="mb-6">
+      <CommandDeckToggle label="Members-only boards" checked={on} onChange={toggle} ledColor="amber" />
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md">
+        When on, only crew members can open this crew's boards. Turn off to let anyone with the link view them.
+      </p>
+    </div>
+  );
+}
+
+function DangerZone({ teamName }: { teamName: string }) {
+  const deleteFetcher = useFetcher();
+  const [confirmText, setConfirmText] = useState("");
+  const canDelete = confirmText === teamName;
+
+  return (
+    <div className="border-2 border-red-300 dark:border-red-900/60 rounded-lg p-5 bg-red-50/50 dark:bg-red-950/20">
+      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-red-600 dark:text-red-400 mb-2">
+        Danger Zone
+      </h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Deleting <strong>{teamName}</strong> cannot be undone. Boards keep existing but leave the crew.
+      </p>
+      <deleteFetcher.Form
+        method="post"
+        className="flex gap-2 items-end flex-wrap"
+        onSubmit={(e) => {
+          if (!canDelete || !confirm(`Delete crew "${teamName}"? This cannot be undone.`)) e.preventDefault();
+        }}
+      >
+        <input type="hidden" name="intent" value="deleteTeam" />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="delete-confirm" className="text-xs text-gray-500 dark:text-gray-400">
+            Type <strong>{teamName}</strong> to confirm
+          </label>
+          <input
+            id="delete-confirm"
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            autoComplete="off"
+            className="border rounded px-3 py-1.5 text-sm border-red-300 dark:border-red-800 bg-white dark:bg-gray-900"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={!canDelete}
+          className="px-3 py-1.5 bg-red-600 text-white rounded text-sm cursor-pointer
+            hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+        >
+          Delete Crew
+        </button>
+      </deleteFetcher.Form>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -473,22 +549,23 @@ export default function CrewDetailPage() {
       isTeamOwner: boolean; currentUserId: string;
     };
   const renameFetcher = useFetcher<{ error?: string }>();
-  const deleteFetcher = useFetcher();
   const addItemFetcher = useFetcher();
 
   return (
     <div className="px-8 mx-auto w-full sm:w-[80%] max-w-5xl">
       <h1 className="text-3xl font-semibold mb-1">{team.name}</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-10">
         <a href="/app/crews" className="text-blue-500 hover:underline">← All crews</a>
       </p>
 
-      <DashboardActionItems
-        items={openItems}
-        defaultExpanded
-        scopedTeamId={team.id}
-        onAddItem={(text) => addItemFetcher.submit({ intent: "addItem", text }, { method: "post" })}
-      />
+      <div className="mb-16">
+        <DashboardActionItems
+          items={openItems}
+          defaultExpanded
+          scopedTeamId={team.id}
+          onAddItem={(text) => addItemFetcher.submit({ intent: "addItem", text }, { method: "post" })}
+        />
+      </div>
 
       <CrewBoards boards={boards} teams={teams} />
 
@@ -497,8 +574,8 @@ export default function CrewDetailPage() {
       <CrewAgents keys={keys} isTeamOwner={isTeamOwner} />
 
       {isTeamOwner && !team.is_personal && (
-        <div className="mb-10">
-          <SectionLabel>Settings</SectionLabel>
+        <div className="mb-16">
+          <SectionLabel icon={SettingsIcon}>Settings</SectionLabel>
           <renameFetcher.Form method="post" className="flex gap-2 items-start flex-wrap mb-4">
             <input type="hidden" name="intent" value="rename" />
             <input
@@ -515,17 +592,9 @@ export default function CrewDetailPage() {
             {renameFetcher.data?.error && <p className="text-sm text-red-500">{renameFetcher.data.error}</p>}
           </renameFetcher.Form>
 
-          <deleteFetcher.Form
-            method="post"
-            onSubmit={(e) => {
-              if (!confirm(`Delete crew "${team.name}"? Boards keep existing but leave the crew.`)) e.preventDefault();
-            }}
-          >
-            <input type="hidden" name="intent" value="deleteTeam" />
-            <button type="submit" className="text-sm text-red-500 hover:text-red-700 cursor-pointer">
-              Delete Crew
-            </button>
-          </deleteFetcher.Form>
+          <CrewAccessSetting restricted={team.restrict_board_access ?? true} />
+
+          <DangerZone teamName={team.name} />
         </div>
       )}
     </div>

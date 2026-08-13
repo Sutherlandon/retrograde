@@ -8,8 +8,9 @@ vi.mock("~/context/BoardContext", () => ({
   useBoard: () => mockUseBoard(),
 }));
 
+const userState = vi.hoisted(() => ({ current: null as { id: string; username: string } | null }));
 vi.mock("~/context/userContext", () => ({
-  useOptionalUser: () => null,
+  useOptionalUser: () => userState.current,
 }));
 
 vi.mock("@dnd-kit/sortable", () => ({
@@ -58,6 +59,7 @@ function makeNote(overrides: Partial<NoteType> = {}): NoteType {
 describe("Note author footer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    userState.current = null;
     mockUseBoard.mockReturnValue(baseBoard);
   });
 
@@ -114,5 +116,33 @@ describe("Note author footer", () => {
   it("renders nothing when the author field is absent", () => {
     render(<Note note={makeNote()} columnId="c1" noteColor="bg-yellow-200" />);
     expect(screen.queryByTestId("note-author")).toBeNull();
+  });
+});
+
+describe("Note author preview while composing", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    userState.current = { id: "u1", username: "Ada" };
+    mockUseBoard.mockReturnValue({ ...baseBoard, attributionEnabled: true });
+  });
+
+  afterEach(() => cleanup());
+
+  it("previews the current user's name on a new note being typed when attribution is on", () => {
+    render(<Note note={makeNote({ is_new: true })} columnId="c1" noteColor="bg-yellow-200" />);
+    const preview = screen.getByTestId("note-author-preview");
+    expect(preview.textContent).toContain("Ada");
+  });
+
+  it("shows no preview when attribution is off", () => {
+    mockUseBoard.mockReturnValue({ ...baseBoard, attributionEnabled: false });
+    render(<Note note={makeNote({ is_new: true })} columnId="c1" noteColor="bg-yellow-200" />);
+    expect(screen.queryByTestId("note-author-preview")).toBeNull();
+  });
+
+  it("shows no preview when there is no signed-in user", () => {
+    userState.current = null;
+    render(<Note note={makeNote({ is_new: true })} columnId="c1" noteColor="bg-yellow-200" />);
+    expect(screen.queryByTestId("note-author-preview")).toBeNull();
   });
 });

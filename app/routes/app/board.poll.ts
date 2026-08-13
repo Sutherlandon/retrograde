@@ -3,10 +3,13 @@ import { type LoaderFunctionArgs } from "react-router";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
 import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
+import { requireBoardAccess } from "~/server/board_permissions";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Missing ID", { status: 400 });
+
+  await requireBoardAccess(request, boardId);
 
   const user = await getOptionalUser(request);
   const board = await getBoardServer(boardId, user?.id);

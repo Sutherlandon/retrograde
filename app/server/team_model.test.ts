@@ -187,3 +187,15 @@ describe("userIsTeamMember", () => {
     expect(await userIsTeamMember("u", "t")).toBe(false);
   });
 });
+
+describe("setTeamBoardRestriction", () => {
+  it("updates the flag, scoped to non-personal crews", async () => {
+    const { setTeamBoardRestriction } = await import("./team_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    await setTeamBoardRestriction("team-1", false);
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("UPDATE teams SET restrict_board_access");
+    expect(call[0]).toContain("is_personal = FALSE");
+    expect(call[1]).toEqual([false, "team-1"]);
+  });
+});

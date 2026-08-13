@@ -89,6 +89,7 @@ export interface BoardDTO {
   boardLocked?: boolean;
   attributionEnabled?: boolean;
   actionItemsVisible?: boolean;
+  hideOthersNotes?: boolean;
   voterCount?: number;
   contributorCount?: number;
   columns: ColumnDTO[];
@@ -116,6 +117,9 @@ export interface TeamDTO {
   name: string;
   is_personal: boolean;
   created_at: string;
+  // When true, only crew members can open this crew's boards. Optional because
+  // not every TeamDTO source selects it; the crew page loader does.
+  restrict_board_access?: boolean;
 }
 
 export interface ApiKeyDTO {
@@ -178,6 +182,10 @@ export interface BoardClientState {
   // Action Items column — facilitators can hide it from the Command Deck.
   // Visible by default.
   actionItemsVisible: boolean;
+  // Blind brainstorm — when true, each participant sees only the notes they
+  // authored. Off by default. Filtered server-side so others' notes never
+  // reach the client.
+  hideOthersNotes: boolean;
   // Participation stats
   voterCount: number;
   contributorCount: number;
@@ -198,7 +206,7 @@ export interface BoardActions {
   updateNote: (columnId: string, noteId: string, newText: string, likes: number, created: string) => void;
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
-  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean }) => void;
+  updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }) => void;
   deleteNote: (columnId: string, noteId: string, text?: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

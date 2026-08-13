@@ -31,7 +31,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!noteId || !fromColumnId || !toColumnId) {
           throw new Response("Missing move fields", { status: 422 });
         }
-        return moveNoteServer(boardId, fromColumnId, toColumnId, noteId);
+        const moveUser = await getOptionalUser(request);
+        return moveNoteServer(boardId, fromColumnId, toColumnId, noteId, moveUser?.id);
       }
 
       if (intent === "reorder") {
@@ -41,7 +42,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
           throw new Response("Missing reorder fields", { status: 422 });
         }
         const orderedNoteIds: string[] = JSON.parse(orderedNoteIdsJson);
-        return reorderNotesServer(boardId, toColumnId, orderedNoteIds);
+        const reorderUser = await getOptionalUser(request);
+        return reorderNotesServer(boardId, toColumnId, orderedNoteIds, reorderUser?.id);
       }
 
       if (intent === "like") {
@@ -80,7 +82,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const noteId = data.get("noteId") as string;
       const columnId = data.get("columnId") as string;
       if (!noteId || !columnId) throw new Response("Missing noteId or columnId", { status: 422 });
-      return deleteNoteServer(boardId, columnId, noteId);
+      const deleteUser = await getOptionalUser(request);
+      return deleteNoteServer(boardId, columnId, noteId, deleteUser?.id);
     }
 
     default:

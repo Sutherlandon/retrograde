@@ -87,7 +87,8 @@ describe("board.settings action", () => {
         boardLocked: false,
         attributionEnabled: false,
         actionItemsVisible: true,
-      });
+        hideOthersNotes: false,
+      }, "anon-user-1");
     });
 
     it("allows registered board owner to update settings", async () => {
@@ -103,6 +104,26 @@ describe("board.settings action", () => {
 
       await action({ request, params: { id: "board-1" }, context: {} });
       expect(mockUpdateSettings).toHaveBeenCalled();
+    });
+
+    it("parses the hideOthersNotes flag (blind brainstorm)", async () => {
+      const { action } = await import("./board.settings");
+      setupUserAndOwnership("user-1", false, true);
+
+      const request = makePatchRequest("board-1", {
+        votingEnabled: "false",
+        votingAllowed: "5",
+        notesLocked: "false",
+        boardLocked: "false",
+        hideOthersNotes: "true",
+      });
+
+      await action({ request, params: { id: "board-1" }, context: {} });
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        "board-1",
+        expect.objectContaining({ hideOthersNotes: true }),
+        "user-1"
+      );
     });
 
     it("returns 403 for anonymous non-owner", async () => {
@@ -158,7 +179,7 @@ describe("board.settings action", () => {
 
       await action({ request, params: { id: "board-1" }, context: {} });
       expect(mockClearVotes).toHaveBeenCalledWith("board-1");
-      expect(mockGetBoard).toHaveBeenCalledWith("board-1");
+      expect(mockGetBoard).toHaveBeenCalledWith("board-1", "anon-user-1");
     });
   });
 });

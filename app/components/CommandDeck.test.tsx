@@ -75,7 +75,7 @@ describe("CommandDeck", () => {
   it("shows 4 status LEDs in pill when collapsed", () => {
     const { container } = render(<CommandDeck />);
     fireEvent.click(screen.getByTitle("Minimize"));
-    // Pill has 4 LEDs: attribution (green), voting (blue), notes locked (amber), board locked (red)
+    // Pill has 4 LEDs: attribution (purple), hide others' notes (cyan), notes locked (amber), voting (blue)
     const leds = container.querySelectorAll(".rounded-full.inline-block");
     expect(leds.length).toBe(4);
   });
@@ -127,14 +127,42 @@ describe("CommandDeck", () => {
     expect(screen.getByText("User Attribution")).toBeInTheDocument();
   });
 
-  it("calls updateBoardSettings with attributionEnabled:true when toggled on", () => {
+  it("warns before enabling attribution and only reveals after confirming", () => {
     const updateBoardSettings = vi.fn();
     mockUseBoard.mockReturnValue({ ...defaultBoard, updateBoardSettings });
     render(<CommandDeck />);
     const toggleSwitch = screen.getByText("User Attribution").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
     fireEvent.click(toggleSwitch);
+    // Enabling shows a warning first — nothing saved yet.
+    expect(screen.getByText(/reveals who wrote each note/i)).toBeInTheDocument();
+    expect(updateBoardSettings).not.toHaveBeenCalled();
+    // Confirming reveals authorship.
+    fireEvent.click(screen.getByRole("button", { name: "Reveal" }));
     expect(updateBoardSettings).toHaveBeenCalledWith(
       expect.objectContaining({ attributionEnabled: true })
+    );
+  });
+
+  it("cancelling the attribution warning leaves it off and saves nothing", () => {
+    const updateBoardSettings = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, updateBoardSettings });
+    render(<CommandDeck />);
+    const toggleSwitch = screen.getByText("User Attribution").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(toggleSwitch);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(updateBoardSettings).not.toHaveBeenCalled();
+    expect(screen.queryByText(/reveals who wrote each note/i)).not.toBeInTheDocument();
+  });
+
+  it("disabling attribution applies immediately without a warning", () => {
+    const updateBoardSettings = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, attributionEnabled: true, updateBoardSettings });
+    render(<CommandDeck />);
+    const toggleSwitch = screen.getByText("User Attribution").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(toggleSwitch);
+    expect(screen.queryByText(/reveals who wrote each note/i)).not.toBeInTheDocument();
+    expect(updateBoardSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ attributionEnabled: false })
     );
   });
 
@@ -146,6 +174,22 @@ describe("CommandDeck", () => {
     fireEvent.click(toggleSwitch);
     expect(updateBoardSettings).toHaveBeenCalledWith(
       expect.objectContaining({ actionItemsVisible: false })
+    );
+  });
+
+  it("renders the Hide Others' Notes toggle (off by default)", () => {
+    render(<CommandDeck />);
+    expect(screen.getByText("Hide Others' Notes")).toBeInTheDocument();
+  });
+
+  it("calls updateBoardSettings with hideOthersNotes:true when toggled on", () => {
+    const updateBoardSettings = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, hideOthersNotes: false, updateBoardSettings });
+    render(<CommandDeck />);
+    const toggleSwitch = screen.getByText("Hide Others' Notes").closest("div")!.parentElement!.querySelector("[role='switch']") as HTMLElement;
+    fireEvent.click(toggleSwitch);
+    expect(updateBoardSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ hideOthersNotes: true })
     );
   });
 

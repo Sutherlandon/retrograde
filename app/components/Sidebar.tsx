@@ -5,7 +5,7 @@
 // inside Header's mobile slide-out menu so the same links stay reachable
 // on small screens.
 import { useLocation } from "react-router";
-import { RocketIcon, AstronautIcon, SettingsIcon, type IconProps } from "~/images/icons";
+import { RocketIcon, AstronautIcon, LockIcon, type IconProps } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
 import type { TeamSummary } from "~/server/team_model";
 
@@ -25,7 +25,7 @@ const navItems: {
 }[] = [
   { href: "/app/dashboard", label: "Dashboard", icon: RocketIcon },
   { href: "/app/crews", label: "Crews", icon: AstronautIcon },
-  { href: "/app/admin/dashboard", label: "Admin", icon: SettingsIcon, adminOnly: true },
+  { href: "/app/admin/dashboard", label: "Admin", icon: LockIcon, adminOnly: true },
 ];
 
 const rowClasses = (active: boolean) =>

@@ -34,6 +34,7 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'boardLocked',      b.board_locked,
       'attributionEnabled', b.attribution_enabled,
       'actionItemsVisible', b.action_items_visible,
+      'hideOthersNotes',  b.hide_others_notes,
       'openFacilitation', b.open_facilitation,
       'canFacilitate',    CASE
                             WHEN $2::uuid IS NOT NULL
@@ -106,6 +107,10 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
                 FROM notes n
                 LEFT JOIN users u ON u.id = n.created_by
                 WHERE n.column_id = c.id
+                  -- Blind brainstorm: each viewer sees only their own notes.
+                  -- created_by is never exposed in the DTO, so this filter is
+                  -- the only way others' notes stay hidden.
+                  AND (NOT b.hide_others_notes OR n.created_by = $2::uuid)
               ),
               '[]'::json
             )
@@ -344,36 +349,39 @@ export async function addColumnServer(
   boardId: string,
   id: string,
   title: string,
-  colOrder: number
+  colOrder: number,
+  viewerId?: string | null
 ) {
   await pool.query(
     `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
     [id, boardId, title, colOrder]
   );
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function updateColumnTitleServer(
   boardId: string,
   columnId: string,
-  newTitle: string
+  newTitle: string,
+  viewerId?: string | null
 ) {
   await pool.query(`UPDATE columns SET title = $1 WHERE id = $2`, [newTitle, columnId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function updateColumnPromptServer(
   boardId: string,
   columnId: string,
-  prompt: string
+  prompt: string,
+  viewerId?: string | null
 ) {
   await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2`, [prompt, columnId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
-export async function deleteColumnServer(boardId: string, columnId: string) {
+export async function deleteColumnServer(boardId: string, columnId: string, viewerId?: string | null) {
   await pool.query(`DELETE FROM columns WHERE id = $1`, [columnId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function upsertNoteServer(
@@ -400,7 +408,9 @@ export async function upsertNoteServer(
     `,
     [noteId, columnId, newText, likes, created, userId ?? null]
   );
-  return getBoardServer(boardId);
+  // The author is the viewer here, so this response is correctly scoped in
+  // blind mode (they only ever see their own notes anyway).
+  return getBoardServer(boardId, userId);
 }
 
 export async function likeNoteServer(boardId: string, noteId: string, delta: number, userId?: string | null) {
@@ -408,7 +418,7 @@ export async function likeNoteServer(boardId: string, noteId: string, delta: num
   if (userId && delta > 0) {
     await pool.query(`INSERT INTO note_likes (note_id, user_id) VALUES ($1, $2)`, [noteId, userId]);
   }
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, userId);
 }
 
 export async function voteNoteServer(boardId: string, noteId: string, userId: string, delta: number) {
@@ -444,10 +454,12 @@ export async function updateBoardSettingsServer(
     boardLocked: boolean;
     attributionEnabled: boolean;
     actionItemsVisible?: boolean;
-  }
+    hideOthersNotes?: boolean;
+  },
+  viewerId?: string | null
 ) {
   await pool.query(
-    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5, attribution_enabled = $6, action_items_visible = $7 WHERE id = $8`,
+    `UPDATE boards SET voting_enabled = $1, voting_allowed = $2, voting_scope = $3, notes_locked = $4, board_locked = $5, attribution_enabled = $6, action_items_visible = $7, hide_others_notes = $8 WHERE id = $9`,
     [
       settings.votingEnabled,
       settings.votingAllowed,
@@ -456,10 +468,11 @@ export async function updateBoardSettingsServer(
       settings.boardLocked,
       settings.attributionEnabled,
       settings.actionItemsVisible ?? true,
+      settings.hideOthersNotes ?? false,
       boardId,
     ]
   );
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function clearBoardVotesServer(boardId: string) {
@@ -472,25 +485,27 @@ export async function clearBoardVotesServer(boardId: string) {
   );
 }
 
-export async function deleteNoteServer(boardId: string, columnId: string, noteId: string) {
+export async function deleteNoteServer(boardId: string, columnId: string, noteId: string, viewerId?: string | null) {
   await pool.query(`DELETE FROM notes WHERE id = $1`, [noteId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function moveNoteServer(
   boardId: string,
   fromColumnId: string,
   toColumnId: string,
-  noteId: string
+  noteId: string,
+  viewerId?: string | null
 ) {
   await pool.query(`UPDATE notes SET column_id = $1 WHERE id = $2`, [toColumnId, noteId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function reorderNotesServer(
   boardId: string,
   toColumnId: string,
-  orderedNoteIds: string[]
+  orderedNoteIds: string[],
+  viewerId?: string | null
 ) {
   const client = await pool.connect();
   try {
@@ -508,7 +523,7 @@ export async function reorderNotesServer(
   } finally {
     client.release();
   }
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function startTimerServer(

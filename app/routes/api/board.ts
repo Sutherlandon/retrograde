@@ -5,6 +5,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { getBoardServer } from "~/server/board_model";
 import { getApiUser } from "~/hooks/useAuth";
+import { getBoardAccess } from "~/server/board_permissions";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const id = params.id;
@@ -16,10 +17,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Pull user context if provided so user_votes is populated correctly.
-  // Public reads (no auth) still work; user_votes just stays 0.
+  // Public reads (no auth) still work on unrestricted boards; user_votes just
+  // stays 0. Members-only crews gate access to members and matching API keys.
   const user = await getApiUser(request);
-  const board = await getBoardServer(id, user?.id ?? null);
+  const apiTeamId = (user as { teamId?: string } | null)?.teamId ?? null;
+  const access = await getBoardAccess(id, user?.id ?? null, apiTeamId);
 
+  if (!access.exists) {
+    return Response.json(
+      { error: { code: "NOT_FOUND", message: "Board not found" } },
+      { status: 404 }
+    );
+  }
+  if (!access.allowed) {
+    return Response.json(
+      { error: { code: "FORBIDDEN", message: "This board is restricted to its crew" } },
+      { status: 403 }
+    );
+  }
+
+  const board = await getBoardServer(id, user?.id ?? null);
   if (!board) {
     return Response.json(
       { error: { code: "NOT_FOUND", message: "Board not found" } },

@@ -139,7 +139,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_scope");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("notes_locked");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("board_locked");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, false, true, false, "board-1"]);
   });
 
   it("disables voting", async () => {
@@ -150,7 +150,7 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, false, "board-1"]);
   });
 
   it("enables notes lock to prevent note editing during voting", async () => {
@@ -161,7 +161,7 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, votingScope: "board", notesLocked: true, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, true, false, "board-1"]);
   });
 
   it("enables full board lock to prevent all modifications", async () => {
@@ -172,7 +172,41 @@ describe("updateBoardSettingsServer", () => {
 
     await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: true, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, true, false, "board-1"]);
+  });
+
+  it("persists hide_others_notes and scopes the returned board to the viewer", async () => {
+    const { updateBoardSettingsServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] }); // getBoardServer
+
+    await updateBoardSettingsServer(
+      "board-1",
+      { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false, actionItemsVisible: true, hideOthersNotes: true },
+      "viewer-1"
+    );
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("hide_others_notes");
+    // hideOthersNotes true lands in the $8 slot, before the board id.
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, true, "board-1"]);
+    // The returned board is fetched scoped to the acting viewer (blind mode).
+    expect(mockPoolQuery.mock.calls[1][1]).toEqual(["board-1", "viewer-1"]);
+  });
+});
+
+describe("getBoardServer — blind brainstorm filtering", () => {
+  it("emits a per-viewer notes filter gated on hide_others_notes", async () => {
+    const { getBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
+
+    await getBoardServer("board-1", "viewer-1");
+
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    // Notes are excluded unless blind mode is off OR the viewer authored them.
+    expect(sql).toContain("NOT b.hide_others_notes OR n.created_by = $2::uuid");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["board-1", "viewer-1"]);
   });
 });
 

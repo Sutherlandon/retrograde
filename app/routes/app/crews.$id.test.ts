@@ -12,6 +12,7 @@ const mockRemoveTeamMember = vi.fn();
 const mockRenameTeam = vi.fn();
 const mockDeleteTeamServer = vi.fn();
 const mockListTeamsForUser = vi.fn();
+const mockSetTeamBoardRestriction = vi.fn();
 vi.mock("~/server/team_model", () => ({
   getTeamWithMembers: (...args: unknown[]) => mockGetTeamWithMembers(...args),
   teamRole: (...args: unknown[]) => mockTeamRole(...args),
@@ -20,6 +21,7 @@ vi.mock("~/server/team_model", () => ({
   renameTeam: (...args: unknown[]) => mockRenameTeam(...args),
   deleteTeamServer: (...args: unknown[]) => mockDeleteTeamServer(...args),
   listTeamsForUser: (...args: unknown[]) => mockListTeamsForUser(...args),
+  setTeamBoardRestriction: (...args: unknown[]) => mockSetTeamBoardRestriction(...args),
 }));
 
 const mockListOpenActionItemsForTeam = vi.fn();
@@ -190,6 +192,33 @@ describe("crews.$id action — shared board mutations", () => {
     expect(result).toEqual({ moved: 2 });
     // Short-circuits before crew-membership work.
     expect(mockGetTeamWithMembers).not.toHaveBeenCalled();
+  });
+});
+
+describe("crews.$id action — members-only board access", () => {
+  it("owner can toggle the crew's board restriction", async () => {
+    const { action } = await import("./crews.$id");
+    const result = await action({
+      request: formRequest({ intent: "setRestrictAccess", restrict: "false" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockSetTeamBoardRestriction).toHaveBeenCalledWith("team-1", false);
+    expect((result as { success?: boolean }).success).toBe(true);
+  });
+
+  it("non-owners cannot change board restriction", async () => {
+    const { action } = await import("./crews.$id");
+    mockTeamRole.mockResolvedValueOnce("member");
+    try {
+      await action({
+        request: formRequest({ intent: "setRestrictAccess", restrict: "true" }),
+        params: { id: "team-1" }, context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockSetTeamBoardRestriction).not.toHaveBeenCalled();
   });
 });
 

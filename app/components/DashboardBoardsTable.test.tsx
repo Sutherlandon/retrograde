@@ -97,3 +97,26 @@ describe("DashboardBoardsTable", () => {
     expect(screen.getByText("Owned Board")).toBeInTheDocument();
   });
 });
+
+describe("DashboardBoardsTable — archived mode", () => {
+  afterEach(() => cleanup());
+
+  const archivedBoards = [
+    {
+      id: "b4", title: "Old Retro", team_id: "t1", team_name: "Design Crew", role: "owner",
+      open_action_items: 0, created_at: "2026-06-01", updated_at: "2026-06-15", archived_at: "2026-07-20",
+    },
+  ];
+
+  it("shows an Archived column instead of Updated, using archived_at", () => {
+    render(<DashboardBoardsTable boards={archivedBoards} teams={teams} archived />);
+    expect(screen.getByRole("columnheader", { name: "Archived" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Updated" })).toBeNull();
+    expect(screen.getByText(new Date("2026-07-20").toLocaleDateString())).toBeInTheDocument();
+  });
+
+  it("renders no selection checkboxes or select-all column", () => {
+    render(<DashboardBoardsTable boards={archivedBoards} teams={teams} archived />);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});

@@ -39,3 +39,5 @@ Don't write an ADR for:
 - [ADR-0006: Board facilitation + action items](0006-board-facilitation-and-action-items.md) — facilitator role on board_members, open_facilitation mode, action_items as first-class board/team records
 - [ADR-0007: Crew page absorbs the dashboard's per-crew filter (GitLab-lite)](0007-crew-page-gitlab-lite.md) — one refined crew page reusing dashboard components; `/app/teams` renamed to `/app/crews` with no back-compat
 - [ADR-0008: API keys are AI crew members](0008-api-keys-are-ai-crew-members.md) — key management moves onto the crew page as an "AI Crew" section; standalone account page retired
+- [ADR-0009: Remove the team auto-claim backfill](0009-remove-team-auto-claim-backfill.md) — startup backfill silently re-attached teamless boards on every restart; removed, plus a one-time pre-launch reset to Unassigned
+- [ADR-0010: Crew boards are members-only by default](0010-members-only-crew-boards.md) — named crews restrict board access to members (personal crews stay open); enforced server-side via a single `getBoardAccess` guard

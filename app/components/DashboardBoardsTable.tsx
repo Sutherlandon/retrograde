@@ -12,16 +12,22 @@ import type { DashboardBoardRow } from "~/server/board.types";
 export type { DashboardBoardRow };
 
 interface DashboardBoardsTableProps {
-  boards: DashboardBoardRow[];
+  boards: (DashboardBoardRow & { archived_at?: string })[];
   teams: TeamSummary[];
-  selected: Set<string>;
-  onToggle: (boardId: string) => void;
-  onSelectAll: (boardIds: string[]) => void;
+  selected?: Set<string>;
+  onToggle?: (boardId: string) => void;
+  onSelectAll?: (boardIds: string[]) => void;
   /** Hide the Crew column when the whole table is already scoped to one crew. */
   showCrewColumn?: boolean;
+  /** Archived-boards mode: no selection checkboxes/bulk actions, the last
+   *  date column reads "Archived" (board.archived_at) instead of "Updated",
+   *  and rows get the archived actions-menu (Unarchive, no Move/Delete). */
+  archived?: boolean;
 }
 
-export function DashboardBoardsTable({ boards, teams, selected, onToggle, onSelectAll, showCrewColumn = true }: DashboardBoardsTableProps) {
+export function DashboardBoardsTable({
+  boards, teams, selected = new Set(), onToggle, onSelectAll, showCrewColumn = true, archived = false,
+}: DashboardBoardsTableProps) {
   const navigate = useNavigate();
   const ownedIds = boards.filter((b) => b.role === "owner").map((b) => b.id);
   const allSelected = ownedIds.length > 0 && ownedIds.every((id) => selected.has(id));
@@ -31,17 +37,19 @@ export function DashboardBoardsTable({ boards, teams, selected, onToggle, onSele
       <table className="table-auto w-full">
         <thead>
           <tr>
-            <th className="border-b-2 px-4 py-2 w-10">
-              <input
-                type="checkbox"
-                aria-label="Select all boards"
-                checked={allSelected}
-                onChange={() => onSelectAll(allSelected ? [] : ownedIds)}
-                className="cursor-pointer accent-blue-600"
-              />
-            </th>
-            {["Title", ...(showCrewColumn ? ["Crew"] : []), "Role", "Action Items", "Created", "Updated"].map((field) => (
-              <th key={field} className="text-left border-b-2 px-4 py-2">
+            {!archived && (
+              <th className="border-b-2 px-4 py-2 w-10">
+                <input
+                  type="checkbox"
+                  aria-label="Select all boards"
+                  checked={allSelected}
+                  onChange={() => onSelectAll?.(allSelected ? [] : ownedIds)}
+                  className="cursor-pointer accent-blue-600"
+                />
+              </th>
+            )}
+            {["Title", ...(showCrewColumn ? ["Crew"] : []), "Role", "Action Items", "Created", archived ? "Archived" : "Updated"].map((field) => (
+              <th key={field} className="text-left border-b-2 px-4 py-2 whitespace-nowrap">
                 {field}
               </th>
             ))}
@@ -56,20 +64,22 @@ export function DashboardBoardsTable({ boards, teams, selected, onToggle, onSele
                 ${selected.has(board.id) ? "bg-blue-50 dark:bg-blue-950/40" : ""}`}
               onClick={() => navigate(`/app/board/${board.id}`)}
             >
-              <td
-                className="border-b dark:border-gray-600 px-4 py-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <input
-                  type="checkbox"
-                  aria-label={`Select ${board.title}`}
-                  checked={selected.has(board.id)}
-                  disabled={board.role !== "owner"}
-                  onChange={() => onToggle(board.id)}
-                  title={board.role !== "owner" ? "Only board owners can move or delete boards" : undefined}
-                  className="cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-30"
-                />
-              </td>
+              {!archived && (
+                <td
+                  className="border-b dark:border-gray-600 px-4 py-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${board.title}`}
+                    checked={selected.has(board.id)}
+                    disabled={board.role !== "owner"}
+                    onChange={() => onToggle?.(board.id)}
+                    title={board.role !== "owner" ? "Only board owners can move or delete boards" : undefined}
+                    className="cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-30"
+                  />
+                </td>
+              )}
               <td className="border-b dark:border-gray-600 px-4 py-4 min-w-[200px]">
                 <a href={`/app/board/${board.id}`}>{board.title}</a>
               </td>
@@ -100,14 +110,14 @@ export function DashboardBoardsTable({ boards, teams, selected, onToggle, onSele
                 {new Date(board.created_at).toLocaleDateString()}
               </td>
               <td className="border-b dark:border-gray-600 px-4 py-4">
-                {new Date(board.updated_at).toLocaleDateString()}
+                {new Date(archived ? board.archived_at! : board.updated_at).toLocaleDateString()}
               </td>
               <td className="border-b dark:border-gray-600 px-4 py-2 text-right">
                 <BoardActionsMenu
                   boardId={board.id}
                   boardTitle={board.title}
                   isOwner={board.role === "owner"}
-                  isArchived={false}
+                  isArchived={archived}
                   teams={teams}
                   currentTeamId={board.team_id}
                 />
