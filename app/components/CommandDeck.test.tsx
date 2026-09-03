@@ -9,6 +9,10 @@ vi.mock("~/context/BoardContext", () => ({
 
 vi.mock("react-router", () => ({
   useFetcher: () => ({ submit: vi.fn(), load: vi.fn(), data: null, state: "idle" }),
+  useLocation: () => ({ pathname: "/app/board/board-1" }),
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) => (
+    <a href={to} {...rest}>{children}</a>
+  ),
 }));
 
 vi.mock("~/utils/exportBoard", () => ({

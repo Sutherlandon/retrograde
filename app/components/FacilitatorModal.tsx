@@ -3,11 +3,12 @@
 // Grant/revoke facilitators by username and toggle open facilitation.
 
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useFetcher, useLocation, Link } from "react-router";
 import { CloseIcon, UserIcon } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
 import { CommandDeckToggle } from "./CommandDeckToggle";
 import { useBoard } from "~/context/BoardContext";
+import { useOptionalUser } from "~/context/userContext";
 import type { BoardFacilitatorDTO } from "~/server/board.types";
 
 interface CrewData {
@@ -30,9 +31,14 @@ export function FacilitatorModal({
   const action = `/app/board/${boardId}/facilitators`;
   // GAP-002: a crewless board (teamName === null) is invariantly open —
   // the toggle to close it doesn't exist here, and the server refuses the
-  // write anyway (setOpenFacilitationServer).
+  // write anyway (setOpenFacilitationServer). DECK-022: on a crewless board
+  // the whole notion of granting/revoking facilitators is meaningless
+  // (everyone with the link already has the Command Deck), so the body is
+  // replaced with an explanation instead of an empty roster and form.
   const { teamName } = useBoard();
   const isCrewless = teamName === null;
+  const user = useOptionalUser();
+  const location = useLocation();
 
   useEffect(() => {
     if (isOpen && fetcher.state === "idle" && !fetcher.data) {
@@ -87,14 +93,40 @@ export function FacilitatorModal({
           </button>
         </div>
 
-        {/* Open facilitation */}
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
-          {isCrewless ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Anonymous boards are open to everyone. Move this board to a crew to restrict facilitation.
+        {isCrewless ? (
+          <div className="px-4 py-4 space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              On a claimed board, Crew Access hands the Command Deck to
+              specific people by username, revokes it, or opens it to
+              everyone in the room. Grants are per-board.
             </p>
-          ) : (
-            <>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              This board is anonymous, so everyone with the link already has
+              the Command Deck.
+            </p>
+            {!user || user.is_anonymous ? (
+              <div>
+                <Link
+                  to={`/auth/login?returnTo=${encodeURIComponent(location.pathname)}`}
+                  className="block text-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer"
+                >
+                  Create an account to claim this board
+                </Link>
+                <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
+                  Claim it, move it to a crew, and Crew Access unlocks.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                You're signed in. Claim this board from the toolbar, then
+                move it to a crew to use Crew Access.
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Open facilitation */}
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
               <CommandDeckToggle
                 label="Open Deck to Everyone"
                 checked={openFacilitation}
@@ -106,74 +138,76 @@ export function FacilitatorModal({
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
                 When on, every participant can see and use the Command Deck.
               </p>
-            </>
-          )}
-        </div>
+            </div>
 
-        {/* Crew list */}
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
-          <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">
-            Facilitators
-          </p>
-          {fetcher.state === "loading" && crew.length === 0 ? (
-            <p className="text-sm text-gray-400">Loading crew…</p>
-          ) : (
-            <ul className="space-y-1.5" data-testid="crew-list">
-              {crew.map((member) => (
-                <li key={member.user_id} className="flex items-center gap-2.5 py-1">
-                  <StatusLED color={member.role === "owner" ? "amber" : "green"} active size="sm" />
-                  <span className="flex-1 text-sm truncate">{member.username}</span>
-                  {member.role === "owner" ? (
-                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
-                      Commander
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        fetcher.submit({ userId: member.user_id }, { method: "DELETE", action })
-                      }
-                      className="text-xs text-red-500 hover:text-red-700 cursor-pointer"
-                    >
-                      Revoke
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            {/* Crew list */}
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">
+                Facilitators
+              </p>
+              {fetcher.state === "loading" && crew.length === 0 ? (
+                <p className="text-sm text-gray-400">Loading crew…</p>
+              ) : crew.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500">None</p>
+              ) : (
+                <ul className="space-y-1.5" data-testid="crew-list">
+                  {crew.map((member) => (
+                    <li key={member.user_id} className="flex items-center gap-2.5 py-1">
+                      <StatusLED color={member.role === "owner" ? "amber" : "green"} active size="sm" />
+                      <span className="flex-1 text-sm truncate">{member.username}</span>
+                      {member.role === "owner" ? (
+                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300">
+                          Commander
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            fetcher.submit({ userId: member.user_id }, { method: "DELETE", action })
+                          }
+                          className="text-xs text-red-500 hover:text-red-700 cursor-pointer"
+                        >
+                          Revoke
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-        {/* Grant access */}
-        <div className="px-4 py-3">
-          <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">
-            Grant Access
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") grant(); }}
-              placeholder="Username"
-              className="flex-1 border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
-            />
-            <button
-              type="button"
-              onClick={grant}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1"
-            >
-              <UserIcon size="sm" /> Grant
-            </button>
-          </div>
-          {fetcher.data?.error && (
-            <p className="text-sm text-red-500 mt-2">{fetcher.data.error}</p>
-          )}
-          <p className="text-xs text-gray-400 dark:text-gray-600 mt-3">
-            Facilitators get full Command Deck access on this board. Grants are
-            per-board and are not copied when a board is duplicated.
-          </p>
-        </div>
+            {/* Grant access */}
+            <div className="px-4 py-3">
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">
+                Grant Access
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") grant(); }}
+                  placeholder="Username"
+                  className="flex-1 border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+                />
+                <button
+                  type="button"
+                  onClick={grant}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1"
+                >
+                  <UserIcon size="sm" /> Grant
+                </button>
+              </div>
+              {fetcher.data?.error && (
+                <p className="text-sm text-red-500 mt-2">{fetcher.data.error}</p>
+              )}
+              <p className="text-xs text-gray-400 dark:text-gray-600 mt-3">
+                Facilitators get full Command Deck access on this board. Grants are
+                per-board and are not copied when a board is duplicated.
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
