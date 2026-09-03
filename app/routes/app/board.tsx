@@ -11,6 +11,7 @@ import { getOptionalUser } from "~/hooks/useAuth";
 import { requireBoardAccess } from "~/server/board_permissions";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
+import { isExampleBoardId } from "~/example-data/example_board_ids";
 
 export const meta = ({ data }: MetaArgs) => {
   const board = data as { title?: string } | undefined;
@@ -24,9 +25,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Board ID Missing", { status: 400 });
   }
 
-  // Example / read-only boards — no DB needed
-  if (board_id === "example-board") return exampleBoardTutorial;
-  if (board_id === "example-board-real-world") return exampleBoardRealWorld;
+  // Example / read-only boards — no DB needed (BRD-017)
+  if (isExampleBoardId(board_id)) {
+    return board_id === exampleBoardTutorial.id ? exampleBoardTutorial : exampleBoardRealWorld;
+  }
 
   // Members-only crews restrict who can open their boards. Anonymous callers who
   // might be members are sent to log in; registered non-members get a 403.

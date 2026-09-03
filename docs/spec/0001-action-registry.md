@@ -84,12 +84,12 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 
 | ID       | Action                                 | Who    | Code path                | Guard                       | Status     |
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
-| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed                 | Unverified |
-| SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed                 | Unverified |
+| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed                 | Verified |
+| SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed                 | Verified |
 | SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only         | Verified   |
-| SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Unverified |
-| SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed                 | Unverified |
-| SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Unverified |
+| SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Verified |
+| SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed                 | Verified |
+| SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
 
 Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 30-day TTL (ADR-0005).
 
@@ -124,8 +124,8 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | BRD-014 | Check off an action item | Session holder w/ access | `board.action-items.ts` `intent=complete` | session required · `requireUnlocked(board)` | Verified |
 | BRD-015 | View action items + progress             | Anyone w/ access   | `ActionItemsPanel` via `BoardDTO`                       | inherits BRD-001                                 | Verified   |
 | BRD-016 | View votes remaining / status indicators | Anyone w/ access   | `BoardStatusBar`                                        | inherits BRD-001                                 | Verified   |
-| BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before access check               | Unverified |
-| BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Unverified |
+| BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before access check               | Verified |
+| BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Verified |
 | BRD-019 | List a board's attachments | Anyone w/ access | `board.attachments.ts` loader | `requireBoardAccess` | Verified |
 | BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
 
@@ -142,10 +142,10 @@ Facilitators — granted, or the owner in their capacity as one, or everyone whe
 | DECK-001 | Open the Command Deck                           | Facilitator        | `Board.tsx` → `CommandDeck`                           | `canFacilitate` from `getBoardServer`       | Verified   |
 | DECK-002 | Start a timer | Facilitator | `board.timer.ts` POST | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
 | DECK-003 | Stop a timer | Facilitator | `board.timer.ts` DELETE | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
-| DECK-004 | Adjust timer ±60s before start                  | Facilitator        | `CommandDeck`                                         | client-side                                 | Unverified |
-| DECK-005 | See the timer-end modal                         | Anyone w/ access   | `TimerEndModal`                                       | —                                           | Unverified |
+| DECK-004 | Adjust timer ±60s before start                  | Facilitator        | `CommandDeck`                                         | client-side                                 | Verified |
+| DECK-005 | See the timer-end modal                         | Anyone w/ access   | `TimerEndModal`                                       | —                                           | Verified |
 | DECK-006 | Add a column | Facilitator | `board.columns.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
-| DECK-007 | Sort notes by score                             | Facilitator        | `CommandDeck` → note reorder                          | inherits BRD-008                            | Unverified |
+| DECK-007 | Sort notes by score                             | Facilitator        | `CommandDeck` → note reorder                          | inherits BRD-008                            | Verified |
 | DECK-008 | Enable / disable voting                         | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
 | DECK-009 | Set votes per person                            | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
 | DECK-010 | Set voting scope (board / column / note)        | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
@@ -180,7 +180,7 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-001 | View the dashboard                                 | Registered                | `dashboard.tsx` loader          | `requireRegisteredUser`                      | Verified             |
 | DASH-002 | See own boards + crew-visible boards               | Registered                | `listVisibleBoards`             | SQL scoping                                  | Verified             |
 | DASH-003 | Create a board (into selected crew, else personal) | Registered                | `dashboard.tsx` action          | `requireRegisteredUser` + `userIsTeamMember` | Verified             |
-| DASH-004 | Filter boards by fuzzy text                        | Registered                | `dashboard.tsx`                 | client-side                                  | Unverified |
+| DASH-004 | Filter boards by fuzzy text                        | Registered                | `dashboard.tsx`                 | client-side                                  | Verified |
 | DASH-005 | Sort by updated / created / title, persisted       | Registered                | `SortBoardsBanner`              | client-side                                  | Verified             |
 | DASH-006 | Duplicate a board | Board owner | `board_actions.ts` `duplicate` | role check in model; the copy lands on the original's crew if the caller is a member, else their personal crew — never crewless | Verified |
 | DASH-007 | Delete a board                                     | Board owner               | `board_actions.ts` `delete`     | role check in model                          | Verified             |
@@ -193,7 +193,7 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-014 | View archived boards                               | Registered                | `dashboard.tsx`                 | scoped to caller                             | Verified             |
 | DASH-015 | View open action items across own boards           | Registered                | `listOpenActionItemsForUser`    | scoped to caller                             | Verified             |
 | DASH-016 | Claim an unowned board by pasting its link | Registered | `board.claim.ts` · `ClaimModal` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
-| DASH-017 | Dismiss the welcome banner                         | Registered                | `WelcomeBanner`                 | client-side                                  | Unverified           |
+| DASH-017 | Dismiss the welcome banner                         | Registered                | `WelcomeBanner`                 | client-side                                  | Verified |
 
 ## CREW — crews
 
@@ -271,6 +271,6 @@ GAP-005 is the only open gap: the paywall itself, which needs a billing provider
 
 ## Untested paths
 
-Code that exists with no test: `board.tsx` loader, `board.poll.ts`, `board.legacy.tsx`; components `Board`, `BoardContext`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`, `useTheme`.
+Every row in this document is **Verified** except CREW-002, which is **Ungated** — its seam is tested, and nothing charges. Components with no dedicated test of their own: `Board`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`; `board.poll.ts` is covered only through the permission matrix.
 
 Every row marked **Verified** is named by at least one test, and `app/server/registry_linkage.test.ts` fails if that stops being true — or if a test names a row this file still marks Unverified. `app/server/permission_matrix.test.ts` asserts every server-enforced row × every actor × every board tier resolves to an explicit allow or deny; a missing cell is a failing test.

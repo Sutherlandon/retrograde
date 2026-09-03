@@ -87,6 +87,20 @@ describe("createAnonymousUser", () => {
       [expect.stringMatching(/^anon-/), "board-1"],
     );
   });
+
+  it("inserts with a null board_id when boardId is null [BRD-017]", async () => {
+    const { createAnonymousUser } = await import("./useAuth");
+    const anonId = "anon-uuid-null-board";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const result = await createAnonymousUser(null);
+
+    expect(result).toBe(anonId);
+    expect(mockPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO users"),
+      [expect.stringMatching(/^anon-/), null],
+    );
+  });
 });
 
 describe("getOrCreateUser", () => {
@@ -170,6 +184,51 @@ describe("getOrCreateUser", () => {
     const result = await getOrCreateUser(request, "board-1");
 
     expect(result.user.username).toBe("Guest");
+  });
+
+  it("passes null board_id to the INSERT for an example board id [BRD-017]", async () => {
+    const { getOrCreateUser } = await import("./useAuth");
+    const anonId = "anon-uuid-example";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const request = new Request("http://localhost:3000/app/board/example-board");
+    const result = await getOrCreateUser(request, "example-board");
+
+    expect(result.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
+    expect(mockPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO users"),
+      [expect.stringMatching(/^anon-/), null],
+    );
+  });
+
+  it("passes null board_id to the INSERT for the real-world example board id [BRD-017]", async () => {
+    const { getOrCreateUser } = await import("./useAuth");
+    const anonId = "anon-uuid-example-2";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const request = new Request("http://localhost:3000/app/board/example-board-real-world");
+    const result = await getOrCreateUser(request, "example-board-real-world");
+
+    expect(result.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
+    expect(mockPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO users"),
+      [expect.stringMatching(/^anon-/), null],
+    );
+  });
+
+  it("still passes a real board id to the INSERT for a non-example board [BRD-017]", async () => {
+    const { getOrCreateUser } = await import("./useAuth");
+    const anonId = "anon-uuid-real";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const request = new Request("http://localhost:3000/app/board/real-board-1");
+    const result = await getOrCreateUser(request, "real-board-1");
+
+    expect(result.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
+    expect(mockPoolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO users"),
+      [expect.stringMatching(/^anon-/), "real-board-1"],
+    );
   });
 });
 

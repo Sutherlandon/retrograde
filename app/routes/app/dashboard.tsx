@@ -82,7 +82,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return redirect(`/app/board/${board_id}`);
 }
 
-function fuzzyMatch(text: string, query: string): boolean {
+export function fuzzyMatch(text: string, query: string): boolean {
   const t = text.toLowerCase();
   const q = query.toLowerCase();
   let ti = 0;

@@ -13,7 +13,7 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,039 passing across 59 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,091 passing across 69 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 32 numbered blocks |
 
@@ -43,7 +43,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 1. **Nothing is payment-gated** (GAP-005). Creating a named crew — CREW-002, the tier-3 line — passes through `accountCanCreateNamedCrew`, which returns true for everyone until a billing provider exists. Everything paid follows from it: members, members-only access, crew action items. No plan or subscription concept exists in the schema (issue #59).
 2. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
 3. **No structured logging** (issue #82). `console.log` only.
-4. **Test coverage gaps:** `board.tsx` loader, `board.poll.ts`, and `board.legacy.tsx` have no route tests; `Board`, `BoardContext`, `ClaimModal`, `useTheme` have no component tests. See the registry's "Untested paths."
+4. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified except CREW-002 (Ungated — its seam is tested; nothing charges).
 5. **README is 11 lines** (issue #10).
 6. **~30 stale local branches** from merged PRs.
 

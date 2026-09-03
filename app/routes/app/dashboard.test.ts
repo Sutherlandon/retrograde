@@ -358,3 +358,30 @@ describe("dashboard action — create board with selected crew", () => {
     expect(mockCreateBoard).toHaveBeenCalledWith("Unassigned View", "user-1", "personal-1");
   });
 });
+
+describe("fuzzyMatch (DASH-004)", () => {
+  it("matches when the query is a subsequence of the text", async () => {
+    const { fuzzyMatch } = await import("./dashboard");
+    expect(fuzzyMatch("retrograde", "rtg")).toBe(true);
+    expect(fuzzyMatch("Sprint Retro", "sprro")).toBe(true);
+  });
+
+  it("matches case-insensitively", async () => {
+    const { fuzzyMatch } = await import("./dashboard");
+    expect(fuzzyMatch("Retrograde", "RTG")).toBe(true);
+    expect(fuzzyMatch("RETROGRADE", "rtg")).toBe(true);
+  });
+
+  it("does not match when the query's characters are out of order or missing", async () => {
+    const { fuzzyMatch } = await import("./dashboard");
+    expect(fuzzyMatch("retrograde", "gtr")).toBe(false);
+    expect(fuzzyMatch("retrograde", "xyz")).toBe(false);
+    expect(fuzzyMatch("short", "shortest")).toBe(false);
+  });
+
+  it("an empty query matches everything", async () => {
+    const { fuzzyMatch } = await import("./dashboard");
+    expect(fuzzyMatch("retrograde", "")).toBe(true);
+    expect(fuzzyMatch("", "")).toBe(true);
+  });
+});

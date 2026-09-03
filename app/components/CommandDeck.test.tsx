@@ -207,4 +207,72 @@ describe("CommandDeck", () => {
     const amberLeds = container.querySelectorAll(".bg-amber-400");
     expect(amberLeds.length).toBeGreaterThan(0);
   });
+
+  it("increases the displayed timer duration by 60s when + is clicked (DECK-004)", () => {
+    const { container } = render(<CommandDeck />);
+    const [minutesInput, secondsInput] = container.querySelectorAll("input[type='number']");
+    expect(minutesInput).toHaveValue(3);
+    expect(secondsInput).toHaveValue(0);
+
+    fireEvent.click(screen.getByText("+"));
+
+    expect(minutesInput).toHaveValue(4);
+    expect(secondsInput).toHaveValue(0);
+  });
+
+  it("decreases the displayed timer duration by 60s when - is clicked (DECK-004)", () => {
+    const { container } = render(<CommandDeck />);
+    const [minutesInput, secondsInput] = container.querySelectorAll("input[type='number']");
+
+    fireEvent.click(screen.getByText("-"));
+
+    expect(minutesInput).toHaveValue(2);
+    expect(secondsInput).toHaveValue(0);
+  });
+
+  it("does not let the timer drop below the 1 second minimum (DECK-004)", () => {
+    const { container } = render(<CommandDeck />);
+    const [minutesInput, secondsInput] = container.querySelectorAll("input[type='number']");
+
+    fireEvent.change(minutesInput, { target: { value: "0" } });
+    fireEvent.change(secondsInput, { target: { value: "0" } });
+
+    fireEvent.click(screen.getByText("-"));
+    expect(minutesInput).toHaveValue(0);
+    expect(secondsInput).toHaveValue(1);
+
+    // Clicking again would go negative — it stays floored at 1 second.
+    fireEvent.click(screen.getByText("-"));
+    expect(minutesInput).toHaveValue(0);
+    expect(secondsInput).toHaveValue(1);
+  });
+
+  it("disables the timer +/- adjustment buttons when boardLocked (DECK-004)", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, boardLocked: true });
+    render(<CommandDeck />);
+    expect(screen.getByText("-")).toBeDisabled();
+    expect(screen.getByText("+")).toBeDisabled();
+  });
+
+  it("calls sortNotesByScore when the sort button is clicked, labeled by likes/votes mode (DECK-007)", () => {
+    const sortNotesByScore = vi.fn();
+    mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: false, sortNotesByScore });
+    render(<CommandDeck />);
+
+    const sortButton = screen.getByText(/Sort by Likes/);
+    fireEvent.click(sortButton);
+    expect(sortNotesByScore).toHaveBeenCalledTimes(1);
+  });
+
+  it("labels the sort button by Votes when voting is enabled (DECK-007)", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true });
+    render(<CommandDeck />);
+    expect(screen.getByText(/Sort by Votes/)).toBeInTheDocument();
+  });
+
+  it("disables the sort-by-score button when boardLocked (DECK-007)", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, boardLocked: true });
+    render(<CommandDeck />);
+    expect(screen.getByText(/Sort by/)).toBeDisabled();
+  });
 });

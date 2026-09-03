@@ -3,6 +3,7 @@ import { getSession } from "~/session.server";
 import { pool } from "~/server/db_config";
 import { siteConfig } from "~/config/siteConfig";
 import { isApiKey, findApiKeyByValue, touchApiKeyLastUsed } from "~/server/api_key";
+import { isExampleBoardId } from "~/example-data/example_board_ids";
 
 export async function getOptionalUser(request: Request) {
   const session = await getSession(request.headers.get("Cookie"));
@@ -25,7 +26,7 @@ export async function getOptionalUser(request: Request) {
   return { id, username, is_anonymous: Boolean(user.is_anonymous) };
 }
 
-export async function createAnonymousUser(boardId: string): Promise<string> {
+export async function createAnonymousUser(boardId: string | null): Promise<string> {
   const externalId = `anon-${crypto.randomUUID()}`;
   const result = await pool.query(
     `INSERT INTO users (external_id, is_anonymous, preferred_username, board_id)
@@ -122,8 +123,10 @@ export async function getOrCreateUser(request: Request, boardId: string) {
     }
   }
 
-  // No valid session — create anonymous user linked to this board
-  userId = await createAnonymousUser(boardId);
+  // No valid session — create anonymous user linked to this board. Example
+  // boards (BRD-017) are static fixtures with no matching `boards` row, so
+  // linking would violate users.board_id's FK — pass null instead.
+  userId = await createAnonymousUser(isExampleBoardId(boardId) ? null : boardId);
   session.set("userId", userId);
   return {
     user: { id: userId, username: "Guest", is_anonymous: true },

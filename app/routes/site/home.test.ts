@@ -1,4 +1,7 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import React from "react";
 
 // Track session data across mock calls
 let sessionData: Record<string, string> = {};
@@ -19,9 +22,14 @@ vi.mock("~/server/db_config", () => ({
   },
 }));
 
+// Mutable so SITE-001's loader tests can flip it per-test; `siteConfig`
+// resolves it via a getter so the change is visible without re-mocking.
+let dashboardHome = false;
 vi.mock("~/config/siteConfig", () => ({
   siteConfig: {
-    dashboardHome: false,
+    get dashboardHome() {
+      return dashboardHome;
+    },
     usernameField: "preferred_username",
   },
 }));
@@ -31,9 +39,27 @@ vi.mock("~/server/board_model", () => ({
   createBoard: (...args: unknown[]) => mockCreateBoard(...args),
 }));
 
+// Home renders <Form>/<Link> which need a data-router context we don't set
+// up here; stub the pieces the component needs while keeping `redirect`
+// (used by both the loader and action under test) as the real implementation.
+let mockActionData: unknown = undefined;
+vi.mock("react-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router")>();
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: React.ReactNode }) =>
+      React.createElement("a", { href: to, ...rest }, children),
+    Form: ({ children, ...rest }: { children?: React.ReactNode }) =>
+      React.createElement("form", { ...rest }, children),
+    useActionData: () => mockActionData,
+  };
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
+  dashboardHome = false;
+  mockActionData = undefined;
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockCreateBoard.mockResolvedValue("new-board-id");
 });
@@ -123,5 +149,48 @@ describe("home page action", () => {
 
     const body = await response.json();
     expect(body.errors.no_jerks).toBeDefined();
+  });
+});
+
+describe("homepage [SITE-001]", () => {
+  it("loader renders the homepage (no redirect) when dashboardHome is disabled", async () => {
+    const { loader } = await import("./home");
+    const result = await loader();
+    expect(result).toBeUndefined();
+  });
+
+  it("loader redirects to /app/dashboard when dashboardHome is enabled", async () => {
+    dashboardHome = true;
+    const { loader } = await import("./home");
+    const result = (await loader()) as unknown as Response;
+    expect(result).toBeInstanceOf(Response);
+    expect(result.status).toBe(302);
+    expect(result.headers.get("Location")).toBe("/app/dashboard");
+  });
+
+  it("renders the hero heading, tutorial link, and board-creation form", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(
+      screen.getByText("Agile Retrospective & Idea Boards for Productive Teams")
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: /Try the tutorial/i })).toHaveAttribute(
+      "href",
+      "/app/board/example-board"
+    );
+
+    expect(screen.getByText("Create a Free Board")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Launch/i })).toBeInTheDocument();
+  });
+
+  it("renders a title validation error from action data", async () => {
+    mockActionData = { errors: { title: "Title must be at least 3 characters." } };
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByText("Title must be at least 3 characters.")).toBeInTheDocument();
   });
 });

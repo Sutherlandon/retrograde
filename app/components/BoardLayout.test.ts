@@ -108,4 +108,25 @@ describe("BoardLayout loader", () => {
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toContain("specific-board-id");
   });
+
+  it("creates an anonymous user with a null board_id for an example board [BRD-017]", async () => {
+    const { loader } = await import("./BoardLayout");
+
+    const anonId = "anon-uuid-example";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const request = new Request("http://localhost:3000/app/board/example-board");
+    const response = await loader({ request, params: { id: "example-board" } });
+
+    const body = await response.json();
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
+
+    // The INSERT must NOT link the anonymous user to the nonexistent
+    // "example-board" row — board_id must be null, not the example id.
+    const insertCall = mockPoolQuery.mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT")
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall![1]).toEqual([expect.stringMatching(/^anon-/), null]);
+  });
 });
