@@ -6,7 +6,7 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { getOptionalUser } from "~/hooks/useAuth";
-import { requireBoardAccess } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
 import {
   addColumnServer,
   updateColumnTitleServer,
@@ -26,6 +26,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   switch (request.method.toUpperCase()) {
     case "POST": {
+      // DECK-006: adding a column is a facilitator control.
+      await requireFacilitator(request, boardId);
+      await requireUnlocked(boardId, { board: true });
+
       const id = data.get("id") as string;
       const title = data.get("title") as string;
       const colOrder = Number(data.get("col_order"));
@@ -41,9 +45,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const intent = data.get("intent") as string;
       if (intent === "updatePrompt") {
+        // BRD-012: prompt text is a facilitator control.
+        await requireFacilitator(request, boardId);
+        await requireUnlocked(boardId, { board: true });
+
         const prompt = data.get("prompt") as string ?? "";
         return updateColumnPromptServer(boardId, columnId, prompt, viewerId);
       }
+
+      // BRD-011: column title stays participant-level — access + lock only.
+      await requireUnlocked(boardId, { notes: true });
 
       const newTitle = data.get("title") as string;
       if (!newTitle) throw new Response("Missing title", { status: 422 });
@@ -51,6 +62,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     case "DELETE": {
+      // BRD-013: deleting a column is a facilitator control.
+      await requireFacilitator(request, boardId);
+      await requireUnlocked(boardId, { board: true });
+
       const columnId = data.get("columnId") as string;
       if (!columnId) throw new Response("Missing columnId", { status: 422 });
       return deleteColumnServer(boardId, columnId, viewerId);

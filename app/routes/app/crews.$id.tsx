@@ -30,7 +30,7 @@ import {
   deleteTeamActionItem,
   type UserActionItemRow,
 } from "~/server/action_item_model";
-import { listApiKeysForTeam, mintApiKey, revokeApiKey } from "~/server/api_key";
+import { listApiKeysForTeam, mintApiKey, revokeApiKey, ApiKeyLimitError } from "~/server/api_key";
 import { findRegisteredUserByUsername } from "~/server/admin_model";
 import type { TeamDTO, TeamMemberDTO, DashboardBoardRow, ApiKeyDTO } from "~/server/board.types";
 import { StatusLED } from "~/components/StatusLED";
@@ -137,8 +137,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const displayName = form.get("display_name")?.toString().trim();
     if (!displayName) return { error: "Display name is required." };
     if (displayName.length > 100) return { error: "Display name is too long (max 100 chars)." };
-    const minted = await mintApiKey(teamId, displayName, user.id);
-    return { mintedKey: minted.key, mintedDisplayName: minted.apiKey.display_name };
+    try {
+      const minted = await mintApiKey(teamId, displayName, user.id);
+      return { mintedKey: minted.key, mintedDisplayName: minted.apiKey.display_name };
+    } catch (e) {
+      if (e instanceof ApiKeyLimitError) return { error: e.message };
+      throw e;
+    }
   }
 
   if (intent === "revokeKey") {

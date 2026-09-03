@@ -60,9 +60,11 @@ describe("mintApiKey", () => {
   it("creates an agent user, inserts the key row, returns full key once", async () => {
     const { mintApiKey } = await import("./api_key");
 
-    // 1st query: INSERT agent user → returns id
+    // 1st query: SELECT is_personal FROM teams → a named (non-personal) crew
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_personal: false }] });
+    // 2nd query: INSERT agent user → returns id
     mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "agent-user-uuid" }] });
-    // 2nd query: INSERT api_key → returns the row
+    // 3rd query: INSERT api_key → returns the row
     mockPoolQuery.mockResolvedValueOnce({
       rows: [{
         id: "key-1",
@@ -80,9 +82,11 @@ describe("mintApiKey", () => {
 
     const result = await mintApiKey("team-1", "Claude", "user-1");
 
-    // Agent user inserted first
-    expect(mockPoolQuery.mock.calls[0][0]).toContain("INSERT INTO users");
-    expect(mockPoolQuery.mock.calls[0][0]).toContain("is_agent");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("is_personal");
+
+    // Agent user inserted second
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("INSERT INTO users");
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("is_agent");
 
     expect(result.key.startsWith("rk_live_")).toBe(true);
     expect(result.apiKey.id).toBe("key-1");
@@ -90,7 +94,7 @@ describe("mintApiKey", () => {
     expect(result.apiKey.display_name).toBe("Claude");
 
     // Key row inserted with the hashed key, not the plaintext
-    const insertCall = mockPoolQuery.mock.calls[1];
+    const insertCall = mockPoolQuery.mock.calls[2];
     expect(insertCall[0]).toContain("INSERT INTO api_keys");
     expect(insertCall[1][1]).not.toBe(result.key); // hash, not plain
     expect(insertCall[1][1]).toMatch(/^[a-f0-9]{64}$/);
@@ -98,6 +102,77 @@ describe("mintApiKey", () => {
     expect(insertCall[1][3]).toBe("Claude");
     expect(insertCall[1][4]).toBe("agent-user-uuid");
     expect(insertCall[1][5]).toBe("user-1");
+  });
+
+  it("CREW-019: refuses a second active key on a personal crew", async () => {
+    const { mintApiKey, ApiKeyLimitError } = await import("./api_key");
+
+    // is_personal → true, then active-key count → 1 (already has one)
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_personal: true }] });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ count: "1" }] });
+
+    let error: unknown;
+    try {
+      await mintApiKey("personal-team", "Second Agent", "user-1");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(ApiKeyLimitError);
+    expect((error as Error).message).toBe(
+      "Personal crews can hold one AI crewmate. Create a named crew to add more."
+    );
+    // Refused before any INSERT is attempted.
+    expect(mockPoolQuery.mock.calls.some((c) => String(c[0]).includes("INSERT"))).toBe(false);
+  });
+
+  it("CREW-019: allows a second active key on a named crew", async () => {
+    const { mintApiKey } = await import("./api_key");
+
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_personal: false }] });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "agent-user-uuid-2" }] });
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "key-2", team_id: "named-team", key_hash: "h2", key_prefix: "rk_live_bbb2",
+        display_name: "Second Agent", agent_user_id: "agent-user-uuid-2",
+        created_by: "user-1", created_at: "x", last_used_at: null, revoked_at: null,
+      }],
+    });
+
+    const result = await mintApiKey("named-team", "Second Agent", "user-1");
+    expect(result.apiKey.id).toBe("key-2");
+    // No active-count query needed for a named crew — no limit to check.
+    expect(mockPoolQuery.mock.calls.length).toBe(3);
+  });
+
+  it("CREW-019: allows minting again on a personal crew after the first key is revoked", async () => {
+    const { mintApiKey } = await import("./api_key");
+
+    // is_personal → true, active count → 0 (the only key was revoked)
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_personal: true }] });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ count: "0" }] });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "agent-user-uuid-3" }] });
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: "key-3", team_id: "personal-team", key_hash: "h3", key_prefix: "rk_live_ccc3",
+        display_name: "Replacement Agent", agent_user_id: "agent-user-uuid-3",
+        created_by: "user-1", created_at: "x", last_used_at: null, revoked_at: null,
+      }],
+    });
+
+    const result = await mintApiKey("personal-team", "Replacement Agent", "user-1");
+    expect(result.apiKey.id).toBe("key-3");
+  });
+});
+
+describe("countActiveApiKeys", () => {
+  it("counts only non-revoked keys for the team", async () => {
+    const { countActiveApiKeys } = await import("./api_key");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ count: "2" }] });
+    const count = await countActiveApiKeys("team-1");
+    expect(count).toBe(2);
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("revoked_at IS NULL");
+    expect(call[1]).toEqual(["team-1"]);
   });
 });
 

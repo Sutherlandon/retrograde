@@ -101,6 +101,61 @@ export async function getBoardAccess(
   return { exists: true, allowed, userIsRegistered: row.is_registered };
 }
 
+// ---------------------------------------------------------------------------
+// Locks (GAP-003) — `notes_locked` and `board_locked` were, until now, a UI
+// convention only: no route re-checked them, so a direct request wrote
+// straight through a locked board. Facilitators do NOT bypass either lock —
+// the client blocks everyone, including the owner, and the server matches
+// that. The one deliberate exception is `board.settings.ts`, which stays
+// unguarded by locks because toggling them off is the only way a locked
+// board gets unlocked again.
+//
+// The matrix below was derived by reading the client (Note.tsx, Column.tsx,
+// CommandDeck.tsx, BoardToolbar.tsx, ActionItemsPanel.tsx) for every place a
+// control is disabled because of `notesLocked` / `boardLocked`.
+//
+// | Registry ID(s)         | Action                              | notes_locked | board_locked | Enforced in              |
+// |-------------------------|--------------------------------------|:---:|:---:|----------------------------|
+// | BRD-003                 | Edit board title                     |  —  |  X  | board.title.ts             |
+// | BRD-004                 | Add a note                           |  X  |  X  | board.notes.ts             |
+// | BRD-005                 | Edit a note                          |  X  |  X  | board.notes.ts             |
+// | BRD-006                 | Delete a note                        |  X  |  X  | board.notes.ts             |
+// | BRD-007                 | Move a note between columns (drag)   |  X  |  X  | board.notes.ts             |
+// | BRD-008                 | Reorder notes within a column (drag) |  X  |  X  | board.notes.ts             |
+// | BRD-009                 | Like a note                          |  —  |  X  | board.notes.ts             |
+// | BRD-010                 | Vote / unvote a note                 |  —  |  X  | board.notes.ts             |
+// | BRD-011                 | Edit a column title                  |  X  |  X  | board.columns.ts (PATCH)   |
+// | BRD-012                 | Column prompt add/edit/delete        |  —  |  X  | board.columns.ts (PATCH)   |
+// | BRD-013                 | Delete a column                      |  —  |  X  | board.columns.ts (DELETE)  |
+// | DECK-002/DECK-003       | Start / stop the timer               |  —  |  X  | board.timer.ts             |
+// | DECK-006                | Add a column                         |  —  |  X  | board.columns.ts (POST)    |
+// | BRD-014, DECK-023–025   | Action item complete / add / edit / delete | — | X (UI only) | not enforced here — out of scope for this pass |
+// | DECK-017–019             | Attach / delete an attachment         |  —  |  —  | never locked — gated by `requireFacilitator` only |
+// | DECK-008–016             | Board settings, incl. the locks themselves | — | — | never locked — `board.settings.ts` is how a board unlocks |
+//
+// "—" means the client never disables that control for that lock; the two
+// rows marked "(UI only)" describe existing client behavior this pass does
+// not add a server guard for (`board.action-items.ts` is out of scope here).
+
+export async function requireUnlocked(
+  boardId: string,
+  flags: { notes?: boolean; board?: boolean }
+): Promise<void> {
+  const res = await pool.query<{ notes_locked: boolean; board_locked: boolean }>(
+    `SELECT notes_locked, board_locked FROM boards WHERE id = $1`,
+    [boardId]
+  );
+  if (res.rowCount === 0) return; // missing board — the caller's own access check already 404s
+
+  const { notes_locked, board_locked } = res.rows[0];
+  if (flags.board && board_locked) {
+    throw new Response("Board is locked", { status: 423 });
+  }
+  if (flags.notes && (notes_locked || board_locked)) {
+    throw new Response("Notes are locked", { status: 423 });
+  }
+}
+
 /**
  * Guard a board route by access. Throws 404 (missing), a login redirect or 401
  * (anonymous caller who might be a member once signed in), or 403 (a registered

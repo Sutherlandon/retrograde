@@ -56,15 +56,59 @@ export interface MintApiKeyResult {
   apiKey: ApiKeyDTO;  // safe-to-store metadata
 }
 
+// Thrown by mintApiKey when a personal crew already holds an active key.
+// See CREW-019: personal crews (tier 2) get one AI crewmate; named crews
+// (tier 3) are unlimited. The route layer catches this and surfaces the
+// message as a form error rather than a 500.
+export class ApiKeyLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiKeyLimitError";
+  }
+}
+
+export const PERSONAL_CREW_KEY_LIMIT_MESSAGE =
+  "Personal crews can hold one AI crewmate. Create a named crew to add more.";
+
+async function isPersonalTeam(teamId: string): Promise<boolean> {
+  const res = await pool.query<{ is_personal: boolean }>(
+    `SELECT is_personal FROM teams WHERE id = $1`,
+    [teamId]
+  );
+  return res.rows[0]?.is_personal ?? false;
+}
+
+/**
+ * Count active (non-revoked) API keys for a team. Used to enforce CREW-019:
+ * a personal crew may hold at most one; named crews are unlimited.
+ */
+export async function countActiveApiKeys(teamId: string): Promise<number> {
+  const res = await pool.query<{ count: string }>(
+    `SELECT COUNT(*) AS count FROM api_keys WHERE team_id = $1 AND revoked_at IS NULL`,
+    [teamId]
+  );
+  return Number(res.rows[0]?.count ?? 0);
+}
+
 /**
  * Mint a new API key for a team. Creates a dedicated agent user for this key
  * (each key produces a distinct agent identity for clear attribution).
+ *
+ * Enforces CREW-019 in the model layer — a personal crew may hold at most
+ * one active key — so no caller can bypass the cap by going around the route.
  */
 export async function mintApiKey(
   teamId: string,
   displayName: string,
   createdByUserId: string
 ): Promise<MintApiKeyResult> {
+  if (await isPersonalTeam(teamId)) {
+    const activeCount = await countActiveApiKeys(teamId);
+    if (activeCount >= 1) {
+      throw new ApiKeyLimitError(PERSONAL_CREW_KEY_LIMIT_MESSAGE);
+    }
+  }
+
   const key = generateApiKey();
   const keyHash = hashApiKey(key);
   const keyPrefix = key.slice(0, KEY_PREFIX_DISPLAY_LEN);

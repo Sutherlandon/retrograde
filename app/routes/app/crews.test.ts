@@ -14,11 +14,17 @@ vi.mock("~/server/team_model", () => ({
 
 vi.mock("~/components/StatusLED", () => ({ StatusLED: () => null }));
 
+const mockAccountCanCreateNamedCrew = vi.fn();
+vi.mock("~/server/entitlements", () => ({
+  accountCanCreateNamedCrew: (...args: unknown[]) => mockAccountCanCreateNamedCrew(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireRegisteredUser.mockResolvedValue({ id: "user-1", username: "landon" });
   mockListTeamsForUser.mockResolvedValue([]);
   mockCreateTeam.mockResolvedValue("team-new");
+  mockAccountCanCreateNamedCrew.mockResolvedValue(true);
 });
 
 function formRequest(fields: Record<string, string>) {
@@ -59,5 +65,33 @@ describe("teams action", () => {
     } as never);
     expect((result as { error?: string }).error).toBeDefined();
     expect(mockCreateTeam).not.toHaveBeenCalled();
+  });
+
+  it("CREW-002: throws 403 when the account is not entitled to a named crew, and never calls createTeam", async () => {
+    mockAccountCanCreateNamedCrew.mockResolvedValueOnce(false);
+    const { action } = await import("./crews");
+    try {
+      await action({
+        request: formRequest({ intent: "create", name: "Voyager Crew" }),
+        params: {}, context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockAccountCanCreateNamedCrew).toHaveBeenCalledWith("user-1");
+    expect(mockCreateTeam).not.toHaveBeenCalled();
+  });
+
+  it("CREW-002: creates the crew when the account is entitled", async () => {
+    mockAccountCanCreateNamedCrew.mockResolvedValueOnce(true);
+    const { action } = await import("./crews");
+    const res = (await action({
+      request: formRequest({ intent: "create", name: "Voyager Crew" }),
+      params: {}, context: {},
+    } as never)) as Response;
+    expect(mockAccountCanCreateNamedCrew).toHaveBeenCalledWith("user-1");
+    expect(mockCreateTeam).toHaveBeenCalledWith("Voyager Crew", "user-1");
+    expect(res.status).toBe(302);
   });
 });

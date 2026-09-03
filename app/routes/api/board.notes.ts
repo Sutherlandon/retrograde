@@ -5,6 +5,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { bulkInsertNotesServer } from "~/server/board_model";
 import { getApiUser } from "~/hooks/useAuth";
+import { getBoardAccess } from "~/server/board_permissions";
 
 const MAX_NOTES_PER_REQUEST = 200;
 const MAX_NOTE_LENGTH = 2000;
@@ -34,6 +35,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
       "Authorization: Bearer <agent_token> required",
       401
     );
+  }
+
+  // GAP-004: `getApiUser` only proves "is some user" — it says nothing about
+  // this board. Mirror api/board.ts's check so a members-only board can't be
+  // written to by a key/session with no relationship to its crew.
+  const apiTeamId = (user as { teamId?: string } | null)?.teamId ?? null;
+  const access = await getBoardAccess(boardId, user.id, apiTeamId);
+  if (!access.exists) {
+    return err("NOT_FOUND", "Board not found", 404);
+  }
+  if (!access.allowed) {
+    return err("FORBIDDEN", "This board is restricted to its crew", 403);
   }
 
   let body: BulkNotesRequest;

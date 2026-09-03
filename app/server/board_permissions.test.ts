@@ -142,3 +142,82 @@ describe("getBoardAccess", () => {
     expect((await getBoardAccess("b", "agent", "team-9")).allowed).toBe(false);
   });
 });
+
+describe("requireUnlocked", () => {
+  it("passes through when neither lock is set", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: false, board_locked: false }],
+    });
+    await expect(requireUnlocked("board-1", { notes: true, board: true })).resolves.toBeUndefined();
+  });
+
+  it("throws 423 'Board is locked' when board is locked and board: true is checked", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: false, board_locked: true }],
+    });
+    try {
+      await requireUnlocked("board-1", { board: true });
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(423);
+      expect(await (response as Response).text()).toBe("Board is locked");
+    }
+  });
+
+  it("throws 423 'Notes are locked' when notes_locked and notes: true is checked", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: true, board_locked: false }],
+    });
+    try {
+      await requireUnlocked("board-1", { notes: true });
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(423);
+      expect(await (response as Response).text()).toBe("Notes are locked");
+    }
+  });
+
+  it("also blocks a notes: true check when only board_locked is set", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: false, board_locked: true }],
+    });
+    try {
+      await requireUnlocked("board-1", { notes: true });
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(423);
+    }
+  });
+
+  it("does not throw for a board: true check when only notes_locked is set", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: true, board_locked: false }],
+    });
+    await expect(requireUnlocked("board-1", { board: true })).resolves.toBeUndefined();
+  });
+
+  it("is a no-op when no flags are passed", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ notes_locked: true, board_locked: true }],
+    });
+    await expect(requireUnlocked("board-1", {})).resolves.toBeUndefined();
+  });
+
+  it("is a no-op when the board is missing (caller's own access check owns 404)", async () => {
+    const { requireUnlocked } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await expect(requireUnlocked("missing", { notes: true, board: true })).resolves.toBeUndefined();
+  });
+});

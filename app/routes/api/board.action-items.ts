@@ -7,7 +7,7 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { bulkCreateBoardActionItems } from "~/server/action_item_model";
-import { userCanFacilitate } from "~/server/board_permissions";
+import { userCanFacilitate, getBoardAccess } from "~/server/board_permissions";
 import { getApiUser } from "~/hooks/useAuth";
 
 const MAX_ITEMS_PER_REQUEST = 100;
@@ -32,6 +32,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const user = await getApiUser(request);
   if (!user) {
     return err("UNAUTHORIZED", "Authorization: Bearer <api key or agent_token> required", 401);
+  }
+
+  // GAP-008: userCanFacilitate alone passes for any caller when
+  // open_facilitation is on, even one with no relationship to a members-only
+  // board's crew. Check board access first, matching api/board.ts.
+  const apiTeamId = (user as { teamId?: string } | null)?.teamId ?? null;
+  const access = await getBoardAccess(boardId, user.id, apiTeamId);
+  if (!access.exists) {
+    return err("NOT_FOUND", "Board not found", 404);
+  }
+  if (!access.allowed) {
+    return err("FORBIDDEN", "This board is restricted to its crew", 403);
   }
 
   if (!(await userCanFacilitate(user.id, boardId))) {

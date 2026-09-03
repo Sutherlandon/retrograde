@@ -4,7 +4,7 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { updateBoardTitleServer } from "~/server/board_model";
-import { requireBoardAccess } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -14,7 +14,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     throw new Response("Method Not Allowed", { status: 405 });
   }
 
+  // BRD-003: renaming the board is a facilitator control. requireFacilitator
+  // alone doesn't cover a members-only board when open_facilitation admits
+  // outsiders, so board access is checked first.
   await requireBoardAccess(request, boardId);
+  await requireFacilitator(request, boardId);
+  await requireUnlocked(boardId, { board: true });
 
   const data = await request.formData();
   const newTitle = (data.get("title") as string)?.trim();

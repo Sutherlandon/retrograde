@@ -10,9 +10,15 @@ vi.mock("~/hooks/useAuth", () => ({
   getApiUser: (...args: unknown[]) => mockGetApiUser(...args),
 }));
 
+const mockGetBoardAccess = vi.fn();
+vi.mock("~/server/board_permissions", () => ({
+  getBoardAccess: (...args: unknown[]) => mockGetBoardAccess(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockBulkInsertNotesServer.mockResolvedValue({ id: "board-1", columns: [] });
+  mockGetBoardAccess.mockResolvedValue({ exists: true, allowed: true, userIsRegistered: true });
 });
 
 function req(body: unknown, opts: { auth?: string } = {}) {
@@ -113,6 +119,66 @@ describe("POST /api/v1/boards/:id/notes", () => {
       context: {},
     } as never)) as Response;
     expect(response.status).toBe(400);
+  });
+
+  it("checks board access before inserting notes (GAP-004)", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1", teamId: "team-1" });
+
+    await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never);
+
+    expect(mockGetBoardAccess).toHaveBeenCalledWith("board-1", "agent-1", "team-1");
+  });
+
+  it("returns 404 when the board does not exist", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1" });
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: false, allowed: false, userIsRegistered: false });
+
+    const response = (await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never)) as Response;
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("NOT_FOUND");
+    expect(mockBulkInsertNotesServer).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when an out-of-crew key writes to a members-only board", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1", teamId: "team-9" });
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: true, allowed: false, userIsRegistered: true });
+
+    const response = (await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never)) as Response;
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("FORBIDDEN");
+    expect(body.error.message).toBe("This board is restricted to its crew");
+    expect(mockBulkInsertNotesServer).not.toHaveBeenCalled();
+  });
+
+  it("allows any authenticated caller on a crewless board", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1" });
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: true, allowed: true, userIsRegistered: false });
+
+    const response = (await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never)) as Response;
+    expect(response.status).toBe(201);
+    expect(mockBulkInsertNotesServer).toHaveBeenCalled();
   });
 
   it("translates COLUMN_NOT_ON_BOARD into a 400 with a clear message", async () => {

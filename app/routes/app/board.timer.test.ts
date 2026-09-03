@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockRequireBoardAccess = vi.fn();
+const mockRequireFacilitator = vi.fn();
+const mockRequireUnlocked = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   requireBoardAccess: (...args: unknown[]) => mockRequireBoardAccess(...args),
+  requireFacilitator: (...args: unknown[]) => mockRequireFacilitator(...args),
+  requireUnlocked: (...args: unknown[]) => mockRequireUnlocked(...args),
 }));
 
 const mockStartTimer = vi.fn();
@@ -15,6 +19,8 @@ vi.mock("~/server/board_model", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireBoardAccess.mockResolvedValue({ id: "user-1" });
+  mockRequireFacilitator.mockResolvedValue({ id: "user-1" });
+  mockRequireUnlocked.mockResolvedValue(undefined);
   mockStartTimer.mockResolvedValue(undefined);
   mockStopTimer.mockResolvedValue(undefined);
 });
@@ -60,6 +66,83 @@ describe("board.timer action", () => {
       expect.unreachable("should have thrown");
     } catch (response: unknown) {
       expect((response as Response).status).toBe(403);
+    }
+    expect(mockStartTimer).not.toHaveBeenCalled();
+  });
+
+  it("requires facilitator status before starting the timer (DECK-002)", async () => {
+    const { action } = await import("./board.timer");
+    await action({
+      request: request("POST", { seconds: "300" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never);
+    expect(mockRequireFacilitator).toHaveBeenCalledWith(expect.any(Request), "board-1");
+  });
+
+  it("rejects a non-facilitator with 403 and never starts the timer", async () => {
+    const { action } = await import("./board.timer");
+    mockRequireFacilitator.mockRejectedValueOnce(
+      new Response("Facilitator access required", { status: 403 })
+    );
+
+    try {
+      await action({
+        request: request("POST", { seconds: "300" }),
+        params: { id: "board-1" },
+        context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockStartTimer).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-facilitator with 403 and never stops the timer", async () => {
+    const { action } = await import("./board.timer");
+    mockRequireFacilitator.mockRejectedValueOnce(
+      new Response("Facilitator access required", { status: 403 })
+    );
+
+    try {
+      await action({ request: request("DELETE"), params: { id: "board-1" }, context: {} } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(403);
+    }
+    expect(mockStopTimer).not.toHaveBeenCalled();
+  });
+
+  it("propagates the 401 when there is no session at all", async () => {
+    const { action } = await import("./board.timer");
+    mockRequireFacilitator.mockRejectedValueOnce(new Response("Unauthorized", { status: 401 }));
+
+    try {
+      await action({
+        request: request("POST", { seconds: "300" }),
+        params: { id: "board-1" },
+        context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(401);
+    }
+  });
+
+  it("rejects a locked board with 423 and never starts the timer", async () => {
+    const { action } = await import("./board.timer");
+    mockRequireUnlocked.mockRejectedValueOnce(new Response("Board is locked", { status: 423 }));
+
+    try {
+      await action({
+        request: request("POST", { seconds: "300" }),
+        params: { id: "board-1" },
+        context: {},
+      } as never);
+      expect.unreachable("should have thrown");
+    } catch (response: unknown) {
+      expect((response as Response).status).toBe(423);
     }
     expect(mockStartTimer).not.toHaveBeenCalled();
   });

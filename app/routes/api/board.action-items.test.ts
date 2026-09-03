@@ -6,8 +6,10 @@ vi.mock("~/server/action_item_model", () => ({
 }));
 
 const mockUserCanFacilitate = vi.fn();
+const mockGetBoardAccess = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   userCanFacilitate: (...args: unknown[]) => mockUserCanFacilitate(...args),
+  getBoardAccess: (...args: unknown[]) => mockGetBoardAccess(...args),
 }));
 
 const mockGetApiUser = vi.fn();
@@ -19,6 +21,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetApiUser.mockResolvedValue({ id: "agent-1", username: "Claude", teamId: "team-1" });
   mockUserCanFacilitate.mockResolvedValue(true);
+  mockGetBoardAccess.mockResolvedValue({ exists: true, allowed: true, userIsRegistered: true });
   mockBulkCreate.mockResolvedValue({ id: "board-1", actionItems: [{ id: "a1" }] });
 });
 
@@ -65,6 +68,44 @@ describe("POST /api/v1/boards/:id/action-items", () => {
       params: { id: "board-1" }, context: {},
     } as never)) as Response;
     expect(res.status).toBe(403);
+  });
+
+  it("checks board access before checking facilitation (GAP-008)", async () => {
+    const { action } = await import("./board.action-items");
+    await action({
+      request: req({ items: [{ text: "x" }] }),
+      params: { id: "board-1" }, context: {},
+    } as never);
+    expect(mockGetBoardAccess).toHaveBeenCalledWith("board-1", "agent-1", "team-1");
+  });
+
+  it("403 for an out-of-crew key on a members-only board with open_facilitation on", async () => {
+    const { action } = await import("./board.action-items");
+    // The key can't facilitate via board access, but open_facilitation would
+    // otherwise let userCanFacilitate say yes — getBoardAccess must gate first.
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: true, allowed: false, userIsRegistered: true });
+    mockUserCanFacilitate.mockResolvedValueOnce(true);
+
+    const res = (await action({
+      request: req({ items: [{ text: "x" }] }),
+      params: { id: "board-1" }, context: {},
+    } as never)) as Response;
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("FORBIDDEN");
+    expect(body.error.message).toBe("This board is restricted to its crew");
+    expect(mockBulkCreate).not.toHaveBeenCalled();
+  });
+
+  it("404 when the board does not exist", async () => {
+    const { action } = await import("./board.action-items");
+    mockGetBoardAccess.mockResolvedValueOnce({ exists: false, allowed: false, userIsRegistered: false });
+
+    const res = (await action({
+      request: req({ items: [{ text: "x" }] }),
+      params: { id: "board-1" }, context: {},
+    } as never)) as Response;
+    expect(res.status).toBe(404);
   });
 
   it("400 on empty items", async () => {

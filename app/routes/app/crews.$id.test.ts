@@ -52,10 +52,12 @@ vi.mock("~/server/board_actions", () => ({
 const mockListApiKeysForTeam = vi.fn();
 const mockMintApiKey = vi.fn();
 const mockRevokeApiKey = vi.fn();
+class MockApiKeyLimitError extends Error {}
 vi.mock("~/server/api_key", () => ({
   listApiKeysForTeam: (...args: unknown[]) => mockListApiKeysForTeam(...args),
   mintApiKey: (...args: unknown[]) => mockMintApiKey(...args),
   revokeApiKey: (...args: unknown[]) => mockRevokeApiKey(...args),
+  ApiKeyLimitError: MockApiKeyLimitError,
 }));
 
 const mockFindUser = vi.fn();
@@ -165,6 +167,24 @@ describe("crews.$id action — AI crewmates (API keys)", () => {
     } as never);
     expect(mockMintApiKey).toHaveBeenCalledWith("team-1", "Solo Agent", "user-1");
     expect((result as { mintedKey?: string }).mintedKey).toBe("rk_live_secret");
+  });
+
+  it("CREW-019: surfaces the personal-crew key limit as a form error, not a 500", async () => {
+    const { action } = await import("./crews.$id");
+    mockGetTeamWithMembers.mockResolvedValue({
+      team: { id: "team-1", name: "landon's Team", is_personal: true, created_at: "x" },
+      members: [],
+    });
+    mockMintApiKey.mockRejectedValueOnce(
+      new MockApiKeyLimitError("Personal crews can hold one AI crewmate. Create a named crew to add more.")
+    );
+    const result = await action({
+      request: formRequest({ intent: "mintKey", display_name: "Second Agent" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect((result as { error?: string }).error).toBe(
+      "Personal crews can hold one AI crewmate. Create a named crew to add more."
+    );
   });
 
   it("revokes a key scoped to the crew", async () => {

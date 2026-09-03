@@ -5,13 +5,18 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { startTimerServer, stopTimerServer } from "~/server/board_model";
-import { requireBoardAccess } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
+  // DECK-002/003: the timer is a facilitator control. requireFacilitator alone
+  // doesn't cover a members-only board when open_facilitation admits outsiders,
+  // so board access is checked first.
   await requireBoardAccess(request, boardId);
+  await requireFacilitator(request, boardId);
+  await requireUnlocked(boardId, { board: true });
 
   switch (request.method.toUpperCase()) {
     case "POST": {

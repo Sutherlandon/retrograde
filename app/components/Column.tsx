@@ -8,7 +8,7 @@ import Button from "./Button";
 import { PlusIcon, EllipsisIcon, TrashIcon, EditIcon } from "~/images/icons";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
-  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked, isOwner } = useBoard();
+  const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked, canFacilitate } = useBoard();
   const [editingTitle, setEditingTitle] = useState(false);
   const [title, setTitle] = useState(column.title);
   const [deleteMode, setDeleteMode] = useState(false);
@@ -155,7 +155,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 size="sm"
               />
             )}
-            {isOwner && !boardLocked && (
+            {canFacilitate && !boardLocked && (
             <div className="relative ml-1" ref={menuRef}>
               <Button
                 icon={<EllipsisIcon />}

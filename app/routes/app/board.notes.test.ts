@@ -24,8 +24,10 @@ vi.mock("~/config/siteConfig", () => ({
 }));
 
 const mockRequireBoardAccess = vi.fn();
+const mockRequireUnlocked = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   requireBoardAccess: (...args: unknown[]) => mockRequireBoardAccess(...args),
+  requireUnlocked: (...args: unknown[]) => mockRequireUnlocked(...args),
 }));
 
 const mockUpsertNote = vi.fn();
@@ -51,6 +53,7 @@ beforeEach(() => {
   sessionData = {};
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockRequireBoardAccess.mockResolvedValue(null);
+  mockRequireUnlocked.mockResolvedValue(undefined);
 });
 
 function makePatchRequest(boardId: string, fields: Record<string, string>) {
@@ -237,6 +240,106 @@ describe("board.notes action", () => {
         expect((response as Response).status).toBe(403);
       }
       expect(mockUpsertNote).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("lock enforcement (GAP-003)", () => {
+    it("checks notes: true before an upsert (BRD-004/005)", async () => {
+      const { action } = await import("./board.notes");
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1", columnId: "col-1", text: "My note", likes: "0", created: "1",
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { notes: true });
+    });
+
+    it("rejects an upsert with 423 when notes are locked", async () => {
+      const { action } = await import("./board.notes");
+      mockRequireUnlocked.mockRejectedValueOnce(new Response("Notes are locked", { status: 423 }));
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1", columnId: "col-1", text: "My note", likes: "0", created: "1",
+      });
+      try {
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
+        expect.unreachable("should have thrown");
+      } catch (response: unknown) {
+        expect((response as Response).status).toBe(423);
+      }
+      expect(mockUpsertNote).not.toHaveBeenCalled();
+    });
+
+    it("checks notes: true before a delete (BRD-006)", async () => {
+      const { action } = await import("./board.notes");
+      const request = new Request("http://localhost:3000/app/board/board-1/notes", {
+        method: "DELETE",
+        body: (() => {
+          const form = new FormData();
+          form.append("noteId", "note-1");
+          form.append("columnId", "col-1");
+          return form;
+        })(),
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { notes: true });
+    });
+
+    it("checks notes: true before a move (BRD-007)", async () => {
+      const { action } = await import("./board.notes");
+      const request = makePatchRequest("board-1", {
+        intent: "move", noteId: "note-1", fromColumnId: "col-1", toColumnId: "col-2",
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { notes: true });
+    });
+
+    it("checks notes: true before a reorder (BRD-008)", async () => {
+      const { action } = await import("./board.notes");
+      const request = makePatchRequest("board-1", {
+        intent: "reorder", toColumnId: "col-1", orderedNoteIds: JSON.stringify(["n1", "n2"]),
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { notes: true });
+    });
+
+    it("checks board: true (not notes) before a like (BRD-009)", async () => {
+      const { action } = await import("./board.notes");
+      const request = makePatchRequest("board-1", { intent: "like", noteId: "note-1", delta: "1" });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { board: true });
+      expect(mockRequireUnlocked).not.toHaveBeenCalledWith("board-1", { notes: true });
+    });
+
+    it("allows a like when notes are locked but the board is not", async () => {
+      const { action } = await import("./board.notes");
+      mockRequireUnlocked.mockResolvedValue(undefined); // requireUnlocked({board:true}) passes
+      const request = makePatchRequest("board-1", { intent: "like", noteId: "note-1", delta: "1" });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockLikeNote).toHaveBeenCalled();
+    });
+
+    it("rejects a like with 423 when the board is locked", async () => {
+      const { action } = await import("./board.notes");
+      mockRequireUnlocked.mockRejectedValueOnce(new Response("Board is locked", { status: 423 }));
+      const request = makePatchRequest("board-1", { intent: "like", noteId: "note-1", delta: "1" });
+      try {
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
+        expect.unreachable("should have thrown");
+      } catch (response: unknown) {
+        expect((response as Response).status).toBe(423);
+      }
+      expect(mockLikeNote).not.toHaveBeenCalled();
+    });
+
+    it("checks board: true (not notes) before a vote (BRD-010)", async () => {
+      const { action } = await import("./board.notes");
+      sessionData["userId"] = "user-1";
+      mockPoolQuery.mockResolvedValueOnce({
+        rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
+        rowCount: 1,
+      });
+      const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { board: true });
     });
   });
 });

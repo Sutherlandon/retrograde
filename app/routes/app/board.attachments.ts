@@ -11,11 +11,15 @@ import {
   addImageAttachmentServer,
   deleteAttachmentServer,
 } from "~/server/attachment_model";
-import { requireFacilitator } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator } from "~/server/board_permissions";
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+
+  // BRD-019: attachment metadata for a members-only board was previously
+  // readable by anyone holding the board id.
+  await requireBoardAccess(request, boardId);
 
   return Response.json(await getAttachmentsServer(boardId));
 }

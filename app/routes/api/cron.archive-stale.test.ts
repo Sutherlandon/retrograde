@@ -8,7 +8,6 @@ vi.mock("~/server/auto_archive", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockArchiveStaleBoards.mockResolvedValue({ archived: 0 });
-  process.env.CRON_SECRET = "test-secret";
 });
 
 function req(method: string, headers: Record<string, string> = {}) {
@@ -18,9 +17,18 @@ function req(method: string, headers: Record<string, string> = {}) {
   });
 }
 
+// cronSecret is loaded once at module init (app/server/db_config.ts), so each
+// test that needs a different value mocks the module and re-imports the
+// route fresh via vi.resetModules().
+async function loadRoute(cronSecret: string | undefined) {
+  vi.resetModules();
+  vi.doMock("~/server/db_config", () => ({ cronSecret }));
+  return import("./cron.archive-stale");
+}
+
 describe("POST /api/v1/cron/archive-stale", () => {
   it("returns 200 and the archive count when the secret matches", async () => {
-    const { action } = await import("./cron.archive-stale");
+    const { action } = await loadRoute("test-secret");
     mockArchiveStaleBoards.mockResolvedValueOnce({ archived: 7 });
 
     const response = (await action({
@@ -34,7 +42,7 @@ describe("POST /api/v1/cron/archive-stale", () => {
   });
 
   it("returns 401 when the secret is missing", async () => {
-    const { action } = await import("./cron.archive-stale");
+    const { action } = await loadRoute("test-secret");
     const response = (await action({
       request: req("POST"),
       params: {}, context: {},
@@ -44,7 +52,7 @@ describe("POST /api/v1/cron/archive-stale", () => {
   });
 
   it("returns 401 when the secret is wrong", async () => {
-    const { action } = await import("./cron.archive-stale");
+    const { action } = await loadRoute("test-secret");
     const response = (await action({
       request: req("POST", { Authorization: "Bearer wrong" }),
       params: {}, context: {},
@@ -54,8 +62,7 @@ describe("POST /api/v1/cron/archive-stale", () => {
   });
 
   it("returns 500 when CRON_SECRET is not configured", async () => {
-    delete process.env.CRON_SECRET;
-    const { action } = await import("./cron.archive-stale");
+    const { action } = await loadRoute(undefined);
     const response = (await action({
       request: req("POST", { Authorization: "Bearer anything" }),
       params: {}, context: {},
@@ -65,7 +72,7 @@ describe("POST /api/v1/cron/archive-stale", () => {
   });
 
   it("rejects GET with 405", async () => {
-    const { loader } = await import("./cron.archive-stale");
+    const { loader } = await loadRoute("test-secret");
     const response = loader() as Response;
     expect(response.status).toBe(405);
   });

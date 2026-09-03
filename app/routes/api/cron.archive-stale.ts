@@ -7,6 +7,7 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { archiveStaleBoards } from "~/server/auto_archive";
+import { cronSecret } from "~/server/db_config";
 
 function err(code: string, message: string, status: number) {
   return Response.json({ error: { code, message } }, { status });
@@ -17,7 +18,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return err("METHOD_NOT_ALLOWED", "Use POST", 405);
   }
 
-  const secret = process.env.CRON_SECRET;
+  const secret = cronSecret;
   if (!secret) {
     return err("MISCONFIGURED", "CRON_SECRET env var not set", 500);
   }

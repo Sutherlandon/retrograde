@@ -72,6 +72,12 @@ if (siteAdminIds.length === 0) {
   console.warn("Warning: SITE_ADMIN_IDS is not set — the admin dashboard will be inaccessible.");
 }
 
+// Shared secret for the Vercel cron trigger that auto-archives stale boards
+// (app/routes/api/cron.archive-stale.ts, see ADR-0005). Undefined when unset
+// — the route treats that as a 500 MISCONFIGURED response rather than
+// silently accepting unauthenticated requests.
+export const cronSecret: string | undefined = process.env.CRON_SECRET;
+
 // OAuth redirect URI — use VERCEL_URL only in preview deployments (where each
 // deploy gets a unique hostname). Production also has VERCEL_URL set, but we
 // want the stable OAUTH_REDIRECT_URI there. Local dev also uses OAUTH_REDIRECT_URI.

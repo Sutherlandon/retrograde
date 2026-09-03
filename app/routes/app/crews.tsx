@@ -7,6 +7,7 @@ import { useEffect, useRef } from "react";
 import { Form, redirect, useLoaderData, useNavigate, useFetcher, type ActionFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { createTeam, listTeamsForUser, type TeamSummary } from "~/server/team_model";
+import { accountCanCreateNamedCrew } from "~/server/entitlements";
 import { StatusLED } from "~/components/StatusLED";
 
 export async function loader({ request }: { request: Request }) {
@@ -23,6 +24,9 @@ export async function action({ request }: ActionFunctionArgs) {
     const name = form.get("name")?.toString().trim();
     if (!name) return { error: "Crew name is required." };
     if (name.length > 100) return { error: "Crew name is too long (max 100 chars)." };
+    if (!(await accountCanCreateNamedCrew(user.id))) {
+      throw new Response("A named crew requires a paid plan", { status: 403 });
+    }
     const teamId = await createTeam(name, user.id);
     return redirect(`/app/crews/${teamId}`);
   }

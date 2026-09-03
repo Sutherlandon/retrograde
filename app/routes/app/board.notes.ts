@@ -5,7 +5,7 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { getOptionalUser } from "~/hooks/useAuth";
-import { requireBoardAccess } from "~/server/board_permissions";
+import { requireBoardAccess, requireUnlocked } from "~/server/board_permissions";
 import {
   upsertNoteServer,
   likeNoteServer,
@@ -28,6 +28,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const intent = data.get("intent") as string;
 
       if (intent === "move") {
+        // BRD-007: dragging a note is blocked by either lock (Note.tsx disables
+        // the sortable when notesLocked || boardLocked).
+        await requireUnlocked(boardId, { notes: true });
+
         const noteId = data.get("noteId") as string;
         const fromColumnId = data.get("fromColumnId") as string;
         const toColumnId = data.get("toColumnId") as string;
@@ -39,6 +43,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
 
       if (intent === "reorder") {
+        // BRD-008: same drag lock as move.
+        await requireUnlocked(boardId, { notes: true });
+
         const toColumnId = data.get("toColumnId") as string;
         const orderedNoteIdsJson = data.get("orderedNoteIds") as string;
         if (!toColumnId || !orderedNoteIdsJson) {
@@ -50,6 +57,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
 
       if (intent === "like") {
+        // BRD-009: Note.tsx only disables likes/votes when boardLocked, not
+        // notesLocked — the like/vote row keeps working while notes are locked.
+        await requireUnlocked(boardId, { board: true });
+
         const noteId = data.get("noteId") as string;
         const delta = Number(data.get("delta"));
         if (!noteId || isNaN(delta)) {
@@ -60,6 +71,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
 
       if (intent === "vote") {
+        // BRD-010: same as like — boardLocked only.
+        await requireUnlocked(boardId, { board: true });
+
         const noteId = data.get("noteId") as string;
         const delta = Number(data.get("delta"));
         if (!noteId || isNaN(delta) || delta === 0) throw new Response("Missing vote fields", { status: 422 });
@@ -68,7 +82,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return voteNoteServer(boardId, noteId, user.id, delta);
       }
 
-      // default PATCH: update note content
+      // default PATCH: update note content (BRD-004/BRD-005 — add/edit)
+      await requireUnlocked(boardId, { notes: true });
+
       const noteId = data.get("noteId") as string;
       const columnId = data.get("columnId") as string;
       const newText = data.get("text") as string;
@@ -82,6 +98,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     case "DELETE": {
+      // BRD-006: deleting a note is blocked by either lock.
+      await requireUnlocked(boardId, { notes: true });
+
       const noteId = data.get("noteId") as string;
       const columnId = data.get("columnId") as string;
       if (!noteId || !columnId) throw new Response("Missing noteId or columnId", { status: 422 });

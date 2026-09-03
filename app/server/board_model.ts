@@ -573,6 +573,17 @@ export async function duplicateBoardServer(
   boardId: string,
   userId: string
 ): Promise<string> {
+  // DASH-006: board lifecycle is owner-only (ADR-0006), mirroring
+  // deleteBoardServer / archiveBoardServer. Checked before opening the
+  // transaction, same as those two.
+  const memberRes = await pool.query(
+    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
+    [boardId, userId]
+  );
+  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
+    throw new Error("Only the board owner can duplicate a board");
+  }
+
   const client = await pool.connect();
   const newId = crypto.randomUUID();
 

@@ -49,6 +49,8 @@ describe("duplicateBoardServer", () => {
   it("creates a new board with '(copy)' suffix and copies columns", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
+    // SELECT role (ownership check, via pool.query — before the transaction)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] });
     // BEGIN
     mockQuery.mockResolvedValueOnce({});
     // SELECT title + voting settings
@@ -115,12 +117,36 @@ describe("duplicateBoardServer", () => {
   it("throws and rolls back when board is not found", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
     mockQuery.mockResolvedValueOnce({}); // BEGIN
     mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // SELECT title - not found
     mockQuery.mockResolvedValueOnce({}); // ROLLBACK
 
     await expect(duplicateBoardServer("bad-id", "user-1")).rejects.toThrow("Board not found");
     expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("throws and never opens a transaction when the caller is not the owner", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "facilitator" }] });
+
+    await expect(duplicateBoardServer("board-1", "user-2")).rejects.toThrow(
+      "Only the board owner can duplicate a board"
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it("throws when the caller is not a board member at all", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(duplicateBoardServer("board-1", "stranger")).rejects.toThrow(
+      "Only the board owner can duplicate a board"
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
