@@ -277,6 +277,18 @@ describe("teams.$id action — owner guards", () => {
     }
   });
 
+  it("rename echoes the new name back for the confirmation banner (CREW-004)", async () => {
+    const { action } = await import("./crews.$id");
+    mockTeamRole.mockResolvedValueOnce("owner");
+    mockRenameTeam.mockResolvedValueOnce(undefined);
+    const result = await action({
+      request: formRequest({ intent: "rename", name: "Starfleet Ops" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockRenameTeam).toHaveBeenCalledWith("team-1", "Starfleet Ops");
+    expect(result).toEqual({ success: true, name: "Starfleet Ops" });
+  });
+
   it("addMember looks up by username and adds (CREW-006)", async () => {
     const { action } = await import("./crews.$id");
     mockFindUser.mockResolvedValueOnce({ id: "user-7", username: "sam" });

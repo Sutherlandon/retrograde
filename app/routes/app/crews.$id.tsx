@@ -39,7 +39,14 @@ import { CommandDeckToggle } from "~/components/CommandDeckToggle";
 import { DashboardActionItems } from "~/components/DashboardActionItems";
 import { DashboardBoardsTable } from "~/components/DashboardBoardsTable";
 import { BulkActionsBar } from "~/components/BulkActionsBar";
-import { PlusIcon, ColumnsIcon, UserIcon, RobotIcon, SettingsIcon } from "~/images/icons";
+import { PlusIcon, ColumnsIcon, UserIcon, RobotIcon, SettingsIcon, CheckIcon } from "~/images/icons";
+
+// CREW-004: how long the post-rename confirmation stays up before it
+// auto-dismisses. The h1 above updates too, but it's far enough up the page
+// (past Roster, AI Crew, Boards) that a rename can go unnoticed without a
+// confirmation right next to where it happened — same reasoning as
+// BoardToolbar's post-claim confirmation.
+const RENAME_CONFIRMATION_MS = 6000;
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await requireRegisteredUser(request);
@@ -97,7 +104,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const name = form.get("name")?.toString().trim();
     if (!name) return { error: "Crew name is required." };
     await renameTeam(teamId, name);
-    return { success: true };
+    return { success: true, name };
   }
 
   if (intent === "deleteTeam") {
@@ -553,7 +560,20 @@ export default function CrewDetailPage() {
       openItems: UserActionItemRow[]; teams: TeamSummary[]; keys: ApiKeyDTO[];
       isTeamOwner: boolean; currentUserId: string;
     };
-  const renameFetcher = useFetcher<{ error?: string }>();
+  const renameFetcher = useFetcher<{ error?: string; success?: boolean; name?: string }>();
+  const [justRenamed, setJustRenamed] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (renameFetcher.data?.success && renameFetcher.data.name) {
+      setJustRenamed(renameFetcher.data.name);
+    }
+  }, [renameFetcher.data]);
+
+  useEffect(() => {
+    if (!justRenamed) return;
+    const timer = setTimeout(() => setJustRenamed(null), RENAME_CONFIRMATION_MS);
+    return () => clearTimeout(timer);
+  }, [justRenamed]);
   const addItemFetcher = useFetcher();
 
   return (
@@ -595,6 +615,12 @@ export default function CrewDetailPage() {
               Rename
             </button>
             {renameFetcher.data?.error && <p className="text-sm text-red-500">{renameFetcher.data.error}</p>}
+            {justRenamed && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300 w-fit">
+                <CheckIcon size="xs" />
+                Renamed to "{justRenamed}".
+              </span>
+            )}
           </renameFetcher.Form>
 
           <CrewAccessSetting restricted={team.restrict_board_access ?? true} />
