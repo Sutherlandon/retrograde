@@ -6,7 +6,7 @@ Accepted (2026-06-22)
 
 ## Context
 
-Retrograde's commercial direction is to monetize the agent layer (see ADR-0001 and the strategy conversation captured in `docs/plans/0002-teams-api-keys-ephemerality.md`). The agent layer plausibly produces 10× the content of a human user, so per-user pricing under-charges accounts running heavy agent workloads and the gate must sit somewhere agent activity flows through.
+Retrograde's commercial direction is to monetize the agent layer (see ADR-0001). The agent layer plausibly produces 10× the content of a human user, so per-user pricing under-charges accounts running heavy agent workloads and the gate must sit somewhere agent activity flows through.
 
 Two further constraints:
 
@@ -65,4 +65,3 @@ boards.team_id -- nullable
 - ADR-0004 (API keys for agent auth) — teams own the keys.
 - ADR-0005 (free-tier ephemerality) — teams' boards are exempt from the TTL.
 - GitHub issue #72 (Teams), #59 (Paywall), #97 (Facilitator Role).
-- `docs/plans/0002-teams-api-keys-ephemerality.md` — implementation plan.

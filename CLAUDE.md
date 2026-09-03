@@ -44,13 +44,15 @@ Never scatter `process.env` references throughout the codebase. Import config va
 
 ### 6. Decision Logs
 
-Maintain a record of key decisions, current project state, and progress in `docs/`. Before starting a significant feature or refactor, note the approach and rationale. This allows new sessions to resume context without re-explaining the problem.
+`docs/` records **where the project is** and **why it is that way**. It does not record how it got there — git has the history, and a narrative archive quietly contradicts the docs that are current.
 
-When completing a meaningful change, update or create a brief note in `docs/` describing what was done and why.
+Before starting a significant feature or refactor, write a plan. When it lands, fold anything durable into the records below and delete the plan.
 
-**Two distinct kinds of decision record:**
+**Four kinds of record:**
 
-- **`docs/STATE.md`** — the short-term "what's where right now" snapshot. Edit freely as the project evolves.
+- **`docs/STATE.md`** — the "what's where right now" snapshot: current pulse, known gaps, gotchas. Edit freely.
+- **`docs/spec/0001-action-registry.md`** — every action in the product, who may take it, what enforces that, and whether a test proves it. Update it whenever you add, remove, or re-gate an action.
+- **`docs/plans/`** — one unfinished feature or refactor. Disposable: deleted when the work merges. See `docs/plans/README.md`.
 - **`docs/adr/`** — Architecture Decision Records. Long-memory documents capturing decisions that shape the architecture or product direction. Use ADRs when a decision is hard to reverse, shapes future work, has non-obvious rejected alternatives, or might otherwise be challenged without context. Read `docs/adr/README.md` for the convention. **Never edit an accepted ADR's substance** — supersede it with a new ADR that references the old one.
 
 ### 7. Keep Secrets Secret

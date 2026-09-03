@@ -55,6 +55,5 @@ Concretely:
 
 - `docs/AI_AGENT_API.md` — agent-facing API documentation.
 - `public/llms.txt` — AI-discoverability surface.
-- `docs/plans/0001-agent-collaboration-mvp.md` — implementation plan for the first slice.
 - GitHub issue #87 (AI Native), #97 (Facilitator Role).
 - ADR-0002 (mandatory agent attribution) elaborates one consequence of treating agents as first-class.

@@ -60,4 +60,4 @@ A dedicated `action_items` table (`board_id` XOR `team_id`) rather than a specia
 - Issues #97 (Facilitator Role), #88 (Actionable Action Items), #72 (Teams).
 - ADR-0003 (teams), ADR-0005 (trial-flow boards stay teamless), ADR-0001 (API parity → the bulk action-items endpoint).
 - `app/server/board_permissions.ts`, `app/server/action_item_model.ts`, `app/server/board_model.ts` (facilitator functions + `getBoardServer` fields).
-- `docs/plans/0003-teams-facilitators-action-items.md` — implementation plan with the full permission matrix.
+- `docs/spec/0001-action-registry.md` — the full permission surface, action by action.
