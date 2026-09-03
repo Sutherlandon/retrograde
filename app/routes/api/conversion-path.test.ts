@@ -46,10 +46,10 @@ const mockPoolQuery = vi.fn(async (sql: string, params: unknown[] = []) => {
   if (sql.includes("SELECT bm.user_id as owner_id")) {
     return { rowCount: 1, rows: [{ owner_id: boardHasOwner ? "human-1" : null }] };
   }
-  // board.claim.ts's claim insert
-  if (sql.includes("INSERT INTO board_members") && sql.includes("'owner'")) {
-    boardHasOwner = true;
-    return {};
+  // team_model.ensurePersonalTeam's existing-team lookup — no personal crew
+  // yet, so it falls through to creating one (via pool.connect, below).
+  if (sql.includes("FROM team_members tm") && sql.includes("is_personal = TRUE")) {
+    return { rowCount: 0, rows: [] };
   }
   // board_model.getBoardServer (bulkInsertNotesServer's return value)
   if (sql.includes("json_build_object")) {
@@ -65,6 +65,16 @@ const mockClientQuery = vi.fn(async (sql: string, params: unknown[] = []) => {
   }
   if (sql.includes("COALESCE(MAX(note_order)")) {
     return { rows: [{ next: 0 }] };
+  }
+  // team_model.ensurePersonalTeam creating the claimer's personal crew.
+  if (sql.includes("INSERT INTO teams")) {
+    return { rows: [{ id: "personal-team-1" }] };
+  }
+  // board.claim.ts's claim insert — same continuity signal as before, just
+  // run via client.query now that the claim is a transaction.
+  if (sql.includes("INSERT INTO board_members") && sql.includes("'owner'")) {
+    boardHasOwner = true;
+    return {};
   }
   return {};
 });

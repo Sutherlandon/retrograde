@@ -53,6 +53,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 - Any session user can un-check another user's completed action item. Per-item assignees are the refinement (ADR-0006).
 - Crew action items have no attribution display.
 - Facilitator grants are **not** copied when a board is duplicated.
+- Claiming a board assigns it to the claimer's personal crew, which makes it permanent (the 30-day TTL only touches crewless boards), but deliberately leaves `open_facilitation` alone so a claim never takes the Command Deck away from a live retro (ADR-0012). `moveBoardsToTeamServer` *does* close facilitation on a crewless→crew move; the claim path is the intentional exception.
 - Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
 - Personal crews cannot be renamed, deleted, restricted, or given human members — but they can mint exactly one API key; the second is a named-crew (tier 3) action.
 

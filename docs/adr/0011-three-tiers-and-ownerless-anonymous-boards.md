@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-03)
+Accepted (2026-09-03) — §5 amended by [ADR-0012](0012-claiming-assigns-the-personal-crew.md): a claimed board now joins the claimer's personal crew instead of staying crewless. The agent-continuity guarantee in §5 is unchanged; the mechanism is.
 
 ## Context
 

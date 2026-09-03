@@ -2,8 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher, useLocation, useRevalidator, Link } from "react-router";
 import { useBoard } from "~/context/BoardContext";
 import { useOptionalUser } from "~/context/userContext";
+import { FlagIcon } from "~/images/icons";
 import TimerDisplay from "./TimerDisplay";
 import { BoardStatusBar } from "./BoardStatusBar";
+
+// BRD-020: how long the post-claim confirmation stays up before it
+// auto-dismisses.
+const CLAIM_CONFIRMATION_MS = 6000;
 
 /**
  * BRD-020: the primary claim affordance — a small, unobtrusive control on
@@ -16,24 +21,44 @@ function ClaimBoardControl() {
   const location = useLocation();
   const revalidator = useRevalidator();
   const fetcher = useFetcher<{ error?: string; success?: boolean }>();
+  const [justClaimed, setJustClaimed] = useState(false);
 
   useEffect(() => {
     // Once the claim lands, revalidate so the loader's hasOwner/isOwner
     // catches up on the next render instead of waiting on the 3s poll,
-    // which doesn't touch these fields.
+    // which doesn't touch these fields. Note the success state locally too —
+    // hasOwner flips true on revalidation, but the confirmation must still
+    // render (it renders even when hasOwner is true, below).
     if (fetcher.data?.success) {
+      setJustClaimed(true);
       revalidator.revalidate();
     }
   }, [fetcher.data]);
 
-  if (hasOwner) return null;
+  useEffect(() => {
+    if (!justClaimed) return;
+    const timer = setTimeout(() => setJustClaimed(false), CLAIM_CONFIRMATION_MS);
+    return () => clearTimeout(timer);
+  }, [justClaimed]);
 
   const badgeClass =
-    "shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300";
+    "shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300";
+
+  if (justClaimed) {
+    return (
+      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300">
+        <FlagIcon size="xs" />
+        You have planted your flag. The board now belongs to you.
+      </span>
+    );
+  }
+
+  if (hasOwner) return null;
 
   if (!user || user.is_anonymous) {
     return (
       <Link to={`/auth/login?returnTo=${encodeURIComponent(location.pathname)}`} className={badgeClass}>
+        <FlagIcon size="xs" />
         Log in to claim this board
       </Link>
     );
@@ -54,6 +79,7 @@ function ClaimBoardControl() {
         disabled={fetcher.state !== "idle"}
         className={`${badgeClass} cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-60`}
       >
+        <FlagIcon size="xs" />
         {fetcher.state !== "idle" ? "Claiming…" : "Claim this board"}
       </button>
       {fetcher.data?.error && (

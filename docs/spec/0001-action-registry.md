@@ -41,13 +41,12 @@ The tiers are shaped by one acquisition loop, and the boundaries sit where they 
 
 1. An agent discovers Retrograde and creates a board with **no authentication** (API-002). The board is crewless, has **no owner**, and holds a 30-day TTL. The agent keeps an `agent_token` for it.
 2. The agent shows the board to a human.
-3. The human signs up and **claims** it (BRD-020, DASH-016) — becoming its owner. The board is still crewless and unrestricted, so **the agent keeps working with the same token**. Nothing is handed over, nothing breaks.
-4. The human moves the board to their personal crew. Still unrestricted, so the agent still works.
-5. The human buys a named crew and moves the board into it. Named crews are members-only by default (ADR-0010), so **now** the agent's anonymous token fails, and it needs a minted key belonging to that crew.
+3. The human signs up and **claims** it (BRD-020, DASH-016) — becoming its owner. The claim also moves the board into their **personal crew**, which makes it permanent: the 30-day TTL only touches crewless boards (ADR-0012). A personal crew is never members-only, so **the agent keeps working with the same token**. Nothing is handed over, nothing breaks, and the room keeps whatever facilitation it had.
+4. The human buys a named crew and moves the board into it. Named crews are members-only by default (ADR-0010), so **now** the agent's anonymous token fails, and it needs a minted key belonging to that crew.
 
-An API key is therefore not what lets an agent participate — it is what lets an agent participate *in a locked room*, plus what lets it create boards that live on the human's dashboard instead of expiring (API-001). That is why the first key is free at tier 2 and why the paywall lands at step 5: the human pays at the moment they ask for control, not at the moment they arrive.
+An API key is therefore not what lets an agent participate — it is what lets an agent participate *in a locked room*, plus what lets it create boards that live on the human's dashboard instead of expiring (API-001). That is why the first key is free at tier 2 and why the paywall lands at step 4: the human pays at the moment they ask for control, not at the moment they arrive.
 
-The handoff at step 5 is real friction — the human mints a key and must get it to their agent. That is the cost of the boundary being where it is, and it is the right place to pay it.
+The handoff at step 4 is real friction — the human mints a key and must get it to their agent. That is the cost of the boundary being where it is, and it is the right place to pay it.
 
 ### Facilitator is the primitive; owner is a kind of facilitator
 
@@ -127,11 +126,11 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before access check               | Verified |
 | BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Verified |
 | BRD-019 | List a board's attachments | Anyone w/ access | `board.attachments.ts` loader | `requireBoardAccess` | Verified |
-| BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
+| BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists; assigns the personal crew (ADR-0012) | Verified |
 
 Locks are enforced on the server with exactly the matrix the UI applies (documented above `requireUnlocked` in `board_permissions.ts`): `notesLocked` blocks BRD-004 – BRD-008 and BRD-011; `boardLocked` blocks those plus BRD-009, BRD-010, BRD-012, BRD-013, BRD-014, the timer, adding a column, the title, and action items. Facilitators do not bypass locks. `board.settings.ts` is never lock-gated, because it is how a board unlocks.
 
-BRD-020 is the primary claim affordance: a button on the board itself, shown when the board has no owner. Claiming from the dashboard by pasting a link (DASH-016) is the fallback for someone who already left the board. A board created anonymously or through the API trial flow never has an owner row, so both succeed on it; a board on a crew always has one, so both refuse.
+BRD-020 is the primary claim affordance: a button on the board itself, shown when the board has no owner. Claiming from the dashboard by pasting a link (DASH-016) is the fallback for someone who already left the board. A board created anonymously or through the API trial flow never has an owner row, so both succeed on it; a board on a crew always has one, so both refuse. Claiming assigns the claimer's personal crew, which makes the board permanent — the 30-day TTL only touches crewless boards. It deliberately leaves `open_facilitation` alone, so claiming a live retro does not take the Command Deck away from the room (ADR-0012).
 
 ## DECK — facilitation (the Command Deck)
 
@@ -192,7 +191,7 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-013 | Filter to unassigned boards (`?team=unassigned`)   | Registered                | `dashboard.tsx` · `Sidebar`     | scoped to caller                             | Verified             |
 | DASH-014 | View archived boards                               | Registered                | `dashboard.tsx`                 | scoped to caller                             | Verified             |
 | DASH-015 | View open action items across own boards           | Registered                | `listOpenActionItemsForUser`    | scoped to caller                             | Verified             |
-| DASH-016 | Claim an unowned board by pasting its link | Registered | `board.claim.ts` · `ClaimModal` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
+| DASH-016 | Claim an unowned board by pasting its link | Registered | `board.claim.ts` · `ClaimModal` | `requireRegisteredUser`; succeeds only when no owner row exists; assigns the personal crew (ADR-0012) | Verified |
 | DASH-017 | Dismiss the welcome banner                         | Registered                | `WelcomeBanner`                 | client-side                                  | Verified |
 
 ## CREW — crews

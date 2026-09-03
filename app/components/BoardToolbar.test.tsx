@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
 
 const mockUseBoard = vi.fn();
 vi.mock("~/context/BoardContext", () => ({
@@ -104,17 +104,71 @@ describe("BoardToolbar — claim board control", () => {
     expect(link).toHaveAttribute("href", "/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1");
   });
 
-  it("shows an inline error from a failed claim attempt", () => {
+  it("shows an inline error in red from a failed claim attempt (BRD-020)", () => {
     mockFetcherData = { error: "This board already has an owner and cannot be claimed." };
     render(<BoardToolbar title="Sprint 12 Retro" />);
-    expect(
-      screen.getByText("This board already has an owner and cannot be claimed.")
-    ).toBeInTheDocument();
+    const errorEl = screen.getByText("This board already has an owner and cannot be claimed.");
+    expect(errorEl).toBeInTheDocument();
+    expect(errorEl.className).toMatch(/text-red-500/);
   });
 
   it("revalidates so the next render reflects the new owner after a successful claim", () => {
     mockFetcherData = { success: true };
     render(<BoardToolbar title="Sprint 12 Retro" />);
     expect(mockRevalidate).toHaveBeenCalled();
+  });
+
+  it("renders the flag icon in both the claim button and the login link (BRD-020)", () => {
+    const { unmount } = render(<BoardToolbar title="Sprint 12 Retro" />);
+    const button = screen.getByText("Claim this board").closest("button");
+    expect(button?.querySelector("svg")).toBeTruthy();
+    unmount();
+
+    mockUseOptionalUser.mockReturnValue({ id: "anon-1", username: "Guest", is_anonymous: true });
+    render(<BoardToolbar title="Sprint 12 Retro" />);
+    const link = screen.getByText("Log in to claim this board").closest("a");
+    expect(link?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("shows the green confirmation and hides the claim button after a successful claim (BRD-020)", () => {
+    mockFetcherData = { success: true };
+    render(<BoardToolbar title="Sprint 12 Retro" />);
+    const confirmation = screen.getByText(
+      "You have planted your flag. The board now belongs to you."
+    );
+    expect(confirmation).toBeInTheDocument();
+    expect(confirmation.className).toMatch(/text-green-700/);
+    expect(confirmation.querySelector("svg")).toBeTruthy();
+    expect(screen.queryByText("Claim this board")).toBeNull();
+  });
+
+  it("still shows the confirmation when hasOwner is already true right after claiming (BRD-020)", () => {
+    mockUseBoard.mockReturnValue({ ...baseBoard, hasOwner: true });
+    mockFetcherData = { success: true };
+    render(<BoardToolbar title="Sprint 12 Retro" />);
+    expect(
+      screen.getByText("You have planted your flag. The board now belongs to you.")
+    ).toBeInTheDocument();
+  });
+
+  it("auto-dismisses the confirmation after about 6 seconds (BRD-020)", () => {
+    vi.useFakeTimers();
+    try {
+      mockFetcherData = { success: true };
+      render(<BoardToolbar title="Sprint 12 Retro" />);
+      expect(
+        screen.getByText("You have planted your flag. The board now belongs to you.")
+      ).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      expect(
+        screen.queryByText("You have planted your flag. The board now belongs to you.")
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
