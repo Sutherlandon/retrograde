@@ -4,6 +4,7 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { updateBoardTitleServer } from "~/server/board_model";
+import { requireBoardAccess } from "~/server/board_permissions";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -12,6 +13,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (request.method.toUpperCase() !== "PATCH") {
     throw new Response("Method Not Allowed", { status: 405 });
   }
+
+  await requireBoardAccess(request, boardId);
 
   const data = await request.formData();
   const newTitle = (data.get("title") as string)?.trim();

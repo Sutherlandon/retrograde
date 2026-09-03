@@ -5,6 +5,7 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { getOptionalUser } from "~/hooks/useAuth";
+import { requireBoardAccess } from "~/server/board_permissions";
 import {
   upsertNoteServer,
   likeNoteServer,
@@ -17,6 +18,8 @@ import {
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+
+  await requireBoardAccess(request, boardId);
 
   const data = await request.formData();
 

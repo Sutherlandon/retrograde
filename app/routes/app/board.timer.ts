@@ -5,10 +5,13 @@
 
 import { type ActionFunctionArgs } from "react-router";
 import { startTimerServer, stopTimerServer } from "~/server/board_model";
+import { requireBoardAccess } from "~/server/board_permissions";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+
+  await requireBoardAccess(request, boardId);
 
   switch (request.method.toUpperCase()) {
     case "POST": {

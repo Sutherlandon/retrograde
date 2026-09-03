@@ -23,6 +23,11 @@ vi.mock("~/config/siteConfig", () => ({
   siteConfig: { usernameField: "preferred_username" },
 }));
 
+const mockRequireBoardAccess = vi.fn();
+vi.mock("~/server/board_permissions", () => ({
+  requireBoardAccess: (...args: unknown[]) => mockRequireBoardAccess(...args),
+}));
+
 const mockUpsertNote = vi.fn();
 const mockLikeNote = vi.fn();
 const mockVoteNote = vi.fn();
@@ -45,6 +50,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
+  mockRequireBoardAccess.mockResolvedValue(null);
 });
 
 function makePatchRequest(boardId: string, fields: Record<string, string>) {
@@ -171,6 +177,66 @@ describe("board.notes action", () => {
       await action({ request, params: { id: "board-1" }, context: {} });
 
       expect(mockLikeNote).toHaveBeenCalledWith("board-1", "note-1", 1, "anon-user-1");
+    });
+  });
+
+  describe("board access check", () => {
+    it("checks board access before an upsert", async () => {
+      const { action } = await import("./board.notes");
+      mockUpsertNote.mockResolvedValueOnce({ ok: true });
+
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1",
+        columnId: "col-1",
+        text: "My note",
+        likes: "0",
+        created: "1234567890",
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+
+      expect(mockRequireBoardAccess).toHaveBeenCalledWith(expect.any(Request), "board-1");
+    });
+
+    it("checks board access before a delete", async () => {
+      const { action } = await import("./board.notes");
+      mockDeleteNote.mockResolvedValueOnce({ ok: true });
+
+      const request = new Request("http://localhost:3000/app/board/board-1/notes", {
+        method: "DELETE",
+        body: (() => {
+          const form = new FormData();
+          form.append("noteId", "note-1");
+          form.append("columnId", "col-1");
+          return form;
+        })(),
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+
+      expect(mockRequireBoardAccess).toHaveBeenCalledWith(expect.any(Request), "board-1");
+      expect(mockDeleteNote).toHaveBeenCalled();
+    });
+
+    it("propagates the access check's rejection and never mutates notes", async () => {
+      const { action } = await import("./board.notes");
+      mockRequireBoardAccess.mockRejectedValueOnce(
+        new Response("This board is restricted to its crew", { status: 403 })
+      );
+
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1",
+        columnId: "col-1",
+        text: "My note",
+        likes: "0",
+        created: "1234567890",
+      });
+
+      try {
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
+        expect.unreachable("should have thrown");
+      } catch (response: unknown) {
+        expect((response as Response).status).toBe(403);
+      }
+      expect(mockUpsertNote).not.toHaveBeenCalled();
     });
   });
 });
