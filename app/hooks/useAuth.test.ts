@@ -63,13 +63,13 @@ describe("getOptionalUser", () => {
     const { getOptionalUser } = await import("./useAuth");
     sessionData["userId"] = "user-1";
     mockPoolQuery.mockResolvedValueOnce({
-      rows: [{ id: "user-1", preferred_username: "testuser" }],
+      rows: [{ id: "user-1", preferred_username: "testuser", is_anonymous: false }],
       rowCount: 1,
     });
 
     const request = new Request("http://localhost:3000/app/board/123");
     const result = await getOptionalUser(request);
-    expect(result).toEqual({ id: "user-1", username: "testuser" });
+    expect(result).toEqual({ id: "user-1", username: "testuser", is_anonymous: false });
   });
 });
 
@@ -94,14 +94,14 @@ describe("getOrCreateUser", () => {
     const { getOrCreateUser } = await import("./useAuth");
     sessionData["userId"] = "user-1";
     mockPoolQuery.mockResolvedValueOnce({
-      rows: [{ id: "user-1", preferred_username: "testuser" }],
+      rows: [{ id: "user-1", preferred_username: "testuser", is_anonymous: false }],
       rowCount: 1,
     });
 
     const request = new Request("http://localhost:3000/app/board/board-1");
     const result = await getOrCreateUser(request, "board-1");
 
-    expect(result.user).toEqual({ id: "user-1", username: "testuser" });
+    expect(result.user).toEqual({ id: "user-1", username: "testuser", is_anonymous: false });
     expect(result.isNew).toBe(false);
     // Should only have queried for the user, not inserted
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe("getOrCreateUser", () => {
     const request = new Request("http://localhost:3000/app/board/board-1");
     const result = await getOrCreateUser(request, "board-1");
 
-    expect(result.user).toEqual({ id: anonId, username: "Guest" });
+    expect(result.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(result.isNew).toBe(true);
     expect(sessionData["userId"]).toBe(anonId);
     // Verify INSERT was called with board_id
@@ -139,7 +139,7 @@ describe("getOrCreateUser", () => {
     const request = new Request("http://localhost:3000/app/board/board-2");
     const result = await getOrCreateUser(request, "board-2");
 
-    expect(result.user).toEqual({ id: anonId, username: "Guest" });
+    expect(result.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(result.isNew).toBe(true);
     expect(sessionData["userId"]).toBe(anonId);
   });
@@ -223,7 +223,7 @@ describe("getApiUser", () => {
 
     const request = new Request("http://localhost:3000/api/v1/boards");
     const result = await getApiUser(request);
-    expect(result).toEqual({ id: "cookie-user", username: "alice" });
+    expect(result).toEqual({ id: "cookie-user", username: "alice", is_anonymous: false });
   });
 
   it("legacy bearer (non-rk_live_) still resolves via session-cookie path", async () => {
@@ -255,7 +255,7 @@ describe("requireRegisteredUser", () => {
 
     const request = new Request("http://localhost:3000/app/dashboard");
     const result = await requireRegisteredUser(request);
-    expect(result).toEqual({ id: "user-1", username: "realuser" });
+    expect(result).toEqual({ id: "user-1", username: "realuser", is_anonymous: false });
   });
 
   it("redirects to login when no session exists", async () => {

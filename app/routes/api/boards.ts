@@ -4,9 +4,11 @@
 // `agent_token` so non-browser clients can use it as Authorization: Bearer.
 
 import type { ActionFunctionArgs } from "react-router";
-import { createBoardWithColumns, setBoardOwner } from "~/server/board_model";
+import { createBoardWithColumns } from "~/server/board_model";
 import { createAgentUser, getApiUser } from "~/hooks/useAuth";
 import { getSession, commitSession } from "~/session.server";
+import { pool } from "~/server/db_config";
+import { getPersonalTeamForUser } from "~/server/team_model";
 
 type CreateBoardRequest = {
   title?: string;
@@ -16,6 +18,32 @@ type CreateBoardRequest = {
 
 function bad(message: string, status = 400) {
   return Response.json({ error: { code: "BAD_REQUEST", message } }, { status });
+}
+
+/**
+ * GAP-002: createBoardWithColumns now writes the owner row itself, iff it's
+ * given a teamId — a crewless board must stay ownerless (ADR-0011). An
+ * API-key caller already carries a teamId (ADR-0004). The edge case is a
+ * caller authenticated via cookie session (getApiUser's legacy path never
+ * sets teamId): if that's a registered human, attach their personal team so
+ * the board ends up owned and on a crew per ADR-0003. An agent or anonymous
+ * session gets neither — agents don't have personal teams.
+ */
+async function resolveTeamIdForAuthedUser(
+  userId: string,
+  existingTeamId: string | null
+): Promise<string | null> {
+  if (existingTeamId) return existingTeamId;
+
+  const userRes = await pool.query<{ is_agent: boolean; is_anonymous: boolean }>(
+    `SELECT is_agent, is_anonymous FROM users WHERE id = $1`,
+    [userId]
+  );
+  const user = userRes.rows[0];
+  if (!user || user.is_agent || user.is_anonymous) return null;
+
+  const personalTeam = await getPersonalTeamForUser(userId);
+  return personalTeam?.id ?? null;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -70,9 +98,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const url = new URL(request.url);
 
   if (authedUser) {
-    const teamId = (authedUser as { teamId?: string }).teamId ?? null;
+    const teamId = await resolveTeamIdForAuthedUser(
+      authedUser.id,
+      (authedUser as { teamId?: string }).teamId ?? null
+    );
     const boardId = await createBoardWithColumns(title, columns, authedUser.id, teamId);
-    await setBoardOwner(boardId, authedUser.id);
     return Response.json(
       {
         board_id: boardId,
@@ -84,9 +114,10 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Trial flow — anonymous agent + teamless board + legacy agent_token.
+  // GAP-002: crewless boards are ownerless (createBoardWithColumns writes no
+  // owner row when teamId is null) — that's what makes the board claimable.
   const agentUserId = await createAgentUser(null, displayName);
   const boardId = await createBoardWithColumns(title, columns, agentUserId, null);
-  await setBoardOwner(boardId, agentUserId);
 
   const session = await getSession();
   session.set("userId", agentUserId);

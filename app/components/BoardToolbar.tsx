@@ -1,7 +1,67 @@
 import { useState, useEffect, useRef } from "react";
+import { useFetcher, useLocation, useRevalidator, Link } from "react-router";
 import { useBoard } from "~/context/BoardContext";
+import { useOptionalUser } from "~/context/userContext";
 import TimerDisplay from "./TimerDisplay";
 import { BoardStatusBar } from "./BoardStatusBar";
+
+/**
+ * BRD-020: the primary claim affordance — a small, unobtrusive control on
+ * the board itself, shown only when the board has no owner (GAP-002). A
+ * registered user claims directly; an anonymous one is sent to log in first.
+ */
+function ClaimBoardControl() {
+  const { hasOwner } = useBoard();
+  const user = useOptionalUser();
+  const location = useLocation();
+  const revalidator = useRevalidator();
+  const fetcher = useFetcher<{ error?: string; success?: boolean }>();
+
+  useEffect(() => {
+    // Once the claim lands, revalidate so the loader's hasOwner/isOwner
+    // catches up on the next render instead of waiting on the 3s poll,
+    // which doesn't touch these fields.
+    if (fetcher.data?.success) {
+      revalidator.revalidate();
+    }
+  }, [fetcher.data]);
+
+  if (hasOwner) return null;
+
+  const badgeClass =
+    "shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300";
+
+  if (!user || user.is_anonymous) {
+    return (
+      <Link to={`/auth/login?returnTo=${encodeURIComponent(location.pathname)}`} className={badgeClass}>
+        Log in to claim this board
+      </Link>
+    );
+  }
+
+  const claim = () => {
+    fetcher.submit(
+      { boardLink: window.location.href },
+      { method: "POST", action: "/app/board/claim" }
+    );
+  };
+
+  return (
+    <span className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={claim}
+        disabled={fetcher.state !== "idle"}
+        className={`${badgeClass} cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-60`}
+      >
+        {fetcher.state !== "idle" ? "Claiming…" : "Claim this board"}
+      </button>
+      {fetcher.data?.error && (
+        <span className="text-xs text-red-500 dark:text-red-400">{fetcher.data.error}</span>
+      )}
+    </span>
+  );
+}
 
 export default function BoardToolbar({ title }: { title: string }) {
   const { updateTitle, canFacilitate, boardLocked, teamName } = useBoard();
@@ -66,6 +126,7 @@ export default function BoardToolbar({ title }: { title: string }) {
             {teamName}
           </span>
         )}
+        {!editing && <ClaimBoardControl />}
       </div>
       <div className="flex-grow text-center">
         <TimerDisplay />

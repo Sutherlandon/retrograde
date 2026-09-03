@@ -401,6 +401,50 @@ export async function initializeDatabase() {
       ALTER COLUMN team_assignment_finalized SET DEFAULT TRUE;
     `);
 
+    // 32 GAP-002 / ADR-0011: anonymous boards must have no owner and be
+    //    invariantly open_facilitation = TRUE — that's the whole reason a
+    //    crewless board's Command Deck still works once its owner row is
+    //    gone. Existing crewless boards were stamped with an owner (the
+    //    anonymous visitor, or the agent itself on the API trial path) and
+    //    open_facilitation = FALSE, which is exactly backwards. One-time
+    //    reset, gated so it can never re-run — same 3-step pattern as
+    //    ADR-0009's block 25: add a column defaulting FALSE so every
+    //    existing row is in scope once, do the work while flagging each row
+    //    TRUE, then flip the column default to TRUE so a board created from
+    //    this point forward (crewless boards now insert with
+    //    open_facilitation TRUE and no owner row from the start — see
+    //    createBoard/createBoardWithColumns) is automatically exempt.
+    //    Registered users' owner rows on crewless boards (grandfathered by
+    //    the ADR-0009 reset) are untouched — only rows whose user is
+    //    anonymous or an agent are removed.
+    await client.query(`
+      ALTER TABLE boards
+      ADD COLUMN IF NOT EXISTS anonymous_ownership_cleared BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
+    await client.query(`
+      DELETE FROM board_members bm
+      USING boards b, users u
+      WHERE bm.board_id = b.id
+        AND bm.user_id = u.id
+        AND bm.role = 'owner'
+        AND b.team_id IS NULL
+        AND NOT b.anonymous_ownership_cleared
+        AND (u.is_anonymous OR u.is_agent);
+    `);
+
+    await client.query(`
+      UPDATE boards
+      SET anonymous_ownership_cleared = TRUE,
+          open_facilitation = CASE WHEN team_id IS NULL THEN TRUE ELSE open_facilitation END
+      WHERE NOT anonymous_ownership_cleared;
+    `);
+
+    await client.query(`
+      ALTER TABLE boards
+      ALTER COLUMN anonymous_ownership_cleared SET DEFAULT TRUE;
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

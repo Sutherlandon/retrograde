@@ -27,10 +27,8 @@ vi.mock("~/config/siteConfig", () => ({
 }));
 
 const mockCreateBoard = vi.fn();
-const mockSetBoardOwner = vi.fn();
 vi.mock("~/server/board_model", () => ({
   createBoard: (...args: unknown[]) => mockCreateBoard(...args),
-  setBoardOwner: (...args: unknown[]) => mockSetBoardOwner(...args),
 }));
 
 beforeEach(() => {
@@ -38,7 +36,6 @@ beforeEach(() => {
   sessionData = {};
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockCreateBoard.mockResolvedValue("new-board-id");
-  mockSetBoardOwner.mockResolvedValue(undefined);
 });
 
 function makeFormData(fields: Record<string, string>) {
@@ -69,7 +66,6 @@ describe("home page action", () => {
     expect(response.headers.get("Location")).toBe("/app/board/new-board-id");
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
     expect(mockCreateBoard).toHaveBeenCalledWith("My Retro");
-    expect(mockSetBoardOwner).toHaveBeenCalledWith("new-board-id", anonId);
   });
 
   it("creates board with existing registered user session", async () => {
@@ -94,7 +90,9 @@ describe("home page action", () => {
     expect(response.headers.get("Location")).toBe("/app/board/new-board-id");
     // No Set-Cookie needed for existing user
     expect(response.headers.get("Set-Cookie")).toBeNull();
-    expect(mockSetBoardOwner).toHaveBeenCalledWith("new-board-id", "registered-user-1");
+    // GAP-002: even a registered visitor hitting the trial form gets a
+    // crewless, ownerless board — it's claimable, not pre-owned.
+    expect(mockCreateBoard).toHaveBeenCalledWith("Team Retro");
   });
 
   it("returns validation error when title is too short", async () => {

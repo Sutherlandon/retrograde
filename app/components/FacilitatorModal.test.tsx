@@ -14,11 +14,19 @@ vi.mock("react-router", () => ({
   }),
 }));
 
+// teamName === null means a crewless board — GAP-002's invariant means the
+// open-facilitation toggle must not even be reachable from this UI there.
+let mockTeamName: string | null = "Acme Crew";
+vi.mock("~/context/BoardContext", () => ({
+  useBoard: () => ({ teamName: mockTeamName }),
+}));
+
 import { FacilitatorModal } from "./FacilitatorModal";
 
 describe("FacilitatorModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockTeamName = "Acme Crew";
     mockFetcherData = {
       facilitators: [
         { user_id: "u1", role: "owner", username: "landon" },
@@ -84,5 +92,23 @@ describe("FacilitatorModal", () => {
     render(<FacilitatorModal boardId="b1" isOpen onClose={onClose} />);
     fireEvent.click(screen.getByTitle("Close"));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // GAP-002 / DECK-008: the invariant is enforced server-side too
+  // (setOpenFacilitationServer refuses the write), but the control shouldn't
+  // even be offered on a crewless board.
+  it("hides the open-facilitation toggle on a crewless board and explains why", () => {
+    mockTeamName = null;
+    render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
+    expect(screen.queryByText("Open Deck to Everyone")).toBeNull();
+    expect(
+      screen.getByText("Anonymous boards are open to everyone. Move this board to a crew to restrict facilitation.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the open-facilitation toggle on a board that belongs to a crew", () => {
+    mockTeamName = "Acme Crew";
+    render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
+    expect(screen.getByText("Open Deck to Everyone")).toBeInTheDocument();
   });
 });

@@ -124,6 +124,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const attachmentFetcher = useFetcher();
   const actionItemFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
+  // BRD-020: default TRUE (not false) — an older/incomplete loader response
+  // should never spuriously offer to claim a board that already has an owner.
+  const hasOwner = loaderData.hasOwner ?? true;
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -693,6 +696,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     teamName,
     updateTitle,
     readonly: isReadOnly,
+    hasOwner,
     isOwner,
     columns,
     nextColOrder: deriveNextColOrder(columns),

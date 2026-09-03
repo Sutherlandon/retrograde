@@ -1,5 +1,5 @@
 import { Form, redirect, useActionData, Link, type ActionFunctionArgs } from "react-router";
-import { createBoard, setBoardOwner } from "~/server/board_model";
+import { createBoard } from "~/server/board_model";
 import { getOrCreateUser } from "~/hooks/useAuth";
 import { commitSession } from "~/session.server";
 import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, EmailIcon } from "~/images/icons";
@@ -70,14 +70,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect(`/app/board/example-board`);
   }
 
-  // create the board first (no owner yet)
+  // create the board first — crewless (tier 1), so no owner (GAP-002 /
+  // ADR-0011). It stays ownerless and open to everyone until claimed.
   const board_id = await createBoard(title!);
 
-  // ensure the user has an identity (creates anonymous user if needed)
-  const { user, session, isNew } = await getOrCreateUser(request, board_id);
-
-  // make this user the board owner
-  await setBoardOwner(board_id, user.id);
+  // ensure the visitor has an identity (creates an anonymous user if needed)
+  const { session, isNew } = await getOrCreateUser(request, board_id);
 
   // redirect with session cookie if a new anonymous user was created
   const headers: HeadersInit = {};

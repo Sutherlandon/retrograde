@@ -73,6 +73,7 @@ export interface BoardDTO {
   id: string;
   title: string;
   readonly: boolean;       // true for example boards — server sets this
+  hasOwner?: boolean;      // true when ANY owner row exists — drives the claim button (BRD-020)
   isOwner?: boolean;       // true when the current user is the board owner
   canFacilitate?: boolean; // owner OR facilitator role OR open_facilitation — see ADR-0006
   openFacilitation?: boolean;
@@ -150,6 +151,7 @@ export interface BoardClientState {
   title: string;
   teamName: string | null; // crew this board belongs to, null when teamless
   readonly: boolean;
+  hasOwner: boolean; // true when ANY owner row exists — drives the claim button (BRD-020)
   isOwner: boolean;
   // Facilitation — owner, granted facilitator, or open_facilitation. Gates the
   // Command Deck and board-level action item management. See ADR-0006.

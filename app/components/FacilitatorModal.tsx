@@ -7,6 +7,7 @@ import { useFetcher } from "react-router";
 import { CloseIcon, UserIcon } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
 import { CommandDeckToggle } from "./CommandDeckToggle";
+import { useBoard } from "~/context/BoardContext";
 import type { BoardFacilitatorDTO } from "~/server/board.types";
 
 interface CrewData {
@@ -27,6 +28,11 @@ export function FacilitatorModal({
   const fetcher = useFetcher<CrewData>();
   const [username, setUsername] = useState("");
   const action = `/app/board/${boardId}/facilitators`;
+  // GAP-002: a crewless board (teamName === null) is invariantly open —
+  // the toggle to close it doesn't exist here, and the server refuses the
+  // write anyway (setOpenFacilitationServer).
+  const { teamName } = useBoard();
+  const isCrewless = teamName === null;
 
   useEffect(() => {
     if (isOpen && fetcher.state === "idle" && !fetcher.data) {
@@ -83,17 +89,25 @@ export function FacilitatorModal({
 
         {/* Open facilitation */}
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
-          <CommandDeckToggle
-            label="Open Deck to Everyone"
-            checked={openFacilitation}
-            onChange={(open: boolean) =>
-              fetcher.submit({ openFacilitation: String(open) }, { method: "PATCH", action })
-            }
-            ledColor="green"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
-            When on, every participant can see and use the Command Deck.
-          </p>
+          {isCrewless ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Anonymous boards are open to everyone. Move this board to a crew to restrict facilitation.
+            </p>
+          ) : (
+            <>
+              <CommandDeckToggle
+                label="Open Deck to Everyone"
+                checked={openFacilitation}
+                onChange={(open: boolean) =>
+                  fetcher.submit({ openFacilitation: String(open) }, { method: "PATCH", action })
+                }
+                ledColor="green"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 pl-1">
+                When on, every participant can see and use the Command Deck.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Crew list */}

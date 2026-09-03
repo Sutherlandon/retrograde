@@ -94,6 +94,7 @@ describe("board.facilitators action", () => {
 
   it("PATCH toggles open facilitation", async () => {
     const { action } = await import("./board.facilitators");
+    mockSetOpen.mockResolvedValue(true);
     mockGetOpen.mockResolvedValue(true);
     const res = (await action({
       request: formRequest("PATCH", { openFacilitation: "true" }),
@@ -101,6 +102,24 @@ describe("board.facilitators action", () => {
     } as never)) as Response;
     expect(mockSetOpen).toHaveBeenCalledWith("board-1", true);
     const body = await res.json();
+    expect(body.openFacilitation).toBe(true);
+    expect(body.error).toBeUndefined();
+  });
+
+  // GAP-002: the invariant is enforced on write. A crewless board's
+  // open_facilitation can never be closed — setOpenFacilitationServer
+  // reports that the write was refused, and this route surfaces it.
+  it("PATCH refuses to close facilitation on a crewless board and leaves it TRUE", async () => {
+    const { action } = await import("./board.facilitators");
+    mockSetOpen.mockResolvedValue(false); // refused: the model's invariant guard
+    mockGetOpen.mockResolvedValue(true); // still TRUE — the write never applied
+    const res = (await action({
+      request: formRequest("PATCH", { openFacilitation: "false" }),
+      params: { id: "board-1" }, context: {},
+    } as never)) as Response;
+    expect(mockSetOpen).toHaveBeenCalledWith("board-1", false);
+    const body = await res.json();
+    expect(body.error).toBe("Anonymous boards are open to everyone.");
     expect(body.openFacilitation).toBe(true);
   });
 

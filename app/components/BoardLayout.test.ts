@@ -44,7 +44,7 @@ describe("BoardLayout loader", () => {
 
     expect(response).toBeInstanceOf(Response);
     const body = await response.json();
-    expect(body.user).toEqual({ id: anonId, username: "Guest" });
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
 
     // Verify anonymous user was created with the board's ID
@@ -59,7 +59,7 @@ describe("BoardLayout loader", () => {
 
     sessionData["userId"] = "user-1";
     mockPoolQuery.mockResolvedValueOnce({
-      rows: [{ id: "user-1", preferred_username: "realuser" }],
+      rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
       rowCount: 1,
     });
 
@@ -67,7 +67,7 @@ describe("BoardLayout loader", () => {
     const response = await loader({ request, params: { id: "board-42" } });
 
     const body = await response.json();
-    expect(body.user).toEqual({ id: "user-1", username: "realuser" });
+    expect(body.user).toEqual({ id: "user-1", username: "realuser", is_anonymous: false });
     // No Set-Cookie for existing user
     expect(response.headers.get("Set-Cookie")).toBeNull();
     // Only SELECT, no INSERT
@@ -88,7 +88,7 @@ describe("BoardLayout loader", () => {
     const response = await loader({ request, params: { id: "board-99" } });
 
     const body = await response.json();
-    expect(body.user).toEqual({ id: anonId, username: "Guest" });
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
   });
 

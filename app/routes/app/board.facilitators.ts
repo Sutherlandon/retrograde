@@ -64,7 +64,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     case "PATCH": {
       const open = data.get("openFacilitation") === "true";
-      await setOpenFacilitationServer(boardId, open);
+      // GAP-002 invariant: a crewless board can never close facilitation.
+      // setOpenFacilitationServer refuses the write in SQL and reports it
+      // here rather than throwing, so the caller sees the current (still
+      // TRUE) state alongside the reason.
+      const applied = await setOpenFacilitationServer(boardId, open);
+      if (!applied) {
+        return Response.json({
+          error: "Anonymous boards are open to everyone.",
+          ...(await crewState(boardId)),
+        });
+      }
       return Response.json(await crewState(boardId));
     }
 

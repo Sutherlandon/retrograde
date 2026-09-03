@@ -13,7 +13,7 @@ import {
   setActionItemCompleted,
   deleteActionItemServer,
 } from "~/server/action_item_model";
-import { requireFacilitator } from "~/server/board_permissions";
+import { requireFacilitator, requireUnlocked } from "~/server/board_permissions";
 import { getOptionalUser } from "~/hooks/useAuth";
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -25,6 +25,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
   switch (request.method.toUpperCase()) {
     case "POST": {
       const user = await requireFacilitator(request, boardId);
+      // GAP-003 residual (BRD-014, DECK-023): notes_locked doesn't apply to
+      // action items — they aren't notes — only board_locked does.
+      await requireUnlocked(boardId, { board: true });
       const text = data.get("text")?.toString().trim();
       if (!text) throw new Response("Text is required", { status: 422 });
       return Response.json(await createBoardActionItem(boardId, text, user?.id ?? null));
@@ -39,12 +42,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
         // Any participant with a session may check off an objective.
         const user = await getOptionalUser(request);
         if (!user) throw new Response("Unauthorized", { status: 401 });
+        await requireUnlocked(boardId, { board: true });
         const completed = data.get("completed") === "true";
         return Response.json(await setActionItemCompleted(boardId, itemId, completed, user.id));
       }
 
       if (intent === "text") {
         const user = await requireFacilitator(request, boardId);
+        await requireUnlocked(boardId, { board: true });
         const text = data.get("text")?.toString().trim();
         if (!text) throw new Response("Text is required", { status: 422 });
         return Response.json(await updateActionItemText(boardId, itemId, text, user?.id ?? null));
@@ -55,6 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     case "DELETE": {
       const user = await requireFacilitator(request, boardId);
+      await requireUnlocked(boardId, { board: true });
       const itemId = data.get("itemId")?.toString();
       if (!itemId) throw new Response("Missing itemId", { status: 422 });
       return Response.json(await deleteActionItemServer(boardId, itemId, user?.id ?? null));

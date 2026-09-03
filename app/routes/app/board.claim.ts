@@ -15,7 +15,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const boardId = match[1];
 
   const boardResult = await pool.query(
-    `SELECT b.created_by, bm.user_id as owner_id
+    `SELECT bm.user_id as owner_id
      FROM boards b
      LEFT JOIN board_members bm ON bm.board_id = b.id AND bm.role = 'owner'
      WHERE b.id = $1`,
@@ -26,12 +26,15 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: "Board not found." };
   }
 
-  const { owner_id, created_by } = boardResult.rows[0];
+  const { owner_id } = boardResult.rows[0];
 
+  // GAP-002: the only thing that matters is whether an owner row exists.
+  // `created_by` is attribution, not ownership — the API trial path sets it
+  // to the agent that created the board, and that board must still be
+  // claimable (it's the whole point of the conversion path, BRD-020/DASH-016).
   const hasOwner = !!owner_id;
-  const isAnonymousCreator = !created_by;
 
-  if (hasOwner || !isAnonymousCreator) {
+  if (hasOwner) {
     return { error: "This board already has an owner and cannot be claimed." };
   }
 

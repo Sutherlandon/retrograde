@@ -129,13 +129,12 @@ export async function getBoardAccess(
 // | BRD-013                 | Delete a column                      |  —  |  X  | board.columns.ts (DELETE)  |
 // | DECK-002/DECK-003       | Start / stop the timer               |  —  |  X  | board.timer.ts             |
 // | DECK-006                | Add a column                         |  —  |  X  | board.columns.ts (POST)    |
-// | BRD-014, DECK-023–025   | Action item complete / add / edit / delete | — | X (UI only) | not enforced here — out of scope for this pass |
+// | BRD-014, DECK-023–025   | Action item complete / add / edit / delete | — | X | board.action-items.ts        |
 // | DECK-017–019             | Attach / delete an attachment         |  —  |  —  | never locked — gated by `requireFacilitator` only |
 // | DECK-008–016             | Board settings, incl. the locks themselves | — | — | never locked — `board.settings.ts` is how a board unlocks |
 //
-// "—" means the client never disables that control for that lock; the two
-// rows marked "(UI only)" describe existing client behavior this pass does
-// not add a server guard for (`board.action-items.ts` is out of scope here).
+// "—" means the client never disables that control for that lock. notes_locked
+// never applies to action items — they aren't notes.
 
 export async function requireUnlocked(
   boardId: string,

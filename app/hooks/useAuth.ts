@@ -22,7 +22,7 @@ export async function getOptionalUser(request: Request) {
   const id = user.id;
   const username = user[siteConfig.usernameField];
 
-  return { id, username };
+  return { id, username, is_anonymous: Boolean(user.is_anonymous) };
 }
 
 export async function createAnonymousUser(boardId: string): Promise<string> {
@@ -111,7 +111,11 @@ export async function getOrCreateUser(request: Request, boardId: string) {
     if (userRows.rows[0]) {
       const user = userRows.rows[0];
       return {
-        user: { id: user.id, username: user[siteConfig.usernameField] || "Guest" },
+        user: {
+          id: user.id,
+          username: user[siteConfig.usernameField] || "Guest",
+          is_anonymous: Boolean(user.is_anonymous),
+        },
         session,
         isNew: false,
       };
@@ -122,7 +126,7 @@ export async function getOrCreateUser(request: Request, boardId: string) {
   userId = await createAnonymousUser(boardId);
   session.set("userId", userId);
   return {
-    user: { id: userId, username: "Guest" },
+    user: { id: userId, username: "Guest", is_anonymous: true },
     session,
     isNew: true,
   };
@@ -146,5 +150,5 @@ export async function requireRegisteredUser(request: Request) {
 
   const { id, preferred_username: username } = user;
 
-  return { id, username };
+  return { id, username, is_anonymous: false };
 }

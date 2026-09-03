@@ -38,10 +38,13 @@ vi.mock("~/hooks/useAuth", () => ({
 }));
 
 const mockCreateBoardWithColumns = vi.fn();
-const mockSetBoardOwner = vi.fn();
 vi.mock("~/server/board_model", () => ({
   createBoardWithColumns: (...args: unknown[]) => mockCreateBoardWithColumns(...args),
-  setBoardOwner: (...args: unknown[]) => mockSetBoardOwner(...args),
+}));
+
+const mockGetPersonalTeamForUser = vi.fn();
+vi.mock("~/server/team_model", () => ({
+  getPersonalTeamForUser: (...args: unknown[]) => mockGetPersonalTeamForUser(...args),
 }));
 
 beforeEach(() => {
@@ -49,8 +52,9 @@ beforeEach(() => {
   sessionData = {};
   mockCreateAgentUser.mockResolvedValue("agent-uuid");
   mockCreateBoardWithColumns.mockResolvedValue("board-uuid");
-  mockSetBoardOwner.mockResolvedValue(undefined);
   mockGetApiUser.mockResolvedValue(null); // unauthenticated trial flow by default
+  mockPoolQuery.mockResolvedValue({ rows: [{ is_agent: false, is_anonymous: false }], rowCount: 1 });
+  mockGetPersonalTeamForUser.mockResolvedValue({ id: "personal-team-1", name: "Personal", is_personal: true, created_at: "" });
 });
 
 function req(body: unknown, method = "POST") {
@@ -93,7 +97,6 @@ describe("POST /api/v1/boards", () => {
       "agent-uuid",
       null
     );
-    expect(mockSetBoardOwner).toHaveBeenCalledWith("board-uuid", "agent-uuid");
   });
 
   it("defaults display_name to 'Agent' when omitted", async () => {
@@ -140,7 +143,64 @@ describe("POST /api/v1/boards", () => {
       "agent-from-key",
       "team-acme"
     );
-    expect(mockSetBoardOwner).toHaveBeenCalledWith("board-uuid", "agent-from-key");
+    // No personal-team lookup: the API key already carried a teamId.
+    expect(mockGetPersonalTeamForUser).not.toHaveBeenCalled();
+  });
+
+  // GAP-002: createBoardWithColumns now writes the owner row itself (iff
+  // teamId is set), so this route no longer calls setBoardOwner directly.
+  // The edge case is a registered, non-agent browser session with no team on
+  // the request (getApiUser's cookie-session path never sets teamId) — that
+  // caller must still end up owning a board on a crew per ADR-0003, so we
+  // attach their personal team before creating the board.
+  it("attaches the caller's personal team when a registered session has no teamId", async () => {
+    const { action } = await import("./boards");
+    mockGetApiUser.mockResolvedValueOnce({ id: "human-1", username: "landon" });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_agent: false, is_anonymous: false }], rowCount: 1 });
+    mockGetPersonalTeamForUser.mockResolvedValueOnce({
+      id: "personal-team-9",
+      name: "Personal",
+      is_personal: true,
+      created_at: "",
+    });
+
+    const response = (await action({
+      request: req({ title: "My Board", columns: [] }),
+      params: {},
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(201);
+    const json = (await response.json()) as { team_id: string };
+    expect(json.team_id).toBe("personal-team-9");
+    expect(mockGetPersonalTeamForUser).toHaveBeenCalledWith("human-1");
+    expect(mockCreateBoardWithColumns).toHaveBeenCalledWith(
+      "My Board",
+      [],
+      "human-1",
+      "personal-team-9"
+    );
+  });
+
+  it("does not attach a personal team for an agent or anonymous caller with no teamId", async () => {
+    const { action } = await import("./boards");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-legacy-1", username: "Agent" });
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ is_agent: true, is_anonymous: true }], rowCount: 1 });
+
+    const response = (await action({
+      request: req({ title: "Agent Board", columns: [] }),
+      params: {},
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(201);
+    expect(mockGetPersonalTeamForUser).not.toHaveBeenCalled();
+    expect(mockCreateBoardWithColumns).toHaveBeenCalledWith(
+      "Agent Board",
+      [],
+      "agent-legacy-1",
+      null
+    );
   });
 
   it("rejects missing title with 400", async () => {

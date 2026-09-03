@@ -19,6 +19,9 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'team_id',        b.team_id,
       'team_name',      MAX(t.name),
       'readonly',       false,
+      -- BRD-020: whether the board has an owner at all, independent of the
+      -- viewer — drives the "Claim this board" control (GAP-002).
+      'hasOwner',       EXISTS(SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.role = 'owner'),
       'isOwner',        CASE
                           WHEN $2::uuid IS NOT NULL
                           THEN EXISTS(SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.user_id = $2::uuid AND bm.role = 'owner')
@@ -186,12 +189,16 @@ export async function createBoard(
   try {
     await client.query("BEGIN");
 
+    // GAP-002: owner row iff the board is on a crew. A crewless board has no
+    // owner and is invariantly open_facilitation = TRUE — that's what makes
+    // "everyone is a facilitator" true on tier 1 instead of an accident of
+    // who clicked create. See ADR-0011.
     await client.query(
-      `INSERT INTO boards (id, title, created_by, team_id) VALUES ($1, $2, $3, $4)`,
-      [id, title, userId, teamId]
+      `INSERT INTO boards (id, title, created_by, team_id, open_facilitation) VALUES ($1, $2, $3, $4, $5)`,
+      [id, title, userId, teamId, teamId === null]
     );
 
-    if (userId) {
+    if (userId && teamId !== null) {
       await client.query(
         `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')`,
         [id, userId]
@@ -240,12 +247,14 @@ export async function createBoardWithColumns(
   try {
     await client.query("BEGIN");
 
+    // GAP-002: owner row iff the board is on a crew — see createBoard's
+    // comment and ADR-0011.
     await client.query(
-      `INSERT INTO boards (id, title, created_by, team_id) VALUES ($1, $2, $3, $4)`,
-      [id, title, userId, teamId]
+      `INSERT INTO boards (id, title, created_by, team_id, open_facilitation) VALUES ($1, $2, $3, $4, $5)`,
+      [id, title, userId, teamId, teamId === null]
     );
 
-    if (userId) {
+    if (userId && teamId !== null) {
       await client.query(
         `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')`,
         [id, userId]
@@ -331,18 +340,6 @@ export async function bulkInsertNotesServer(
   }
 
   return getBoardServer(boardId, userId);
-}
-
-export async function setBoardOwner(boardId: string, userId: string) {
-  await pool.query(
-    `UPDATE boards SET created_by = $1 WHERE id = $2`,
-    [userId, boardId]
-  );
-  await pool.query(
-    `INSERT INTO board_members (board_id, user_id, role) VALUES ($1, $2, 'owner')
-     ON CONFLICT (board_id, user_id) DO NOTHING`,
-    [boardId, userId]
-  );
 }
 
 export async function addColumnServer(
@@ -638,6 +635,11 @@ export async function duplicateBoardServer(
  * Permission is enforced in SQL: the caller must own each board, and when
  * moving TO a team, must be a member of that team. Boards that fail either
  * guard are silently skipped; the returned ids are the boards actually moved.
+ *
+ * GAP-002: open_facilitation transitions in the same UPDATE — becoming
+ * crewless opens facilitation (the invariant for tier 1), leaving crewless
+ * closes it back to the role, and a crew-to-crew move preserves whatever the
+ * facilitator had chosen. See ADR-0011.
  */
 export async function moveBoardsToTeamServer(
   boardIds: string[],
@@ -647,7 +649,10 @@ export async function moveBoardsToTeamServer(
   if (boardIds.length === 0) return [];
 
   const res = await pool.query<{ id: string }>(
-    `UPDATE boards b SET team_id = $2
+    `UPDATE boards b SET team_id = $2, open_facilitation = CASE
+       WHEN $2::uuid IS NULL THEN TRUE
+       WHEN b.team_id IS NULL THEN FALSE
+       ELSE b.open_facilitation END
      WHERE b.id = ANY($1)
        AND EXISTS (
          SELECT 1 FROM board_members bm
@@ -800,11 +805,19 @@ export async function removeFacilitatorServer(boardId: string, userId: string) {
   );
 }
 
-export async function setOpenFacilitationServer(boardId: string, open: boolean) {
-  await pool.query(
-    `UPDATE boards SET open_facilitation = $1 WHERE id = $2`,
+/**
+ * GAP-002 invariant, enforced on write: a crewless board can never have
+ * open_facilitation set to FALSE — that would strip everyone's Command Deck
+ * access with no owner row to fall back on (ADR-0011). The guard is the WHERE
+ * clause itself, not an app-level check, so no caller can bypass it. Returns
+ * whether the write actually applied.
+ */
+export async function setOpenFacilitationServer(boardId: string, open: boolean): Promise<boolean> {
+  const res = await pool.query(
+    `UPDATE boards SET open_facilitation = $1 WHERE id = $2 AND ($1 OR team_id IS NOT NULL)`,
     [open, boardId]
   );
+  return (res.rowCount ?? 0) > 0;
 }
 
 export async function getOpenFacilitationServer(boardId: string): Promise<boolean | null> {
