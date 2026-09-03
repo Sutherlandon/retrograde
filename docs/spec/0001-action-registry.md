@@ -20,9 +20,11 @@ Three tiers. A tier is what an **account** is entitled to; a board inherits the 
 
 The tier boundary in code is `teams.is_personal`. A personal crew is tier 2 and cannot be renamed, deleted, given human members, or restricted. A named crew is tier 3 and can do all four.
 
+Tier 1 is enforced by construction, not by convention. A crewless board is created with **no owner row** and `open_facilitation = TRUE`; the open-facilitation toggle is refused on a crewless board; moving a board onto a crew closes facilitation to the role and moving it off reopens it. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) brought pre-existing anonymous boards into line. No path in the code can produce a crewless board with an owner.
+
 ### Board access is a separate axis
 
-Being tier 3 does not by itself close a board. **A board is members-only if and only if its crew has `restrict_board_access = true`** — a switch only named crews can flip (CREW-008), off by default. A tier-3 crew that leaves it off has boards as open as a tier-1 board. Throughout this document, "members-only board" means that switch is on; it is not a synonym for tier 3.
+Being tier 3 does not by itself close a board. **A board is members-only if and only if its crew has `restrict_board_access = true`** — a switch only named crews can flip (CREW-008). It is **on by default** for every named crew and forced off for personal crews (ADR-0010, `db_init.ts` block 31). A tier-3 crew that turns it off has boards as open as a tier-1 board. Throughout this document, "members-only board" means that switch is on; it is not a synonym for tier 3.
 
 Two independent mechanisms enforce all of this, and the distinction matters for every row below:
 
@@ -41,7 +43,7 @@ The tiers are shaped by one acquisition loop, and the boundaries sit where they 
 2. The agent shows the board to a human.
 3. The human signs up and **claims** it (BRD-020, DASH-016) — becoming its owner. The board is still crewless and unrestricted, so **the agent keeps working with the same token**. Nothing is handed over, nothing breaks.
 4. The human moves the board to their personal crew. Still unrestricted, so the agent still works.
-5. The human buys a named crew and turns on members-only access (CREW-008). **Now** the agent's anonymous token fails, and it needs a minted key belonging to that crew.
+5. The human buys a named crew and moves the board into it. Named crews are members-only by default (ADR-0010), so **now** the agent's anonymous token fails, and it needs a minted key belonging to that crew.
 
 An API key is therefore not what lets an agent participate — it is what lets an agent participate *in a locked room*, plus what lets it create boards that live on the human's dashboard instead of expiring (API-001). That is why the first key is free at tier 2 and why the paywall lands at step 5: the human pays at the moment they ask for control, not at the moment they arrive.
 
@@ -61,7 +63,7 @@ This ordering is what makes all three tiers describable with one primitive. At t
 
 This is ADR-0006's decision, not a new one: facilitators get "settings, locks, timer, attachments, title, action items, and managing other facilitators," and only board lifecycle and immunity-from-removal stay with the owner.
 
-`userCanFacilitate` gets it right — it resolves `open_facilitation OR role IN ('owner','facilitator')`, folding the owner into the facilitator set. The **UI does not**: `Column.tsx` and `AttachmentsList.tsx` gate on `isOwner`, locking granted facilitators out of controls both the server and ADR-0006 grant them. See GAP-009.
+`userCanFacilitate` gets it right — it resolves `open_facilitation OR role IN ('owner','facilitator')`, folding the owner into the facilitator set. So do `Column.tsx` and `AttachmentsList.tsx`, which gate on `canFacilitate`.
 
 `isOwner` is the correct gate in exactly one place — the dashboard's lifecycle controls (`BoardActionsMenu`, DASH-006 – DASH-012).
 
@@ -82,7 +84,7 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 
 | ID       | Action                                 | Who    | Code path                | Guard                       | Status     |
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
-| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed                 | Verified   |
+| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed                 | Unverified |
 | SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed                 | Unverified |
 | SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only         | Verified   |
 | SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Unverified |
@@ -106,30 +108,30 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 
 | ID      | Action                                   | Who                | Code path                                               | Guard                                            | Status     |
 | ------- | ---------------------------------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------ | ---------- |
-| BRD-001 | View a board                             | Anyone w/ access   | `routes/app/board.tsx`                                  | `requireBoardAccess` (login redirect)            | Unverified |
-| BRD-002 | Poll a board for updates                 | Anyone w/ access   | `board.poll.ts`                                         | `requireBoardAccess`                             | Unverified |
-| BRD-003 | Edit board title                         | Facilitator *(UI)* | `board.title.ts` · `BoardToolbar`                       | `requireBoardAccess` only                        | **Gap**    |
-| BRD-004 | Add a note                               | Anyone w/ access   | `board.notes.ts` PATCH                                  | `requireBoardAccess`                             | Verified   |
-| BRD-005 | Edit a note                              | Anyone w/ access   | `board.notes.ts` PATCH                                  | `requireBoardAccess`                             | Verified   |
-| BRD-006 | Delete a note                            | Anyone w/ access   | `board.notes.ts` DELETE                                 | `requireBoardAccess`                             | Verified   |
-| BRD-007 | Move a note between columns              | Anyone w/ access   | `board.notes.ts` `intent=move`                          | `requireBoardAccess`                             | Unverified |
-| BRD-008 | Reorder notes within a column            | Anyone w/ access   | `board.notes.ts` `intent=reorder`                       | `requireBoardAccess`                             | Unverified |
-| BRD-009 | Like a note                              | Anyone w/ access   | `board.notes.ts` `intent=like`                          | `requireBoardAccess`                             | Verified   |
-| BRD-010 | Vote / unvote a note                     | Anyone w/ access   | `board.notes.ts` `intent=vote`                          | `requireBoardAccess` + 401 if no session         | Verified   |
-| BRD-011 | Edit a column title                      | Anyone w/ access   | `board.columns.ts` PATCH · `Column.tsx`                 | `requireBoardAccess`                             | Verified   |
-| BRD-012 | Add / edit / delete column prompt text   | Facilitator        | `board.columns.ts` `intent=updatePrompt` · `Column.tsx` | `requireBoardAccess` only; UI gates on `isOwner` | **Gap**    |
-| BRD-013 | Delete a column                          | Facilitator        | `board.columns.ts` DELETE · `Column.tsx`                | `requireBoardAccess` only; UI gates on `isOwner` | **Gap**    |
-| BRD-014 | Check off an action item                 | Anyone w/ access   | `board.action-items.ts` `intent=complete`               | session required                                 | Verified   |
+| BRD-001 | View a board                             | Anyone w/ access   | `routes/app/board.tsx`                                  | `requireBoardAccess` (login redirect)            | Verified |
+| BRD-002 | Poll a board for updates                 | Anyone w/ access   | `board.poll.ts`                                         | `requireBoardAccess`                             | Verified |
+| BRD-003 | Edit board title | Facilitator | `board.title.ts` · `BoardToolbar` | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
+| BRD-004 | Add a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-005 | Edit a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-006 | Delete a note | Anyone w/ access | `board.notes.ts` DELETE | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-007 | Move a note between columns | Anyone w/ access | `board.notes.ts` `intent=move` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-008 | Reorder notes within a column | Anyone w/ access | `board.notes.ts` `intent=reorder` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-009 | Like a note | Anyone w/ access | `board.notes.ts` `intent=like` | `requireBoardAccess` · `requireUnlocked(board)` | Verified |
+| BRD-010 | Vote / unvote a note | Session holder w/ access | `board.notes.ts` `intent=vote` | `requireBoardAccess` · `requireUnlocked(board)` · 401 if no session | Verified |
+| BRD-011 | Edit a column title | Anyone w/ access | `board.columns.ts` PATCH · `Column.tsx` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-012 | Add / edit / delete column prompt text | Facilitator | `board.columns.ts` `intent=updatePrompt` · `Column.tsx` | `requireFacilitator` · `requireUnlocked(board)`; UI gates on `canFacilitate` | Verified |
+| BRD-013 | Delete a column | Facilitator | `board.columns.ts` DELETE · `Column.tsx` | `requireFacilitator` · `requireUnlocked(board)`; UI gates on `canFacilitate` | Verified |
+| BRD-014 | Check off an action item | Session holder w/ access | `board.action-items.ts` `intent=complete` | session required · `requireUnlocked(board)` | Verified |
 | BRD-015 | View action items + progress             | Anyone w/ access   | `ActionItemsPanel` via `BoardDTO`                       | inherits BRD-001                                 | Verified   |
 | BRD-016 | View votes remaining / status indicators | Anyone w/ access   | `BoardStatusBar`                                        | inherits BRD-001                                 | Verified   |
 | BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before access check               | Unverified |
 | BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Unverified |
-| BRD-019 | List a board's attachments               | Anyone w/ board id | `board.attachments.ts` loader                           | **none**                                         | **Gap**    |
-| BRD-020 | Claim an unowned board from the board itself | Registered     | — no code path —                                        | would be `requireRegisteredUser`                 | **Missing** |
+| BRD-019 | List a board's attachments | Anyone w/ access | `board.attachments.ts` loader | `requireBoardAccess` | Verified |
+| BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
 
-Locks (`notesLocked`, `boardLocked`) disable BRD-004 – BRD-013 in the UI. No server route checks either flag — see GAP-003.
+Locks are enforced on the server with exactly the matrix the UI applies (documented above `requireUnlocked` in `board_permissions.ts`): `notesLocked` blocks BRD-004 – BRD-008 and BRD-011; `boardLocked` blocks those plus BRD-009, BRD-010, BRD-012, BRD-013, BRD-014, the timer, adding a column, the title, and action items. Facilitators do not bypass locks. `board.settings.ts` is never lock-gated, because it is how a board unlocks.
 
-BRD-020 is the primary claim affordance: a button on the board itself, shown when the board has no owner. Claiming from the dashboard by pasting a link (DASH-016) is the fallback for someone who already left the board. Both depend on anonymous boards actually having no owner — see GAP-002.
+BRD-020 is the primary claim affordance: a button on the board itself, shown when the board has no owner. Claiming from the dashboard by pasting a link (DASH-016) is the fallback for someone who already left the board. A board created anonymously or through the API trial flow never has an owner row, so both succeed on it; a board on a crew always has one, so both refuse.
 
 ## DECK — facilitation (the Command Deck)
 
@@ -138,12 +140,12 @@ Facilitators — granted, or the owner in their capacity as one, or everyone whe
 | ID       | Action                                          | Who                | Code path                                             | Guard                                       | Status     |
 | -------- | ----------------------------------------------- | ------------------ | ----------------------------------------------------- | ------------------------------------------- | ---------- |
 | DECK-001 | Open the Command Deck                           | Facilitator        | `Board.tsx` → `CommandDeck`                           | `canFacilitate` from `getBoardServer`       | Verified   |
-| DECK-002 | Start a timer                                   | Facilitator *(UI)* | `board.timer.ts` POST                                 | `requireBoardAccess` only                   | **Gap**    |
-| DECK-003 | Stop a timer                                    | Facilitator *(UI)* | `board.timer.ts` DELETE                               | `requireBoardAccess` only                   | **Gap**    |
-| DECK-004 | Adjust timer ±60s before start                  | Facilitator        | `CommandDeck`                                         | client-side                                 | Verified   |
+| DECK-002 | Start a timer | Facilitator | `board.timer.ts` POST | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
+| DECK-003 | Stop a timer | Facilitator | `board.timer.ts` DELETE | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
+| DECK-004 | Adjust timer ±60s before start                  | Facilitator        | `CommandDeck`                                         | client-side                                 | Unverified |
 | DECK-005 | See the timer-end modal                         | Anyone w/ access   | `TimerEndModal`                                       | —                                           | Unverified |
-| DECK-006 | Add a column                                    | Facilitator *(UI)* | `board.columns.ts` POST                               | `requireBoardAccess` only                   | **Gap**    |
-| DECK-007 | Sort notes by score                             | Facilitator        | `CommandDeck` → note reorder                          | inherits BRD-008                            | Verified   |
+| DECK-006 | Add a column | Facilitator | `board.columns.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
+| DECK-007 | Sort notes by score                             | Facilitator        | `CommandDeck` → note reorder                          | inherits BRD-008                            | Unverified |
 | DECK-008 | Enable / disable voting                         | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
 | DECK-009 | Set votes per person                            | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
 | DECK-010 | Set voting scope (board / column / note)        | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
@@ -153,15 +155,15 @@ Facilitators — granted, or the owner in their capacity as one, or everyone whe
 | DECK-014 | Show / hide the action-items column             | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
 | DECK-015 | Lock notes                                      | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator` (setting only)         | Verified   |
 | DECK-016 | Lock the board                                  | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator` (setting only)         | Verified   |
-| DECK-017 | Attach a link                                   | Facilitator        | `board.attachments.ts` POST                           | `requireFacilitator`                        | Unverified |
-| DECK-018 | Attach an image (max 5, compressed client-side) | Facilitator        | `board.attachments.ts` POST                           | `requireFacilitator`                        | Unverified |
-| DECK-019 | Delete an attachment                            | Facilitator        | `board.attachments.ts` DELETE · `AttachmentsList.tsx` | `requireFacilitator`; UI gates on `isOwner` | **Gap**    |
+| DECK-017 | Attach a link | Facilitator | `board.attachments.ts` POST | `requireFacilitator` | Verified |
+| DECK-018 | Attach an image (max 5, compressed client-side) | Facilitator | `board.attachments.ts` POST | `requireFacilitator` | Verified |
+| DECK-019 | Delete an attachment | Facilitator | `board.attachments.ts` DELETE · `AttachmentsList.tsx` | `requireFacilitator`; UI gates on `canFacilitate` | Verified |
 | DECK-020 | Grant a facilitator by username                 | Facilitator        | `board.facilitators.ts` POST                          | `requireFacilitator`                        | Verified   |
 | DECK-021 | Revoke a facilitator (never the owner)          | Facilitator        | `board.facilitators.ts` DELETE                        | `requireFacilitator`                        | Verified   |
-| DECK-022 | Toggle open facilitation                        | Facilitator        | `board.facilitators.ts` PATCH                         | `requireFacilitator`                        | Verified   |
-| DECK-023 | Create an action item                           | Facilitator        | `board.action-items.ts` POST                          | `requireFacilitator`                        | Verified   |
-| DECK-024 | Edit an action item                             | Facilitator        | `board.action-items.ts` `intent=text`                 | `requireFacilitator`                        | Verified   |
-| DECK-025 | Delete an action item                           | Facilitator        | `board.action-items.ts` DELETE                        | `requireFacilitator`                        | Verified   |
+| DECK-022 | Toggle open facilitation | Facilitator | `board.facilitators.ts` PATCH | `requireFacilitator`; refused on a crewless board, which is always open | Verified |
+| DECK-023 | Create an action item | Facilitator | `board.action-items.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
+| DECK-024 | Edit an action item | Facilitator | `board.action-items.ts` `intent=text` | `requireFacilitator` · `requireUnlocked(board)` | Verified |
+| DECK-025 | Delete an action item | Facilitator | `board.action-items.ts` DELETE | `requireFacilitator` · `requireUnlocked(board)` | Verified |
 | DECK-026 | Export board as CSV                             | Facilitator        | `CommandDeck` → `utils/exportBoard`                   | client-side                                 | Verified   |
 | DECK-027 | Export board as Markdown                        | Facilitator        | `CommandDeck` → `utils/exportBoard`                   | client-side                                 | Verified   |
 | DECK-028 | View note / contributor / voter counts          | Facilitator        | `CommandDeck`                                         | client-side                                 | Verified   |
@@ -178,9 +180,9 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-001 | View the dashboard                                 | Registered                | `dashboard.tsx` loader          | `requireRegisteredUser`                      | Verified             |
 | DASH-002 | See own boards + crew-visible boards               | Registered                | `listVisibleBoards`             | SQL scoping                                  | Verified             |
 | DASH-003 | Create a board (into selected crew, else personal) | Registered                | `dashboard.tsx` action          | `requireRegisteredUser` + `userIsTeamMember` | Verified             |
-| DASH-004 | Filter boards by fuzzy text                        | Registered                | `dashboard.tsx`                 | client-side                                  | Verified             |
+| DASH-004 | Filter boards by fuzzy text                        | Registered                | `dashboard.tsx`                 | client-side                                  | Unverified |
 | DASH-005 | Sort by updated / created / title, persisted       | Registered                | `SortBoardsBanner`              | client-side                                  | Verified             |
-| DASH-006 | Duplicate a board                                  | Registered                | `board_actions.ts` `duplicate`  | client-side                                  | unverified           |
+| DASH-006 | Duplicate a board | Board owner | `board_actions.ts` `duplicate` | role check in model; the copy lands on the original's crew if the caller is a member, else their personal crew — never crewless | Verified |
 | DASH-007 | Delete a board                                     | Board owner               | `board_actions.ts` `delete`     | role check in model                          | Verified             |
 | DASH-008 | Archive a board                                    | Board owner               | `board_actions.ts` `archive`    | role check in model                          | Verified             |
 | DASH-009 | Unarchive a board                                  | Board owner               | `board_actions.ts` `unarchive`  | role check in model                          | Verified             |
@@ -190,7 +192,7 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-013 | Filter to unassigned boards (`?team=unassigned`)   | Registered                | `dashboard.tsx` · `Sidebar`     | scoped to caller                             | Verified             |
 | DASH-014 | View archived boards                               | Registered                | `dashboard.tsx`                 | scoped to caller                             | Verified             |
 | DASH-015 | View open action items across own boards           | Registered                | `listOpenActionItemsForUser`    | scoped to caller                             | Verified             |
-| DASH-016 | Claim an anonymous board by link                   | Registered                | `board.claim.ts`                | `requireRegisteredUser`                      | **Broken** (GAP-002) |
+| DASH-016 | Claim an unowned board by pasting its link | Registered | `board.claim.ts` · `ClaimModal` | `requireRegisteredUser`; succeeds only when no owner row exists | Verified |
 | DASH-017 | Dismiss the welcome banner                         | Registered                | `WelcomeBanner`                 | client-side                                  | Unverified           |
 
 ## CREW — crews
@@ -200,7 +202,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | ID       | Action                                    | Tier | Who         | Code path                           | Guard                                | Status      |
 | -------- | ----------------------------------------- | ---- | ----------- | ----------------------------------- | ------------------------------------ | ----------- |
 | CREW-001 | List own crews                            | 2    | Registered  | `crews.tsx` loader                  | `requireRegisteredUser`              | Verified    |
-| CREW-002 | **Create a named crew**                   | 3    | Paid        | `crews.tsx` action                  | `requireRegisteredUser` only         | **Ungated** |
+| CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` seam → 403; returns true until a billing provider exists | **Ungated** |
 | CREW-003 | View a crew page                          | 2    | Crew member | `crews.$id.tsx` loader              | `requireRegisteredUser` + `teamRole` | Verified    |
 | CREW-004 | Rename a crew                             | 3    | Crew owner  | `crews.$id.tsx` `rename`            | owner + `!is_personal`               | Verified    |
 | CREW-005 | Delete a crew                             | 3    | Crew owner  | `crews.$id.tsx` `deleteTeam`        | owner + `!is_personal`               | Verified    |
@@ -208,7 +210,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | CREW-007 | Remove a member                           | 3    | Crew owner  | `crews.$id.tsx` `removeMember`      | owner                                | Verified    |
 | CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal`               | Verified    |
 | CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed)       | Verified    |
-| CREW-019 | Mint **additional** API keys                 | 3 | Crew owner  | `crews.$id.tsx` `mintKey`           | no cap enforced                      | **Ungated** |
+| CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew | Verified |
 | CREW-010 | List API keys                             | 2    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
 | CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner                                | Verified    |
 | CREW-012 | Create a board into the crew              | 2    | Crew member | `crews.$id.tsx` `createBoard`       | membership                           | Verified    |
@@ -221,7 +223,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 
 Tier-2 rows describe the personal crew: every registered user gets one, it holds their boards, and it can mint **one** API key, since that is how a solo user brings an agent in. Tier-3 rows require a named crew, and CREW-002 is the only thing standing between a free user and one.
 
-**One key free, additional keys paid**, applying ADR-0008's "API keys are AI crew members" consistently: a crew of one — you plus your agent — is tier 2, and a second member is tier 3 whether that member is human or AI. The cap is not implemented; `mintKey` has no count check.
+**One key free, additional keys paid**, applying ADR-0008's "API keys are AI crew members" consistently: a crew of one — you plus your agent — is tier 2, and a second member is tier 3 whether that member is human or AI. The cap is enforced in `mintApiKey`, so the API cannot bypass it.
 
 Note what the cap does and does not do. It limits *fleet size*, not *volume* — a single free key can drive unlimited writes, and API-002 needs no key at all. Metering agent activity is a separate lever and neither exists today.
 
@@ -245,11 +247,11 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 
 | ID      | Action                                                                   | Who                      | Code path                        | Guard                  | Status   |
 | ------- | ------------------------------------------------------------------------ | ------------------------ | -------------------------------- | ---------------------- | -------- |
-| API-001 | Create a board with columns (authenticated → caller's crew)              | API key or session       | `api/boards.ts` POST             | `getApiUser`           | Verified |
-| API-002 | Create a trial board (unauthenticated → teamless, returns `agent_token`) | Anyone                   | `api/boards.ts` POST             | none, by design        | Verified |
+| API-001 | Create a board with columns (authenticated → caller's crew; a registered cookie caller with no crew gets their personal crew) | API key or session | `api/boards.ts` POST | `getApiUser` | Verified |
+| API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone | `api/boards.ts` POST | none, by design | Verified |
 | API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
-| API-004 | Bulk-add notes (≤200, ≤2000 chars)                                       | Any authenticated caller | `api/board.notes.ts` POST        | `getApiUser` **only**  | **Gap**  |
-| API-005 | Bulk-add action items (≤100)                                             | Facilitator              | `api/board.action-items.ts` POST | `userCanFacilitate`    | Verified |
+| API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
+| API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |
 | API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts`      | `CRON_SECRET` bearer   | Verified |
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
@@ -262,22 +264,13 @@ Where the code diverges from the model above. Each is a fact confirmed by readin
 
 | ID          | Gap                                                                                    | Affects                                                 | Consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GAP-001** | Facilitator-only board controls are enforced in the UI but not on the server           | BRD-003, BRD-012, BRD-013, DECK-002, DECK-003, DECK-006 | On any board above tier 1, a participant can rename the board, add or delete columns, edit prompts, and start or stop the timer by posting to the route directly. The facilitator role is not kept server-side for these six actions.                                                                                                                                                                                                                                                                   |
-| **GAP-002** | Anonymous boards are stamped with an owner, so nothing is claimable — and there is no claim button on the board | DASH-016, BRD-020 | Anonymous boards must have **no owner**. Today `home.tsx:80` sets the anonymous visitor as owner, and `api/boards.ts:89` sets the **agent** as owner of the trial board it just created — the exact board the human is meant to claim. `board.claim.ts` then rejects anything with an owner, so every board reachable by the claim UI is refused. The dashboard affordance is visible and dead; the board-level one (BRD-020) does not exist. Breaks step 3 of the conversion path, which is the whole acquisition loop. |
-| **GAP-003** | `notesLocked` / `boardLocked` are client-only                                          | BRD-004 – BRD-013                                       | Locking is a UI convention. Any direct request writes through a locked board.                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **GAP-004** | `POST /api/v1/boards/:id/notes` authorizes "is some user," not "may act on this board" | API-004                                                 | Any valid API key or session can write notes to any board id, including a members-only crew board it has no relationship to. This is the one confirmed cross-tenant write.                                                                                                                                                                                                                                                                                                                                    |
-| **GAP-005** | Nothing is payment-gated                                                               | CREW-002, and via it every tier-3 row                   | `crews.tsx` requires only a registered session to create a named crew. Any free account creates unlimited named crews, adds unlimited members, turns on members-only access, and mints unlimited API keys. There is no plan or subscription concept in the schema. CREW-002 is the one gate that has to exist; the rest follow from it.                                                                                                                                                                   |
-| **GAP-006** | `duplicateBoardServer` performs no ownership or access check                           | DASH-006                                                | Any registered user who knows a board id can duplicate it, copying its title, columns, and prompts (not its notes) into a board they own — including from a members-only crew board.                                                                                                                                                                                                                                                                                                                          |
-| **GAP-007** | The attachments loader is unguarded                                                    | BRD-019                                                 | Attachment metadata for a members-only board is readable by anyone holding the board id.                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **GAP-008** | `api/board.action-items.ts` checks facilitation but not board access                   | API-005                                                 | On a members-only board with `open_facilitation` on, an out-of-crew key can add action items.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **GAP-009** | Two board controls gate on `isOwner` instead of `canFacilitate`                        | BRD-012, BRD-013, DECK-019                              | `Column.tsx` (column menu — prompts, delete column) and `AttachmentsList.tsx` (delete attachment) hide these from a granted facilitator, who can otherwise open the Command Deck, run the timer, and lock the board. The server would allow DECK-019; only the UI refuses. Contradicts ADR-0006, which already grants facilitators "settings, locks, timer, attachments, title, action items," reserving only lifecycle for the owner. A UI regression from an accepted decision, not an open question. |
+| **GAP-005** | Nothing is payment-gated | CREW-002, and via it every tier-3 row | `crews.tsx` routes through `accountCanCreateNamedCrew` — the single seam — but it returns true for everyone until a billing provider exists, so any free account creates unlimited named crews, adds unlimited members, and turns on members-only access. API keys are capped at one per personal crew. There is no plan or subscription concept in the schema. When billing lands, the seam's body is the whole integration. |
 
-GAP-001 and GAP-004 are the two that break the tier model itself. GAP-002 breaks the acquisition loop. GAP-009 is a coherence bug — the role exists and works, but two controls don't honor it.
+GAP-005 is the only open gap: the paywall itself, which needs a billing provider before it can close. The seam it will use already exists.
 
-**GAP-002 cannot be fixed by dropping `setBoardOwner` alone.** `canFacilitate` resolves to `open_facilitation OR role IN ('owner','facilitator')`, and `open_facilitation` defaults to FALSE. On an anonymous board today, the creator's owner row is the *only* thing granting anyone the Command Deck. Remove it in isolation and tier 1 loses facilitation entirely — no timer, no locks, no settings, for anybody, forever. The fix is a pair: anonymous and trial boards get **no owner row and `open_facilitation = TRUE`**, which is what makes "everyone is a facilitator" true in the schema instead of an accident of who clicked create.
 
 ## Untested paths
 
-Code that exists with no test: `board.tsx` loader, `board.poll.ts`, `board.attachments.ts`, `board.claim.ts`, `board.legacy.tsx`; components `Board`, `Column`, `BoardContext`, `AttachmentModal`, `AttachmentsList`, `ClaimModal`, `AppLayout`, `ThemeToggle`, `useTheme`; and the `move` / `reorder` note intents.
+Code that exists with no test: `board.tsx` loader, `board.poll.ts`, `board.legacy.tsx`; components `Board`, `BoardContext`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`, `useTheme`.
 
-`BoardSettingsModal.tsx`, `TimerButton.tsx`, and `ExportButton.tsx` are unreferenced. They are not features; delete them.
+Every row marked **Verified** is named by at least one test, and `app/server/registry_linkage.test.ts` fails if that stops being true — or if a test names a row this file still marks Unverified. `app/server/permission_matrix.test.ts` asserts every server-enforced row × every actor × every board tier resolves to an explicit allow or deny; a missing cell is a failing test.

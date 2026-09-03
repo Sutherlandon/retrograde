@@ -35,6 +35,5 @@ Keeping shipped plans around produces an archive of how we got here, which nobod
 
 | # | Plan | Status |
 |---|---|---|
-| [0006](0006-close-the-tier-model.md) | Close the tier model before selling crews | **Accepted** 2026-09-03 |
 
-Plans 0001–0005 shipped or were absorbed and have been deleted. Their decisions live in ADRs 0001–0010 and the action registry.
+Plans 0001–0006 shipped and have been deleted. Their decisions live in ADRs 0001–0011 and the action registry. There is no open plan.

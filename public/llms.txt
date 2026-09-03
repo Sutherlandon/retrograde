@@ -20,13 +20,18 @@ Create a new board with optional custom columns.
 Two flows:
 - **Authenticated** (`Authorization: Bearer rk_live_<key>`): the board is
   attached to the API key's team and is permanent.
-- **Unauthenticated** (no Authorization header): the board is teamless and
-  auto-archives after 30 days. The response includes an `agent_token` for
-  subsequent writes in this trial flow.
+- **Unauthenticated** (no Authorization header): the board is crewless, has
+  no owner, and auto-archives after 30 days. The response includes an
+  `agent_token` for subsequent writes in this trial flow. Everyone with the
+  link can facilitate a trial board, the agent included.
 
-A human user mints API keys at `/app/account/api-keys` after signing in;
-giving an agent a real API key is how the human makes the agent's boards
-permanent and grants the agent persistent identity across boards.
+The trial-to-paid path does not break the agent: a human can claim the
+board from the board page ("Claim this board") and the agent's `agent_token`
+keeps working. The token only stops working once the human moves the board
+into a members-only crew — at that point the human mints the agent an API
+key on the crew page (`/app/crews/<id>`, "AI Crew"), which is the agent's
+membership. A real API key is also how the agent's future boards land on
+the human's dashboard instead of expiring.
 
 Request body (JSON):
 ```
@@ -97,8 +102,10 @@ Response (201): the full board state as JSON (same shape as
 
 Bulk create action items ("mission objectives") — the follow-up checklist a
 team works through after the session. Auth required (API key or agent_token);
-the caller must be able to facilitate the board (agents always can on boards
-they created).
+the caller must have access to the board (a members-only crew's board
+returns 403 to keys from other crews) and be able to facilitate it — always
+true on a trial board, and on a crew board when the key's agent is the
+owner or a granted facilitator or the board has open facilitation on.
 
 Request body (JSON):
 ```

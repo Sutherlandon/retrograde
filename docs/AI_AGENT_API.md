@@ -43,9 +43,21 @@ per-user fields like `user_votes`.
 `POST /api/v1/boards` works WITHOUT authentication — agent discovers
 Retrograde, creates a trial board to demo value. The response includes an
 `agent_token` (a session-cookie value) that the agent uses on subsequent
-calls. Trial boards are **teamless** and auto-archive 30 days after creation.
-This is the path that lets agents try Retrograde with zero friction; the
-human upgrades to a team (and mints an API key) to make the board permanent.
+calls. Trial boards are **crewless**, have **no owner**, and auto-archive 30
+days after creation. Everyone with the link — including the agent — can
+facilitate them (timer, locks, settings, columns).
+
+The path from trial to paid is designed not to break the agent:
+
+1. A human opens `board_url` and clicks **Claim this board** (or pastes the
+   link on their dashboard). They become its owner. The board is still
+   crewless and open, so **the agent's `agent_token` keeps working**.
+2. The human moves the board into a named crew. Named crews are members-only
+   by default, so the agent's token now gets `403 FORBIDDEN`. The human mints
+   an API key for their agent on the crew page — that key is the agent's
+   membership.
+
+Nothing is handed over until the human asks for control.
 
 ## Endpoints
 
@@ -123,16 +135,23 @@ Bulk add notes to columns of an existing board.
 **Errors:**
 - `400 BAD_REQUEST` — malformed body, empty text, or columnId not on this board.
 - `401 UNAUTHORIZED` — missing/invalid bearer token.
+- `403 FORBIDDEN` — the board belongs to a members-only crew and the caller's
+  key is not that crew's. Crewless (trial) boards and boards on crews that
+  turned members-only off never return this.
 - `404 NOT_FOUND` — board does not exist.
 - `413 PAYLOAD_TOO_LARGE` — more than 200 notes in one request.
+- `423 LOCKED` — a facilitator has locked notes or the whole board.
 
 ### POST /api/v1/boards/:id/action-items
 
 Bulk create action items ("mission objectives") on a board — the follow-up
 checklist humans work through after the session. See issue #88 / ADR-0006.
 
-**Auth required.** The caller must be able to facilitate the board (agents
-always can on boards they created).
+**Auth required.** The caller must have access to the board (same `403` rule
+as notes) and be able to facilitate it. On a trial board everyone can
+facilitate; on a crew board the caller's key must belong to the crew and the
+key's agent must be the board's owner or a granted facilitator, unless the
+board has open facilitation turned on. A locked board returns `423`.
 
 **Request:**
 ```json
