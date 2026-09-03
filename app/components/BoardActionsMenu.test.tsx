@@ -79,3 +79,49 @@ describe("BoardActionsMenu — move to team", () => {
     expect(screen.queryByText("Move to Crew")).toBeNull();
   });
 });
+
+describe("BoardActionsMenu — dropdown escapes a clipping ancestor", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  it("portals the menu to document.body, outside the scrolling table container", () => {
+    const { container } = render(
+      <div style={{ overflow: "hidden" }}>
+        <BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />
+      </div>
+    );
+    openMenu();
+    const menu = screen.getByText("Duplicate Board").closest("div[style]");
+    expect(container.contains(menu)).toBe(false);
+    expect(document.body.contains(menu)).toBe(true);
+  });
+
+  it("positions the portaled menu with position: fixed, not absolute", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    openMenu();
+    const menu = screen.getByText("Duplicate Board").closest("div[style]") as HTMLElement;
+    expect(menu.style.position).toBe("fixed");
+  });
+
+  it("closes on scroll rather than drifting away from the button", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    openMenu();
+    expect(screen.getByText("Duplicate Board")).toBeInTheDocument();
+    fireEvent.scroll(window);
+    expect(screen.queryByText("Duplicate Board")).toBeNull();
+  });
+
+  it("does not close on an outside click that lands inside the portaled panel", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    openMenu();
+    fireEvent.mouseDown(screen.getByText("Duplicate Board"));
+    expect(screen.getByText("Duplicate Board")).toBeInTheDocument();
+  });
+
+  it("closes on a click outside both the button and the portaled panel", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    openMenu();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByText("Duplicate Board")).toBeNull();
+  });
+});

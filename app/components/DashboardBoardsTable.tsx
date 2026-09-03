@@ -33,7 +33,7 @@ export function DashboardBoardsTable({
   const allSelected = ownedIds.length > 0 && ownedIds.every((id) => selected.has(id));
 
   return (
-    <div className="border rounded-lg w-full overflow-x-auto overflow-y-visible">
+    <div className="border rounded-lg w-full overflow-x-auto">
       <table className="table-auto w-full">
         <thead>
           <tr>
