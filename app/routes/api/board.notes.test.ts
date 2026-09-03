@@ -33,7 +33,7 @@ function req(body: unknown, opts: { auth?: string } = {}) {
 }
 
 describe("POST /api/v1/boards/:id/notes", () => {
-  it("inserts notes when authenticated via Bearer", async () => {
+  it("inserts notes when authenticated via Bearer (API-004)", async () => {
     const { action } = await import("./board.notes");
     mockGetApiUser.mockResolvedValueOnce({ id: "agent-1" });
 

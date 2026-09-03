@@ -1,5 +1,5 @@
 // app/routes/app/board.attachments.test.ts
-// Covers BRD-019 (loader guard) and DECK-017/018/019 (facilitator-gated action).
+// Covers BRD-019 (loader guard) and DECK-017, DECK-018, DECK-019 (facilitator-gated action).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

@@ -5,6 +5,7 @@
 import { pool } from "./db_config";
 import "./db_init";
 import type { BoardDTO, DashboardBoardRow } from "./board.types";
+import { getPersonalTeamForUser } from "./team_model";
 
 // ---------------------------------------------------------------------------
 // READ
@@ -581,6 +582,36 @@ export async function duplicateBoardServer(
     throw new Error("Only the board owner can duplicate a board");
   }
 
+  // ADR-0011 / DASH-006: a duplicate is never crewless — a crewless board
+  // with an owner row would violate the invariant every other creation path
+  // enforces (crewless => no owner row and open_facilitation = TRUE). Land
+  // the copy on the original's crew when the caller is a member of it,
+  // otherwise fall back to the caller's personal crew. If neither resolves,
+  // refuse rather than silently produce team_id IS NULL with an owner.
+  const origTeamRes = await pool.query<{ team_id: string | null }>(
+    `SELECT team_id FROM boards WHERE id = $1`,
+    [boardId]
+  );
+  const origTeamId = origTeamRes.rowCount ? origTeamRes.rows[0].team_id : null;
+
+  let targetTeamId: string | null = null;
+  if (origTeamId) {
+    const memberOfOrig = await pool.query(
+      `SELECT 1 FROM team_members WHERE team_id = $1 AND user_id = $2`,
+      [origTeamId, userId]
+    );
+    if ((memberOfOrig.rowCount ?? 0) > 0) {
+      targetTeamId = origTeamId;
+    }
+  }
+  if (!targetTeamId) {
+    const personalTeam = await getPersonalTeamForUser(userId);
+    targetTeamId = personalTeam?.id ?? null;
+  }
+  if (!targetTeamId) {
+    throw new Error("Could not resolve a crew for the duplicated board");
+  }
+
   const client = await pool.connect();
   const newId = crypto.randomUUID();
 
@@ -596,10 +627,11 @@ export async function duplicateBoardServer(
     const { title, voting_enabled, voting_allowed, voting_scope } = boardRes.rows[0];
     const newTitle = `${title} (copy)`;
 
-    // Create the new board (copy voting settings, locks default to false)
+    // Create the new board on targetTeamId. open_facilitation is FALSE — a
+    // duplicate always lands on a crew, so it is never open by default.
     await client.query(
-      `INSERT INTO boards (id, title, created_by, voting_enabled, voting_allowed, voting_scope) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [newId, newTitle, userId, voting_enabled, voting_allowed, voting_scope]
+      `INSERT INTO boards (id, title, created_by, team_id, open_facilitation, voting_enabled, voting_allowed, voting_scope) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [newId, newTitle, userId, targetTeamId, false, voting_enabled, voting_allowed, voting_scope]
     );
 
     // Add the user as owner

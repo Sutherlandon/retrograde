@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe("GET /auth/login", () => {
-  it("redirects to the OAuth authorization URL with correct params", async () => {
+  it("redirects to the OAuth authorization URL with correct params [AUTH-001]", async () => {
     const { loader } = await import("./login");
     const request = new Request("http://localhost:3000/auth/login?returnTo=/app/dashboard");
 

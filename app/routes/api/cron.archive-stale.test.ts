@@ -27,7 +27,7 @@ async function loadRoute(cronSecret: string | undefined) {
 }
 
 describe("POST /api/v1/cron/archive-stale", () => {
-  it("returns 200 and the archive count when the secret matches", async () => {
+  it("returns 200 and the archive count when the secret matches (API-006)", async () => {
     const { action } = await loadRoute("test-secret");
     mockArchiveStaleBoards.mockResolvedValueOnce({ archived: 7 });
 

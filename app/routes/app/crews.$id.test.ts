@@ -94,7 +94,7 @@ function formRequest(fields: Record<string, string>) {
 }
 
 describe("teams.$id loader", () => {
-  it("returns 403 for non-members", async () => {
+  it("returns 403 for non-members (CREW-003)", async () => {
     const { loader } = await import("./crews.$id");
     mockTeamRole.mockResolvedValueOnce(null);
     try {
@@ -105,7 +105,7 @@ describe("teams.$id loader", () => {
     }
   });
 
-  it("returns team data with owner flag, crew-scoped boards, open items, and crews", async () => {
+  it("returns team data with owner flag, crew-scoped boards, open items, and crews (CREW-003, CREW-010, CREW-013, CREW-018)", async () => {
     const { loader } = await import("./crews.$id");
     mockListVisibleBoards.mockResolvedValueOnce([{ id: "b1", title: "Retro", role: "owner" }]);
     mockListOpenActionItemsForTeam.mockResolvedValueOnce([{ id: "ai1", text: "Do it" }]);
@@ -130,7 +130,7 @@ describe("teams.$id loader", () => {
 });
 
 describe("crews.$id action — AI crewmates (API keys)", () => {
-  it("mints a key for the crew owner", async () => {
+  it("mints a key for the crew owner (CREW-009)", async () => {
     const { action } = await import("./crews.$id");
     const result = await action({
       request: formRequest({ intent: "mintKey", display_name: "Claude (roadmap)" }),
@@ -140,7 +140,7 @@ describe("crews.$id action — AI crewmates (API keys)", () => {
     expect((result as { mintedKey?: string }).mintedKey).toBe("rk_live_secret");
   });
 
-  it("forbids non-owners from minting", async () => {
+  it("forbids non-owners from minting (CREW-009)", async () => {
     const { action } = await import("./crews.$id");
     mockTeamRole.mockResolvedValueOnce("member");
     try {
@@ -187,7 +187,7 @@ describe("crews.$id action — AI crewmates (API keys)", () => {
     );
   });
 
-  it("revokes a key scoped to the crew", async () => {
+  it("revokes a key scoped to the crew (CREW-011)", async () => {
     const { action } = await import("./crews.$id");
     const result = await action({
       request: formRequest({ intent: "revokeKey", api_key_id: "key-1" }),
@@ -216,7 +216,7 @@ describe("crews.$id action — shared board mutations", () => {
 });
 
 describe("crews.$id action — members-only board access", () => {
-  it("owner can toggle the crew's board restriction", async () => {
+  it("owner can toggle the crew's board restriction (CREW-008)", async () => {
     const { action } = await import("./crews.$id");
     const result = await action({
       request: formRequest({ intent: "setRestrictAccess", restrict: "false" }),
@@ -226,7 +226,7 @@ describe("crews.$id action — members-only board access", () => {
     expect((result as { success?: boolean }).success).toBe(true);
   });
 
-  it("non-owners cannot change board restriction", async () => {
+  it("non-owners cannot change board restriction (CREW-008)", async () => {
     const { action } = await import("./crews.$id");
     mockTeamRole.mockResolvedValueOnce("member");
     try {
@@ -243,7 +243,7 @@ describe("crews.$id action — members-only board access", () => {
 });
 
 describe("teams.$id action — owner guards", () => {
-  it("rename requires owner", async () => {
+  it("rename requires owner (CREW-004)", async () => {
     const { action } = await import("./crews.$id");
     mockTeamRole.mockResolvedValueOnce("member");
     try {
@@ -258,7 +258,7 @@ describe("teams.$id action — owner guards", () => {
     expect(mockRenameTeam).not.toHaveBeenCalled();
   });
 
-  it("rename + delete are forbidden on personal teams even for the owner", async () => {
+  it("rename + delete are forbidden on personal teams even for the owner (CREW-004, CREW-005)", async () => {
     const { action } = await import("./crews.$id");
     mockGetTeamWithMembers.mockResolvedValue({
       team: { id: "team-1", name: "landon's Team", is_personal: true, created_at: "x" },
@@ -277,7 +277,7 @@ describe("teams.$id action — owner guards", () => {
     }
   });
 
-  it("addMember looks up by username and adds", async () => {
+  it("addMember looks up by username and adds (CREW-006)", async () => {
     const { action } = await import("./crews.$id");
     mockFindUser.mockResolvedValueOnce({ id: "user-7", username: "sam" });
     const result = await action({
@@ -288,7 +288,7 @@ describe("teams.$id action — owner guards", () => {
     expect((result as { addedUsername?: string }).addedUsername).toBe("sam");
   });
 
-  it("deleteTeam redirects to /app/crews", async () => {
+  it("deleteTeam redirects to /app/crews (CREW-005)", async () => {
     const { action } = await import("./crews.$id");
     const res = (await action({
       request: formRequest({ intent: "deleteTeam" }),
@@ -304,7 +304,7 @@ describe("teams.$id action — member abilities", () => {
     mockTeamRole.mockResolvedValue("member");
   });
 
-  it("members can create a board under the team", async () => {
+  it("members can create a board under the team (CREW-012)", async () => {
     const { action } = await import("./crews.$id");
     const res = (await action({
       request: formRequest({ intent: "createBoard", title: "Sprint 13" }),
@@ -314,7 +314,7 @@ describe("teams.$id action — member abilities", () => {
     expect(res.headers.get("Location")).toBe("/app/board/board-new");
   });
 
-  it("members can add, toggle, and delete team objectives", async () => {
+  it("members can add, toggle, and delete team objectives (CREW-014, CREW-015, CREW-016, CREW-017)", async () => {
     const { action } = await import("./crews.$id");
 
     await action({

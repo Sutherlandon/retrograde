@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("BoardLayout loader", () => {
-  it("creates anonymous user and sets session cookie when no session exists", async () => {
+  it("creates anonymous user and sets session cookie when no session exists [AUTH-004]", async () => {
     const { loader } = await import("./BoardLayout");
 
     const anonId = "anon-uuid-new";

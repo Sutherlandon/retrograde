@@ -99,7 +99,7 @@ describe("board.timer action", () => {
     expect(mockStartTimer).not.toHaveBeenCalled();
   });
 
-  it("rejects a non-facilitator with 403 and never stops the timer", async () => {
+  it("rejects a non-facilitator with 403 and never stops the timer (DECK-003)", async () => {
     const { action } = await import("./board.timer");
     mockRequireFacilitator.mockRejectedValueOnce(
       new Response("Facilitator access required", { status: 403 })

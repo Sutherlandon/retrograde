@@ -52,13 +52,13 @@ describe("CommandDeck", () => {
     mockUseBoard.mockReturnValue(defaultBoard);
   });
 
-  it("renders expanded by default", () => {
+  it("renders expanded by default (DECK-001)", () => {
     render(<CommandDeck />);
     expect(screen.getByText("Command Deck")).toBeInTheDocument();
     expect(screen.getByText("Mission Clock")).toBeInTheDocument();
   });
 
-  it("collapses to pill when minimize button clicked", () => {
+  it("collapses to pill when minimize button clicked (DECK-029)", () => {
     render(<CommandDeck />);
     fireEvent.click(screen.getByTitle("Minimize"));
     expect(screen.queryByText("Mission Clock")).not.toBeInTheDocument();
@@ -97,7 +97,7 @@ describe("CommandDeck", () => {
     expect(screen.getByText("+ Add Column")).toBeDisabled();
   });
 
-  it("shows stats footer with notes, contributors, and voters", () => {
+  it("shows stats footer with notes, contributors, and voters (DECK-028)", () => {
     render(<CommandDeck />);
     expect(screen.getByText(/1 note/)).toBeInTheDocument();
     expect(screen.getByText(/3 contributors/)).toBeInTheDocument();
@@ -127,7 +127,7 @@ describe("CommandDeck", () => {
     expect(screen.getByText("User Attribution")).toBeInTheDocument();
   });
 
-  it("warns before enabling attribution and only reveals after confirming", () => {
+  it("warns before enabling attribution and only reveals after confirming (DECK-012)", () => {
     const updateBoardSettings = vi.fn();
     mockUseBoard.mockReturnValue({ ...defaultBoard, updateBoardSettings });
     render(<CommandDeck />);
@@ -166,7 +166,7 @@ describe("CommandDeck", () => {
     );
   });
 
-  it("calls updateBoardSettings with actionItemsVisible:false when Action Items toggled off", () => {
+  it("calls updateBoardSettings with actionItemsVisible:false when Action Items toggled off (DECK-014)", () => {
     const updateBoardSettings = vi.fn();
     mockUseBoard.mockReturnValue({ ...defaultBoard, actionItemsVisible: true, updateBoardSettings });
     render(<CommandDeck />);

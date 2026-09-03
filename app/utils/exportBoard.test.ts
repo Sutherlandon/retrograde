@@ -24,7 +24,7 @@ function makeColumn(title: string, notes: { text: string; likes: number; votes?:
 const noOptions = { votingEnabled: false, votingAllowed: 5, voterCount: 0, attachments: [] };
 
 describe("exportToCSV", () => {
-  it("generates CSV with column headers and note data", () => {
+  it("generates CSV with column headers and note data (DECK-026)", () => {
     const columns = [
       makeColumn("Good", [{ text: "Fast deploys", likes: 3 }, { text: "Great teamwork", likes: 1 }]),
       makeColumn("Bad", [{ text: "Slow reviews", likes: 2 }]),
@@ -97,7 +97,7 @@ describe("exportToCSV", () => {
 });
 
 describe("exportToMarkdown", () => {
-  it("generates markdown with title, column headers, and bulleted notes (likes mode)", () => {
+  it("generates markdown with title, column headers, and bulleted notes (likes mode) (DECK-027)", () => {
     const columns = [
       makeColumn("Good", [{ text: "Fast deploys", likes: 3 }, { text: "Great teamwork", likes: 1 }]),
       makeColumn("Bad", [{ text: "Slow reviews", likes: 2 }]),

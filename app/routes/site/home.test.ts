@@ -47,7 +47,7 @@ function makeFormData(fields: Record<string, string>) {
 }
 
 describe("home page action", () => {
-  it("creates board and anonymous user when no session exists", async () => {
+  it("creates board and anonymous user when no session exists [SITE-003]", async () => {
     const { action } = await import("./home");
 
     // getOrCreateUser will INSERT anonymous user
@@ -60,7 +60,7 @@ describe("home page action", () => {
       body: formData,
     });
 
-    const response = await action({ request, params: {}, context: {} }) as unknown as Response;
+    const response = await action({ request, params: {}, context: {} } as never) as unknown as Response;
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/app/board/new-board-id");
@@ -84,7 +84,7 @@ describe("home page action", () => {
       body: formData,
     });
 
-    const response = await action({ request, params: {}, context: {} }) as unknown as Response;
+    const response = await action({ request, params: {}, context: {} } as never) as unknown as Response;
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/app/board/new-board-id");
@@ -103,7 +103,7 @@ describe("home page action", () => {
       body: formData,
     });
 
-    const response = await action({ request, params: {}, context: {} }) as unknown as Response;
+    const response = await action({ request, params: {}, context: {} } as never) as unknown as Response;
     expect(response.status).toBe(400);
 
     const body = await response.json();
@@ -118,7 +118,7 @@ describe("home page action", () => {
       body: formData,
     });
 
-    const response = await action({ request, params: {}, context: {} }) as unknown as Response;
+    const response = await action({ request, params: {}, context: {} } as never) as unknown as Response;
     expect(response.status).toBe(400);
 
     const body = await response.json();

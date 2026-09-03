@@ -70,7 +70,7 @@ describe("BoardStatusBar", () => {
     expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
   });
 
-  it("shows correct vote count", () => {
+  it("shows correct vote count (BRD-016)", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true, votingAllowed: 5 });
     render(<BoardStatusBar />);
     // 1 vote used (n2 has user_votes: 1), so 4 remaining

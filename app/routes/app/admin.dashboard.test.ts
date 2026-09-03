@@ -66,7 +66,7 @@ function loginAs(userId: string, externalId: string, isAnonymous = false) {
 }
 
 describe("admin dashboard loader — site admin", () => {
-  it("returns metrics, isSiteAdmin: true, and grantedAdmins", async () => {
+  it("returns metrics, isSiteAdmin: true, and grantedAdmins (ADMIN-001)", async () => {
     const { loader } = await import("./admin.dashboard");
     loginAs("admin-1", SITE_ADMIN_EXT_ID);
 
@@ -108,7 +108,7 @@ describe("admin dashboard loader — granted admin", () => {
 });
 
 describe("admin dashboard loader — access denied", () => {
-  it("throws 403 when user is neither site admin nor granted admin", async () => {
+  it("throws 403 when user is neither site admin nor granted admin (ADMIN-001)", async () => {
     const { loader } = await import("./admin.dashboard");
     loginAs("user-3", "unrecognised-ext-id");
     mockIsGrantedAdmin.mockResolvedValueOnce(false);

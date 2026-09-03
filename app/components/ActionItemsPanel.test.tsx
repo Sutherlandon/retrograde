@@ -31,7 +31,7 @@ describe("ActionItemsPanel", () => {
 
   afterEach(() => cleanup());
 
-  it("renders objectives with a completion count and progress bar", () => {
+  it("renders objectives with a completion count and progress bar (BRD-015)", () => {
     mockUseBoard.mockReturnValue({
       ...baseBoard,
       actionItems: [item("1", "Ship it", true), item("2", "Test it")],

@@ -79,7 +79,7 @@ function loginAs(userId: string) {
 }
 
 describe("dashboard loader", () => {
-  it("returns boards, teams, and open action items with default sort 'updated'", async () => {
+  it("returns boards, teams, and open action items with default sort 'updated' (DASH-001, DASH-002, DASH-015)", async () => {
     const { loader } = await import("./dashboard");
 
     loginAs("user-1");
@@ -107,7 +107,7 @@ describe("dashboard loader", () => {
     expect(mockListVisibleBoards).toHaveBeenNthCalledWith(1, "user-1", { order: "updated_at DESC" });
   });
 
-  it("respects the sort query param", async () => {
+  it("respects the sort query param (DASH-005)", async () => {
     const { loader } = await import("./dashboard");
 
     loginAs("user-1");
@@ -118,7 +118,7 @@ describe("dashboard loader", () => {
     expect(mockListVisibleBoards).toHaveBeenNthCalledWith(1, "user-1", { order: "title ASC" });
   });
 
-  it("requests active boards and a separate archived list", async () => {
+  it("requests active boards and a separate archived list (DASH-014)", async () => {
     const { loader } = await import("./dashboard");
 
     loginAs("user-1");
@@ -182,7 +182,7 @@ describe("dashboard action — archive / unarchive", () => {
     mockArchiveBoard.mockResolvedValueOnce(undefined);
 
     const request = makeRequest("archive", "board-1");
-    const result = await action({ request });
+    const result = await action({ request } as never);
 
     expect(mockArchiveBoard).toHaveBeenCalledWith("board-1", "user-1");
     expect(result).toBeNull();
@@ -195,7 +195,7 @@ describe("dashboard action — archive / unarchive", () => {
     mockUnarchiveBoard.mockResolvedValueOnce(undefined);
 
     const request = makeRequest("unarchive", "board-1");
-    const result = await action({ request });
+    const result = await action({ request } as never);
 
     expect(mockUnarchiveBoard).toHaveBeenCalledWith("board-1", "user-1");
     expect(result).toBeNull();
@@ -211,7 +211,7 @@ describe("dashboard action — archive / unarchive", () => {
     const request = new Request("http://localhost:3000/app/dashboard", { method: "post", body: form });
 
     try {
-      await action({ request });
+      await action({ request } as never);
       expect.unreachable("should have thrown");
     } catch (response: unknown) {
       expect((response as Response).status).toBe(400);
@@ -233,7 +233,7 @@ describe("dashboard action — move to team / bulk operations", () => {
 
     const result = await action({
       request: makeFormRequest({ intent: "moveBoard", boardId: "board-1", teamId: "team-9" }),
-    });
+    } as never);
 
     expect(mockMoveBoards).toHaveBeenCalledWith(["board-1"], "team-9", "user-1");
     expect(result).toEqual({ moved: 1 });
@@ -246,7 +246,7 @@ describe("dashboard action — move to team / bulk operations", () => {
 
     await action({
       request: makeFormRequest({ intent: "moveBoard", boardId: "board-1", teamId: "none" }),
-    });
+    } as never);
 
     expect(mockMoveBoards).toHaveBeenCalledWith(["board-1"], null, "user-1");
   });
@@ -258,7 +258,7 @@ describe("dashboard action — move to team / bulk operations", () => {
 
     const result = await action({
       request: makeFormRequest({ intent: "bulkMove", boardIds: "b1,b2,b3", teamId: "team-9" }),
-    });
+    } as never);
 
     expect(mockMoveBoards).toHaveBeenCalledWith(["b1", "b2", "b3"], "team-9", "user-1");
     expect(result).toEqual({ moved: 2 });
@@ -271,7 +271,7 @@ describe("dashboard action — move to team / bulk operations", () => {
 
     const result = await action({
       request: makeFormRequest({ intent: "bulkDelete", boardIds: "b1,b2" }),
-    });
+    } as never);
 
     expect(mockBulkDelete).toHaveBeenCalledWith(["b1", "b2"], "user-1");
     expect(result).toEqual({ deleted: 2 });
@@ -281,7 +281,7 @@ describe("dashboard action — move to team / bulk operations", () => {
     const { action } = await import("./dashboard");
     loginAs("user-1");
     try {
-      await action({ request: makeFormRequest({ intent: "moveBoard", boardId: "b1" }) });
+      await action({ request: makeFormRequest({ intent: "moveBoard", boardId: "b1" }) } as never);
       expect.unreachable("should have thrown");
     } catch (response: unknown) {
       expect((response as Response).status).toBe(400);
@@ -292,7 +292,7 @@ describe("dashboard action — move to team / bulk operations", () => {
     const { action } = await import("./dashboard");
     loginAs("user-1");
     try {
-      await action({ request: makeFormRequest({ intent: "bulkDelete", boardIds: "" }) });
+      await action({ request: makeFormRequest({ intent: "bulkDelete", boardIds: "" }) } as never);
       expect.unreachable("should have thrown");
     } catch (response: unknown) {
       expect((response as Response).status).toBe(400);
@@ -307,11 +307,11 @@ describe("dashboard action — create board with selected crew", () => {
     return new Request("http://localhost:3000/app/dashboard", { method: "post", body: form });
   }
 
-  it("assigns a new board to the personal team when no crew is selected", async () => {
+  it("assigns a new board to the personal team when no crew is selected (DASH-003)", async () => {
     const { action } = await import("./dashboard");
     loginAs("user-1");
 
-    const res = (await action({ request: makeCreateRequest({ title: "Fresh Retro" }) })) as Response;
+    const res = (await action({ request: makeCreateRequest({ title: "Fresh Retro" }) } as never)) as Response;
 
     expect(mockCreateBoard).toHaveBeenCalledWith("Fresh Retro", "user-1", "personal-1");
     expect(res.headers.get("Location")).toBe("/app/board/board-new");
@@ -322,7 +322,7 @@ describe("dashboard action — create board with selected crew", () => {
     loginAs("user-1");
     mockUserIsTeamMember.mockResolvedValueOnce(true);
 
-    await action({ request: makeCreateRequest({ title: "Crew Retro", teamId: "crew-9" }) });
+    await action({ request: makeCreateRequest({ title: "Crew Retro", teamId: "crew-9" }) } as never);
 
     expect(mockUserIsTeamMember).toHaveBeenCalledWith("user-1", "crew-9");
     expect(mockCreateBoard).toHaveBeenCalledWith("Crew Retro", "user-1", "crew-9");
@@ -333,7 +333,7 @@ describe("dashboard action — create board with selected crew", () => {
     loginAs("user-1");
     mockUserIsTeamMember.mockResolvedValueOnce(false);
 
-    await action({ request: makeCreateRequest({ title: "Sneaky", teamId: "not-mine" }) });
+    await action({ request: makeCreateRequest({ title: "Sneaky", teamId: "not-mine" }) } as never);
 
     expect(mockCreateBoard).toHaveBeenCalledWith("Sneaky", "user-1", "personal-1");
   });
@@ -342,7 +342,7 @@ describe("dashboard action — create board with selected crew", () => {
     const { action } = await import("./dashboard");
     loginAs("user-1");
 
-    await action({ request: makeCreateRequest({ title: "All View", teamId: "all" }) });
+    await action({ request: makeCreateRequest({ title: "All View", teamId: "all" }) } as never);
 
     expect(mockUserIsTeamMember).not.toHaveBeenCalled();
     expect(mockCreateBoard).toHaveBeenCalledWith("All View", "user-1", "personal-1");
@@ -352,7 +352,7 @@ describe("dashboard action — create board with selected crew", () => {
     const { action } = await import("./dashboard");
     loginAs("user-1");
 
-    await action({ request: makeCreateRequest({ title: "Unassigned View", teamId: "unassigned" }) });
+    await action({ request: makeCreateRequest({ title: "Unassigned View", teamId: "unassigned" }) } as never);
 
     expect(mockUserIsTeamMember).not.toHaveBeenCalled();
     expect(mockCreateBoard).toHaveBeenCalledWith("Unassigned View", "user-1", "personal-1");

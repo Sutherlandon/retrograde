@@ -34,7 +34,7 @@ function req(body: unknown) {
 }
 
 describe("POST /api/v1/boards/:id/action-items", () => {
-  it("bulk creates items for a facilitating agent", async () => {
+  it("bulk creates items for a facilitating agent (API-005)", async () => {
     const { action } = await import("./board.action-items");
     const res = (await action({
       request: req({ items: [{ text: "Ship the fix" }, { text: "  Write the doc " }] }),

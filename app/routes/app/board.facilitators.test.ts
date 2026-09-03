@@ -54,7 +54,7 @@ describe("board.facilitators loader", () => {
 });
 
 describe("board.facilitators action", () => {
-  it("POST grants facilitator by username", async () => {
+  it("POST grants facilitator by username (DECK-020)", async () => {
     const { action } = await import("./board.facilitators");
     mockFindUser.mockResolvedValueOnce({ id: "user-9", username: "sam" });
 
@@ -82,7 +82,7 @@ describe("board.facilitators action", () => {
     expect(mockAdd).not.toHaveBeenCalled();
   });
 
-  it("DELETE revokes a facilitator", async () => {
+  it("DELETE revokes a facilitator (DECK-021)", async () => {
     const { action } = await import("./board.facilitators");
     const res = (await action({
       request: formRequest("DELETE", { userId: "user-9" }),
@@ -92,7 +92,7 @@ describe("board.facilitators action", () => {
     expect(res.status).toBe(200);
   });
 
-  it("PATCH toggles open facilitation", async () => {
+  it("PATCH toggles open facilitation (DECK-022)", async () => {
     const { action } = await import("./board.facilitators");
     mockSetOpen.mockResolvedValue(true);
     mockGetOpen.mockResolvedValue(true);

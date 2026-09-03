@@ -13,7 +13,7 @@ beforeEach(() => {
 });
 
 describe("GET /auth/logout", () => {
-  it("destroys the session and redirects to /", async () => {
+  it("destroys the session and redirects to / [AUTH-003]", async () => {
     const { loader } = await import("./logout");
     const request = new Request("http://localhost:3000/auth/logout");
 

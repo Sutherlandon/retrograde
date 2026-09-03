@@ -67,7 +67,7 @@ function setupUserAndOwnership(userId: string, isAnonymous: boolean, canFacilita
 
 describe("board.settings action", () => {
   describe("PATCH (update settings)", () => {
-    it("allows anonymous board owner to update settings", async () => {
+    it("allows anonymous board owner to update settings (DECK-008, DECK-009, DECK-015, DECK-016)", async () => {
       const { action } = await import("./board.settings");
       setupUserAndOwnership("anon-user-1", true, true);
 
@@ -78,7 +78,7 @@ describe("board.settings action", () => {
         boardLocked: "false",
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockUpdateSettings).toHaveBeenCalledWith("board-1", {
         votingEnabled: true,
         votingAllowed: 3,
@@ -102,11 +102,11 @@ describe("board.settings action", () => {
         boardLocked: "false",
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockUpdateSettings).toHaveBeenCalled();
     });
 
-    it("parses the hideOthersNotes flag (blind brainstorm)", async () => {
+    it("parses the hideOthersNotes flag (blind brainstorm) (DECK-013)", async () => {
       const { action } = await import("./board.settings");
       setupUserAndOwnership("user-1", false, true);
 
@@ -118,7 +118,7 @@ describe("board.settings action", () => {
         hideOthersNotes: "true",
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockUpdateSettings).toHaveBeenCalledWith(
         "board-1",
         expect.objectContaining({ hideOthersNotes: true }),
@@ -138,7 +138,7 @@ describe("board.settings action", () => {
       });
 
       try {
-        await action({ request, params: { id: "board-1" }, context: {} });
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
         expect.unreachable("should have thrown");
       } catch (response: unknown) {
         const res = response as Response;
@@ -157,7 +157,7 @@ describe("board.settings action", () => {
       });
 
       try {
-        await action({ request, params: { id: "board-1" }, context: {} });
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
         expect.unreachable("should have thrown");
       } catch (response: unknown) {
         const res = response as Response;
@@ -167,7 +167,7 @@ describe("board.settings action", () => {
   });
 
   describe("POST (clear votes)", () => {
-    it("allows anonymous owner to clear votes", async () => {
+    it("allows anonymous owner to clear votes (DECK-011)", async () => {
       const { action } = await import("./board.settings");
       setupUserAndOwnership("anon-user-1", true, true);
 
@@ -177,7 +177,7 @@ describe("board.settings action", () => {
         body: form,
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockClearVotes).toHaveBeenCalledWith("board-1");
       expect(mockGetBoard).toHaveBeenCalledWith("board-1", "anon-user-1");
     });

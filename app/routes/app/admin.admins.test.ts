@@ -88,7 +88,7 @@ describe("admin.admins action — access control", () => {
 });
 
 describe("admin.admins action — add intent", () => {
-  it("adds a user and returns success", async () => {
+  it("adds a user and returns success (ADMIN-004)", async () => {
     const { action } = await import("./admin.admins");
     loginAs("admin-1", SITE_ADMIN_EXT_ID);
     mockFind.mockResolvedValueOnce({ id: "target-1", username: "alice" });
@@ -123,7 +123,7 @@ describe("admin.admins action — add intent", () => {
 });
 
 describe("admin.admins action — remove intent", () => {
-  it("removes a user and returns success", async () => {
+  it("removes a user and returns success (ADMIN-005)", async () => {
     const { action } = await import("./admin.admins");
     loginAs("admin-1", SITE_ADMIN_EXT_ID);
 

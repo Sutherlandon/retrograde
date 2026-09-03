@@ -125,7 +125,7 @@ describe("team membership management", () => {
     expect(mockPoolQuery.mock.calls[0][0]).toContain("ON CONFLICT");
   });
 
-  it("removeTeamMember never removes an owner", async () => {
+  it("removeTeamMember never removes an owner (CREW-007)", async () => {
     const { removeTeamMember } = await import("./team_model");
     mockPoolQuery.mockResolvedValueOnce({});
     await removeTeamMember("team-1", "user-3");

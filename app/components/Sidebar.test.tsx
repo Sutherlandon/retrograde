@@ -68,7 +68,7 @@ describe("Sidebar — crew selector", () => {
     expect(screen.queryByText("Manage")).toBeNull();
   });
 
-  it("only shows Unassigned when teamless boards exist (stays a dashboard filter)", () => {
+  it("only shows Unassigned when teamless boards exist (stays a dashboard filter) (DASH-013)", () => {
     renderAt("/app/dashboard", { unassignedCount: 0 });
     expect(screen.queryByText("Unassigned")).toBeNull();
     cleanup();

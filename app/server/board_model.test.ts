@@ -46,11 +46,15 @@ describe("updateColumnPromptServer", () => {
 });
 
 describe("duplicateBoardServer", () => {
-  it("creates a new board with '(copy)' suffix and copies columns", async () => {
+  it("creates a new board with '(copy)' suffix and copies columns [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
     // SELECT role (ownership check, via pool.query — before the transaction)
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] });
+    // SELECT team_id (original board's crew)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "team-orig" }] });
+    // SELECT 1 FROM team_members (caller is a member of the original's crew)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     // BEGIN
     mockQuery.mockResolvedValueOnce({});
     // SELECT title + voting settings
@@ -87,10 +91,14 @@ describe("duplicateBoardServer", () => {
     expect(insertBoardCall[0]).toContain("INSERT INTO boards");
     expect(insertBoardCall[1][1]).toBe("Sprint 1 (copy)");
 
+    // Verify it landed on the original's crew, closed to open facilitation
+    expect(insertBoardCall[1][3]).toBe("team-orig"); // team_id
+    expect(insertBoardCall[1][4]).toBe(false);       // open_facilitation
+
     // Verify voting settings were copied
-    expect(insertBoardCall[1][3]).toBe(true);     // voting_enabled
-    expect(insertBoardCall[1][4]).toBe(3);        // voting_allowed
-    expect(insertBoardCall[1][5]).toBe("column"); // voting_scope
+    expect(insertBoardCall[1][5]).toBe(true);     // voting_enabled
+    expect(insertBoardCall[1][6]).toBe(3);        // voting_allowed
+    expect(insertBoardCall[1][7]).toBe("column"); // voting_scope
 
     // Verify owner membership
     const insertMemberCall = mockQuery.mock.calls[3];
@@ -114,10 +122,12 @@ describe("duplicateBoardServer", () => {
     expect(mockRelease).toHaveBeenCalled();
   });
 
-  it("throws and rolls back when board is not found", async () => {
+  it("throws and rolls back when board is not found [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "team-orig" }] }); // original team_id
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // caller is a member of it
     mockQuery.mockResolvedValueOnce({}); // BEGIN
     mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // SELECT title - not found
     mockQuery.mockResolvedValueOnce({}); // ROLLBACK
@@ -126,7 +136,7 @@ describe("duplicateBoardServer", () => {
     expect(mockRelease).toHaveBeenCalled();
   });
 
-  it("throws and never opens a transaction when the caller is not the owner", async () => {
+  it("throws and never opens a transaction when the caller is not the owner [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "facilitator" }] });
@@ -138,7 +148,7 @@ describe("duplicateBoardServer", () => {
     expect(mockRelease).not.toHaveBeenCalled();
   });
 
-  it("throws when the caller is not a board member at all", async () => {
+  it("throws when the caller is not a board member at all [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
@@ -148,10 +158,99 @@ describe("duplicateBoardServer", () => {
     );
     expect(mockQuery).not.toHaveBeenCalled();
   });
+
+  it("copies into the original's crew when the caller is a member of it [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "crew-A" }] }); // original's crew
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // caller is a member of crew-A
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Sprint 1", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("crew-A"); // team_id — the original's crew, not the caller's personal crew
+    expect(insertBoardCall[1][4]).toBe(false);    // open_facilitation
+  });
+
+  it("falls back to the personal crew when the caller is not a member of the original's crew [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "crew-A" }] }); // original's crew
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // caller is NOT a member of crew-A
+    mockPoolQuery.mockResolvedValueOnce({ // getPersonalTeamForUser
+      rowCount: 1,
+      rows: [{ id: "personal-team-1", name: "Personal", is_personal: true, created_at: "2026-01-01" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Sprint 1", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("personal-team-1"); // fell back to caller's personal crew
+    expect(insertBoardCall[1][4]).toBe(false);             // open_facilitation
+  });
+
+  it("falls back to the personal crew when the original board is crewless [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: null }] }); // original is crewless
+    mockPoolQuery.mockResolvedValueOnce({ // getPersonalTeamForUser (no team_members lookup — origTeamId is null)
+      rowCount: 1,
+      rows: [{ id: "personal-team-2", name: "Personal", is_personal: true, created_at: "2026-01-01" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Anon board", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("personal-team-2");
+  });
+
+  it("never produces team_id IS NULL — throws when no crew resolves [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: null }] }); // original is crewless
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // getPersonalTeamForUser finds none
+
+    await expect(duplicateBoardServer("board-1", "user-1")).rejects.toThrow(
+      "Could not resolve a crew for the duplicated board"
+    );
+    // Never opened a transaction, so it can never write a crewless board with an owner row.
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateBoardSettingsServer", () => {
-  it("enables voting with a specified allowed vote count", async () => {
+  it("enables voting with a specified allowed vote count (DECK-008, DECK-009)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
@@ -179,7 +278,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, false, "board-1"]);
   });
 
-  it("enables notes lock to prevent note editing during voting", async () => {
+  it("enables notes lock to prevent note editing during voting (DECK-015)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({});
@@ -190,7 +289,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, true, false, "board-1"]);
   });
 
-  it("enables full board lock to prevent all modifications", async () => {
+  it("enables full board lock to prevent all modifications (DECK-016)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({});
@@ -201,7 +300,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, true, false, "board-1"]);
   });
 
-  it("persists hide_others_notes and scopes the returned board to the viewer", async () => {
+  it("persists hide_others_notes and scopes the returned board to the viewer (DECK-013)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
@@ -237,7 +336,7 @@ describe("getBoardServer — blind brainstorm filtering", () => {
 });
 
 describe("moveBoardsToTeamServer", () => {
-  it("moves owned boards to a team the user belongs to and returns moved ids", async () => {
+  it("moves owned boards to a team the user belongs to and returns moved ids (DASH-010, DASH-011)", async () => {
     const { moveBoardsToTeamServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({
@@ -336,7 +435,7 @@ describe("countUnassignedBoardsForUser", () => {
 });
 
 describe("bulkDeleteBoardsServer", () => {
-  it("deletes only owned boards (notes, columns, members, board) in one transaction", async () => {
+  it("deletes only owned boards (notes, columns, members, board) in one transaction (DASH-012)", async () => {
     const { bulkDeleteBoardsServer } = await import("./board_model");
 
     mockQuery.mockResolvedValueOnce({}); // BEGIN
@@ -443,7 +542,7 @@ describe("voteNoteServer", () => {
 });
 
 describe("archiveBoardServer", () => {
-  it("sets archived_at when the user is the board owner", async () => {
+  it("sets archived_at when the user is the board owner (DASH-008)", async () => {
     const { archiveBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
@@ -478,7 +577,7 @@ describe("archiveBoardServer", () => {
 });
 
 describe("unarchiveBoardServer", () => {
-  it("clears archived_at when the user is the board owner", async () => {
+  it("clears archived_at when the user is the board owner (DASH-009)", async () => {
     const { unarchiveBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
@@ -890,7 +989,7 @@ describe("bulkInsertNotesServer", () => {
 });
 
 describe("deleteBoardServer", () => {
-  it("deletes board and all related data when user is owner", async () => {
+  it("deletes board and all related data when user is owner (DASH-007)", async () => {
     const { deleteBoardServer } = await import("./board_model");
 
     mockQuery.mockResolvedValueOnce({}); // BEGIN

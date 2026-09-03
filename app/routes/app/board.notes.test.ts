@@ -80,7 +80,7 @@ describe("board.notes action", () => {
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
 
       expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "anon-user-1", 1);
     });
@@ -96,7 +96,7 @@ describe("board.notes action", () => {
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
 
       expect(mockVoteNote).toHaveBeenCalledWith("board-1", "note-1", "user-1", 1);
     });
@@ -107,7 +107,7 @@ describe("board.notes action", () => {
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
 
       try {
-        await action({ request, params: { id: "board-1" }, context: {} });
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
         expect.unreachable("should have thrown");
       } catch (response: unknown) {
         const res = response as Response;
@@ -134,7 +134,7 @@ describe("board.notes action", () => {
         likes: "0",
         created: "1234567890",
       });
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
 
       expect(mockUpsertNote).toHaveBeenCalledWith(
         "board-1", "note-1", "col-1", "My note", 0, "1234567890", "anon-user-1"
@@ -153,7 +153,7 @@ describe("board.notes action", () => {
         likes: "0",
         created: "1234567890",
       });
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
 
       expect(mockUpsertNote).toHaveBeenCalledWith(
         "board-1", "note-1", "col-1", "Guest note", 0, "1234567890", undefined
@@ -177,7 +177,7 @@ describe("board.notes action", () => {
         noteId: "note-1",
         delta: "1",
       });
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
 
       expect(mockLikeNote).toHaveBeenCalledWith("board-1", "note-1", 1, "anon-user-1");
     });
@@ -244,7 +244,7 @@ describe("board.notes action", () => {
   });
 
   describe("lock enforcement (GAP-003)", () => {
-    it("checks notes: true before an upsert (BRD-004/005)", async () => {
+    it("checks notes: true before an upsert (BRD-004, BRD-005)", async () => {
       const { action } = await import("./board.notes");
       const request = makePatchRequest("board-1", {
         noteId: "note-1", columnId: "col-1", text: "My note", likes: "0", created: "1",

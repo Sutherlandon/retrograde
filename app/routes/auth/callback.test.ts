@@ -127,7 +127,7 @@ describe("GET /auth/callback", () => {
     }
   });
 
-  it("exchanges code for token and upserts user on success", async () => {
+  it("exchanges code for token and upserts user on success [AUTH-002]", async () => {
     setupFetchMocks();
     const { loader } = await import("./callback");
     const state = makeState("/app/dashboard");

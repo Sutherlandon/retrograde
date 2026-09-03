@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 describe("GET /api/v1/boards/:id", () => {
-  it("returns the board as JSON with user_votes populated when authenticated", async () => {
+  it("returns the board as JSON with user_votes populated when authenticated (API-003)", async () => {
     const { loader } = await import("./board");
 
     mockGetApiUser.mockResolvedValueOnce({ id: "user-1" });

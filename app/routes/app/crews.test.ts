@@ -34,7 +34,7 @@ function formRequest(fields: Record<string, string>) {
 }
 
 describe("teams loader", () => {
-  it("lists the caller's teams", async () => {
+  it("lists the caller's teams (CREW-001)", async () => {
     const { loader } = await import("./crews");
     mockListTeamsForUser.mockResolvedValueOnce([
       { id: "t1", name: "landon's Team", is_personal: true, member_count: 1, board_count: 0, open_action_items: 0 },

@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 describe("getMetrics", () => {
-  it("returns all four counts from the database", async () => {
+  it("returns all four counts from the database (ADMIN-002)", async () => {
     mockPoolQuery.mockResolvedValueOnce({
       rows: [{
         registeredUsers: 42,

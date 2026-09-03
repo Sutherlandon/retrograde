@@ -66,7 +66,7 @@ function req(body: unknown, method = "POST") {
 }
 
 describe("POST /api/v1/boards", () => {
-  it("creates a board with custom columns, mints an agent user, returns token", async () => {
+  it("creates a board with custom columns, mints an agent user, returns token (API-002)", async () => {
     const { action } = await import("./boards");
 
     const response = (await action({
@@ -110,7 +110,7 @@ describe("POST /api/v1/boards", () => {
     expect(mockCreateBoardWithColumns).toHaveBeenCalledWith("Plain", [], "agent-uuid", null);
   });
 
-  it("attaches the board to the caller's team when authenticated via API key", async () => {
+  it("attaches the board to the caller's team when authenticated via API key (API-001)", async () => {
     const { action } = await import("./boards");
     mockGetApiUser.mockResolvedValueOnce({
       id: "agent-from-key",

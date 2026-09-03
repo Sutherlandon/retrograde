@@ -34,7 +34,7 @@ describe("isGrantedAdmin", () => {
 });
 
 describe("listGrantedAdmins", () => {
-  it("returns formatted admin rows", async () => {
+  it("returns formatted admin rows (ADMIN-003)", async () => {
     mockPoolQuery.mockResolvedValueOnce({
       rows: [
         { id: "au-1", userId: "u-1", username: "alice", grantedBy: "ext-root", createdAt: "2025-01-01T00:00:00Z" },
