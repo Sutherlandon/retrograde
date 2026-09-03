@@ -135,9 +135,11 @@ function NoUnassignedBoardsState() {
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Every board you can see already belongs to a crew.
       </p>
-      <Link to="/dashboard">
-        <Button text="Back to Dashboard" variant="solid" color="primary" />
-      </Link>
+      <div className="flex justify-center">
+        <Link to="/dashboard">
+          <Button text="Back to Dashboard" variant="solid" color="primary" />
+        </Link>
+      </div>
     </div>
   );
 }
