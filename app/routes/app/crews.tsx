@@ -104,7 +104,7 @@ export default function TeamsPage() {
             placeholder="Crew name"
             required
             maxLength={100}
-            className="border rounded px-3 py-1.5 border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+            className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
           />
           {createFetcher.data?.error && (
             <p className="text-sm text-red-500">{createFetcher.data.error}</p>

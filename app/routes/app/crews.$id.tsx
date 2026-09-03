@@ -273,7 +273,7 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
               name="username"
               placeholder="Add member by username"
               required
-              className="border rounded px-3 py-1.5 border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
             />
             {addFetcher.data?.error && <p className="text-sm text-red-500">{addFetcher.data.error}</p>}
             {addFetcher.data?.addedUsername && (
@@ -390,7 +390,7 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
               placeholder='Agent name (e.g. "Claude (roadmap)")'
               required
               maxLength={100}
-              className="border rounded px-3 py-1.5 border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
             />
             {mintFetcher.data?.error && <p className="text-sm text-red-500">{mintFetcher.data.error}</p>}
           </div>
