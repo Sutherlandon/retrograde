@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Form, useLoaderData, useSearchParams, useFetcher, redirect, type ActionFunctionArgs, type MetaArgs } from "react-router";
+import { Form, Link, useLoaderData, useSearchParams, useFetcher, redirect, type ActionFunctionArgs, type MetaArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { createBoard, listVisibleBoards } from "~/server/board_model";
 import { handleBoardMutation } from "~/server/board_actions";
@@ -119,6 +119,25 @@ function EmptyBoardsState({ onClaim }: { onClaim: () => void }) {
           color="primary"
         />
       </div>
+    </div>
+  );
+}
+
+function NoUnassignedBoardsState() {
+  return (
+    <div className="text-center py-20 border rounded-lg">
+      <div className="flex justify-center text-green-500 dark:text-green-400 mb-4">
+        <CheckIcon size="3xl" />
+      </div>
+      <h2 className="text-xl font-medium mb-1">
+        No unassigned boards
+      </h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        Every board you can see already belongs to a crew.
+      </p>
+      <Link to="/dashboard">
+        <Button text="Back to Dashboard" variant="solid" color="primary" />
+      </Link>
     </div>
   );
 }
@@ -310,7 +329,9 @@ export default function AppDashboard() {
       <div className="mb-16">
         <SectionLabel icon={ColumnsIcon}>Boards</SectionLabel>
 
-        {boards.length === 0 ? (
+        {unassignedOnly && scopedBoards.length === 0 ? (
+          <NoUnassignedBoardsState />
+        ) : boards.length === 0 ? (
           <EmptyBoardsState onClaim={() => setClaimOpen(true)} />
         ) : (
           <>

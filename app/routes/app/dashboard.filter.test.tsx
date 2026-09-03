@@ -18,6 +18,9 @@ vi.mock("react-router", () => ({
   Form: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
     <form {...props}>{children}</form>
   ),
+  Link: ({ children, to, ...props }: React.PropsWithChildren<{ to: string }>) => (
+    <a href={to} {...props}>{children}</a>
+  ),
   redirect: vi.fn(),
   createCookieSessionStorage: () => ({
     getSession: vi.fn(),
