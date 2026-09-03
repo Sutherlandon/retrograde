@@ -91,7 +91,7 @@ describe("dashboard unassigned view, empty (DASH-013)", () => {
 
     expect(screen.getByText("No unassigned boards")).toBeInTheDocument();
     const back = screen.getByRole("link", { name: /back to dashboard/i });
-    expect(back).toHaveAttribute("href", "/dashboard");
+    expect(back).toHaveAttribute("href", "/app/dashboard");
 
     // The table and its toolbar are gone, not just empty.
     expect(screen.queryByPlaceholderText("Filter boards…")).not.toBeInTheDocument();

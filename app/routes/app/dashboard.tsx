@@ -136,7 +136,7 @@ function NoUnassignedBoardsState() {
         Every board you can see already belongs to a crew.
       </p>
       <div className="flex justify-center">
-        <Link to="/dashboard">
+        <Link to="/app/dashboard">
           <Button text="Back to Dashboard" variant="solid" color="primary" />
         </Link>
       </div>
