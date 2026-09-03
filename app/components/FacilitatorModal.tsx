@@ -193,7 +193,7 @@ export function FacilitatorModal({
                 <button
                   type="button"
                   onClick={grant}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1"
                 >
                   <UserIcon size="sm" /> Grant
                 </button>

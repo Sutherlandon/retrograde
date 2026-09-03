@@ -280,7 +280,7 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
               <p className="text-sm text-green-600">Added {addFetcher.data.addedUsername}.</p>
             )}
           </div>
-          <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
+          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
             Add to Crew
           </button>
         </addFetcher.Form>
@@ -394,7 +394,7 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
             />
             {mintFetcher.data?.error && <p className="text-sm text-red-500">{mintFetcher.data.error}</p>}
           </div>
-          <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
+          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
             Add AI Crewmate
           </button>
         </mintFetcher.Form>
@@ -433,7 +433,7 @@ function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: Tea
             placeholder="New board title"
             className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
           />
-          <button type="submit" className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1">
+          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1">
             <PlusIcon size="sm" /> New Board
           </button>
         </createFetcher.Form>
@@ -532,7 +532,7 @@ function DangerZone({ teamName }: { teamName: string }) {
         <button
           type="submit"
           disabled={!canDelete}
-          className="px-3 py-1.5 bg-red-600 text-white rounded text-sm cursor-pointer
+          className="px-3 py-1.5 border border-transparent bg-red-600 text-white rounded text-sm cursor-pointer
             hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-red-600"
         >
           Delete Crew
