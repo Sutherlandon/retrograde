@@ -19,8 +19,9 @@ function req(method: string, headers: Record<string, string> = {}) {
 
 // cronSecret is loaded once at module init (app/server/db_config.ts), so each
 // test that needs a different value mocks the module and re-imports the
-// route fresh via vi.resetModules().
-async function loadRoute(cronSecret: string | undefined) {
+// route fresh via vi.resetModules(). db_config now fails loudly at startup
+// (requireEnv) if CRON_SECRET is unset, so cronSecret here is always a string.
+async function loadRoute(cronSecret: string) {
   vi.resetModules();
   vi.doMock("~/server/db_config", () => ({ cronSecret }));
   return import("./cron.archive-stale");
@@ -58,16 +59,6 @@ describe("POST /api/v1/cron/archive-stale", () => {
       params: {}, context: {},
     } as never)) as Response;
     expect(response.status).toBe(401);
-    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
-  });
-
-  it("returns 500 when CRON_SECRET is not configured", async () => {
-    const { action } = await loadRoute(undefined);
-    const response = (await action({
-      request: req("POST", { Authorization: "Bearer anything" }),
-      params: {}, context: {},
-    } as never)) as Response;
-    expect(response.status).toBe(500);
     expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
   });
 

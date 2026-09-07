@@ -4,16 +4,20 @@
 export const meta = () => [{ title: "Crews – Retrograde" }];
 
 import { useEffect, useRef } from "react";
-import { Form, redirect, useLoaderData, useNavigate, useFetcher, type ActionFunctionArgs } from "react-router";
+import { Form, redirect, useLoaderData, useNavigate, useFetcher, useSearchParams, type ActionFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { createTeam, listTeamsForUser, type TeamSummary } from "~/server/team_model";
 import { accountCanCreateNamedCrew } from "~/server/entitlements";
+import { getBillingForUser } from "~/server/billing_model";
 import { StatusLED } from "~/components/StatusLED";
+import { CheckIcon } from "~/images/icons";
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireRegisteredUser(request);
   const teams = await listTeamsForUser(user.id);
-  return { teams };
+  const entitled = await accountCanCreateNamedCrew(user.id);
+  const billing = await getBillingForUser(user.id);
+  return { teams, entitled, hasBilling: !!billing?.stripeCustomerId };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -65,9 +69,26 @@ function TeamCard({ team, onOpen }: { team: TeamSummary; onOpen: () => void }) {
   );
 }
 
-export default function TeamsPage() {
-  const { teams } = useLoaderData<typeof loader>() as { teams: TeamSummary[] };
-  const navigate = useNavigate();
+function SubscribeExplainer() {
+  return (
+    <div className="border rounded-2xl p-5 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700/60">
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Named crews are the paid tier: invite human members, keep members-only
+        boards, and bring on more AI crewmates. Your personal crew stays free.
+      </p>
+      <Form method="post" action="/app/billing/checkout">
+        <button
+          type="submit"
+          className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer"
+        >
+          Subscribe to create named crews
+        </button>
+      </Form>
+    </div>
+  );
+}
+
+function CreateCrewForm({ hasBilling }: { hasBilling: boolean }) {
   const createFetcher = useFetcher<{ error?: string }>();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -76,25 +97,7 @@ export default function TeamsPage() {
   }, [createFetcher.state, createFetcher.data]);
 
   return (
-    <div className="px-8 mx-auto w-full sm:w-[80%] max-w-5xl">
-      <h1 className="text-3xl font-semibold mb-1">Crews</h1>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-        Organize boards under crews, share them with your crewmates, and track
-        crew-level action items. Crew boards are permanent and visible to every member.
-      </p>
-
-      <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
-        Your Crews
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-        {teams.map((team) => (
-          <TeamCard key={team.id} team={team} onOpen={() => navigate(`/app/crews/${team.id}`)} />
-        ))}
-      </div>
-
-      <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
-        Assemble a New Crew
-      </p>
+    <div className="flex flex-col gap-3">
       <createFetcher.Form ref={formRef} method="post" className="flex gap-2 items-start flex-wrap">
         <input type="hidden" name="intent" value="create" />
         <div className="flex flex-col gap-1 flex-1 min-w-[16rem]">
@@ -117,6 +120,58 @@ export default function TeamsPage() {
           Create Crew
         </button>
       </createFetcher.Form>
+      {hasBilling && (
+        <Form method="post" action="/app/billing/portal">
+          <button
+            type="submit"
+            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2 cursor-pointer"
+          >
+            Manage billing
+          </button>
+        </Form>
+      )}
+    </div>
+  );
+}
+
+export default function TeamsPage() {
+  const { teams, entitled, hasBilling } = useLoaderData<typeof loader>() as {
+    teams: TeamSummary[];
+    entitled: boolean;
+    hasBilling: boolean;
+  };
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const checkoutSuccess = searchParams.get("checkout") === "success";
+
+  return (
+    <div className="px-8 mx-auto w-full sm:w-[80%] max-w-5xl">
+      <h1 className="text-3xl font-semibold mb-1">Crews</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        Organize boards under crews, share them with your crewmates, and track
+        crew-level action items. Crew boards are permanent and visible to every member.
+      </p>
+
+      {checkoutSuccess && (
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300 w-fit mb-4">
+          <CheckIcon size="xs" />
+          Payment received — your crews are unlocked.
+        </span>
+      )}
+
+      <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
+        Your Crews
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+        {teams.map((team) => (
+          <TeamCard key={team.id} team={team} onOpen={() => navigate(`/app/crews/${team.id}`)} />
+        ))}
+      </div>
+
+      <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
+        Assemble a New Crew
+      </p>
+      {entitled ? <CreateCrewForm hasBilling={hasBilling} /> : <SubscribeExplainer />}
     </div>
   );
 }

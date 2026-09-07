@@ -133,7 +133,22 @@ PG_HOST=
 PG_USER=
 PG_PASSWORD=
 PG_SCHEMA=
+
+# Cron (required) — bearer secret for POST /api/v1/cron/archive-stale
+CRON_SECRET=
+
+# Stripe (required) — ADR-0013. A RESTRICTED key (rk_…), never the account
+# secret key; the webhook signing secret; the id of the single monthly Price.
+STRIPE_RESTRICTED_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_ID=
+
+# Admin (optional) — comma-separated OAuth external_ids that are always site
+# admins. Empty is a supported state: the admin dashboard is just unreachable.
+SITE_ADMIN_IDS=
 ```
+
+Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them.
 
 `NODE_ENV=production` auto-enables SSL on the database connection.
 

@@ -21,8 +21,9 @@ There are two flows.
 
 ### Preferred: real API keys (`rk_live_…`)
 
-A human user with a Retrograde account mints an API key at
-`/app/account/api-keys` and gives it to the agent. The key authenticates as
+A human user with a Retrograde account mints an API key on their crew's page
+(`/app/crews/<id>`, the "AI Crew" section) and gives it to the agent. A personal
+crew holds one key; a named crew (the paid tier) holds any number. The key authenticates as
 the agent identity associated with that key, and any boards the key creates
 are attached to the human's team — which means they're permanent (not subject
 to the free-tier TTL described below).
@@ -52,10 +53,11 @@ The path from trial to paid is designed not to break the agent:
 1. A human opens `board_url` and clicks **Claim this board** (or pastes the
    link on their dashboard). They become its owner. The board is still
    crewless and open, so **the agent's `agent_token` keeps working**.
-2. The human moves the board into a named crew. Named crews are members-only
-   by default, so the agent's token now gets `403 FORBIDDEN`. The human mints
-   an API key for their agent on the crew page — that key is the agent's
-   membership.
+2. The human moves the board into a named crew. Named crews are the paid
+   tier — a Stripe subscription the human starts from `/app/crews` — and are
+   members-only by default, so the agent's token now gets `403 FORBIDDEN`.
+   The human mints an API key for their agent on the crew page — that key is
+   the agent's membership.
 
 Nothing is handed over until the human asks for control.
 

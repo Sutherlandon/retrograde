@@ -445,6 +445,22 @@ export async function initializeDatabase() {
       ALTER COLUMN anonymous_ownership_cleared SET DEFAULT TRUE;
     `);
 
+    // 33 GAP-005 / ADR-0011: subscription state belongs to the account, not
+    //    the crew. Stripe's own status strings (active, past_due, canceled,
+    //    ...) are stored verbatim in subscription_status — no custom enum,
+    //    so there's no translation layer to keep in sync with Stripe's
+    //    state machine. See ADR-0013.
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT,
+        ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT,
+        ADD COLUMN IF NOT EXISTS subscription_status TEXT;
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_users_stripe_customer_id ON users(stripe_customer_id);
+    `);
+
     console.log("Done");
     console.log("Inserting dev data...");
 

@@ -72,11 +72,29 @@ if (siteAdminIds.length === 0) {
   console.warn("Warning: SITE_ADMIN_IDS is not set — the admin dashboard will be inaccessible.");
 }
 
+// Fails loudly at startup (CLAUDE.md rule 5) for any env var that has no
+// valid "unset" state — rather than silently limping along with `undefined`
+// until some unlucky request hits the missing config at runtime.
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    console.error(`FATAL: missing required environment variable ${name}`);
+    process.exit(1);
+  }
+  return value;
+}
+
+// Stripe (GAP-005 / ADR-0013): restricted API key, webhook signing secret,
+// and the one recurring Price backing the paid tier.
+export const stripeRestrictedKey = requireEnv("STRIPE_RESTRICTED_KEY");
+export const stripeWebhookSecret = requireEnv("STRIPE_WEBHOOK_SECRET");
+export const stripePriceId = requireEnv("STRIPE_PRICE_ID");
+
 // Shared secret for the Vercel cron trigger that auto-archives stale boards
-// (app/routes/api/cron.archive-stale.ts, see ADR-0005). Undefined when unset
-// — the route treats that as a 500 MISCONFIGURED response rather than
-// silently accepting unauthenticated requests.
-export const cronSecret: string | undefined = process.env.CRON_SECRET;
+// (app/routes/api/cron.archive-stale.ts, see ADR-0005). Required at startup;
+// the route only has to distinguish a wrong/missing bearer token (401) since
+// an unset secret now fails the process before any request can arrive.
+export const cronSecret = requireEnv("CRON_SECRET");
 
 // OAuth redirect URI — use VERCEL_URL only in preview deployments (where each
 // deploy gets a unique hostname). Production also has VERCEL_URL set, but we
@@ -84,4 +102,4 @@ export const cronSecret: string | undefined = process.env.CRON_SECRET;
 export const oauthRedirectUri =
   process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}/auth/callback`
-    : process.env.OAUTH_REDIRECT_URI!;
+    : requireEnv("OAUTH_REDIRECT_URI");

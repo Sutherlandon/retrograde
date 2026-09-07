@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-03 · **Version:** 1.6.1 · **Branch:** `agent-substrate` (ahead of `main`, unreviewed)
+**Updated:** 2026-09-06 · **Version:** 1.6.1 · **Branch:** `agent-substrate` (ahead of `main`, unreviewed)
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md).
 
@@ -13,9 +13,9 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,091 passing across 69 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,158 passing across 77 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
-| Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 32 numbered blocks |
+| Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
 ## Branch state
 
@@ -36,16 +36,19 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 **Facilitator is the primitive.** Every board control is designed for the facilitator role; the owner is a facilitator who also holds lifecycle rights (delete, archive, duplicate, move) and cannot be demoted. `isOwner` is the right gate only for those lifecycle controls, which live on the dashboard. On a board page, reach for `canFacilitate`.
 
-**The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table has one open entry, GAP-005 — the paywall itself, which cannot close until a billing provider exists. The seam it will use (`app/server/entitlements.ts`) already does.
+**The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. The paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
 
 ## Known rough edges
 
-1. **Nothing is payment-gated** (GAP-005). Creating a named crew — CREW-002, the tier-3 line — passes through `accountCanCreateNamedCrew`, which returns true for everyone until a billing provider exists. Everything paid follows from it: members, members-only access, crew action items. No plan or subscription concept exists in the schema (issue #59).
-2. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
-3. **No structured logging** (issue #82). `console.log` only.
-4. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified except CREW-002 (Ungated — its seam is tested; nothing charges).
-5. **README is 11 lines** (issue #10).
-6. **~30 stale local branches** from merged PRs.
+1. **The app will not boot without Stripe configuration, in every environment** (ADR-0013, CLAUDE.md rule 5). `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `CRON_SECRET`, and `OAUTH_REDIRECT_URI` go through `requireEnv()` and a missing one exits the process at startup. `npm run build` does not execute `db_config.ts`, so a CI build will not catch a missing var — only a server boot does.
+2. **Stripe Tax is not enabled.** Charging US/EU customers carries sales-tax/VAT obligations; `automatic_tax` collects nothing until a registration exists, silently. Decide jurisdictions before charging real customers.
+3. **The permission matrix has no registered-but-unsubscribed actor.** Its fixture answers the entitlement query with `active` for every registered human, so it proves "registered + active → allowed" and "everyone else → denied" for CREW-002; the not-subscribed case is covered by `entitlements.test.ts` and `crews.test.ts`, not the matrix.
+4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
+5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
+6. **No structured logging** (issue #82). `console.log` only.
+7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified except CREW-002 (Ungated — its seam is tested; nothing charges).
+8. **README is 11 lines** (issue #10).
+9. **~30 stale local branches** from merged PRs.
 
 ## Behavioral notes that are easy to get wrong
 
@@ -59,7 +62,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 ## Deferred by design
 
-Recorded so they aren't rediscovered as gaps: billing/Stripe (#59), MCP server, webhooks, per-key API scopes, account-level (non-crew) API keys, agent-name verification, JSON update/delete of notes, and pagination on board reads. Agent activity metering and the rate limiting that covers the unauthenticated trial path are tracked, not deferred — issue #105.
+Recorded so they aren't rediscovered as gaps: annual billing (a second Price on the same Product), MCP server, webhooks, per-key API scopes, account-level (non-crew) API keys, agent-name verification, JSON update/delete of notes, and pagination on board reads. Agent activity metering and the rate limiting that covers the unauthenticated trial path are tracked, not deferred — issue #105.
 
 ## Operational reality
 

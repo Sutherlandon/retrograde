@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-09-03 · **Branch:** `agent-substrate`
+**Updated:** 2026-09-06 · **Branch:** `agent-substrate`
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
@@ -201,7 +201,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | ID       | Action                                    | Tier | Who         | Code path                           | Guard                                | Status      |
 | -------- | ----------------------------------------- | ---- | ----------- | ----------------------------------- | ------------------------------------ | ----------- |
 | CREW-001 | List own crews                            | 2    | Registered  | `crews.tsx` loader                  | `requireRegisteredUser`              | Verified    |
-| CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` seam → 403; returns true until a billing provider exists | **Ungated** |
+| CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` → 403 unless `users.subscription_status = 'active'`, which only the signature-verified Stripe webhook writes (ADR-0013) | Verified |
 | CREW-003 | View a crew page                          | 2    | Crew member | `crews.$id.tsx` loader              | `requireRegisteredUser` + `teamRole` | Verified    |
 | CREW-004 | Rename a crew                             | 3    | Crew owner  | `crews.$id.tsx` `rename`            | owner + `!is_personal`               | Verified    |
 | CREW-005 | Delete a crew                             | 3    | Crew owner  | `crews.$id.tsx` `deleteTeam`        | owner + `!is_personal`               | Verified    |
@@ -210,6 +210,8 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal`               | Verified    |
 | CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed)       | Verified    |
 | CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew | Verified |
+| CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use | Verified |
+| CREW-021 | Manage billing (Stripe Billing Portal) | 3 | Subscriber | `billing.portal.ts` | `requireRegisteredUser`; redirects to `/app/crews` if no Stripe customer | Verified |
 | CREW-010 | List API keys                             | 2    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
 | CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner                                | Verified    |
 | CREW-012 | Create a board into the crew              | 2    | Crew member | `crews.$id.tsx` `createBoard`       | membership                           | Verified    |
@@ -226,7 +228,7 @@ Tier-2 rows describe the personal crew: every registered user gets one, it holds
 
 Note what the cap does and does not do. It limits *fleet size*, not *volume* — a single free key can drive unlimited writes, and API-002 needs no key at all. Metering agent activity is a separate lever and neither exists today.
 
-CREW-002 is therefore the single gate that has to hold for any of this to be sellable, and it does not exist — see GAP-005. CREW-014 – CREW-018 are marked tier 3 because a personal crew is single-member; the code does not block crew action items on a personal crew, it is simply a list of one.
+CREW-002 is therefore the single gate that has to hold for any of this to be sellable, and it holds: `accountCanCreateNamedCrew` reads `users.subscription_status`, and only the Stripe webhook (API-007) writes it. Subscribing (CREW-020) and managing billing (CREW-021) are Stripe-hosted pages the app redirects to; no card data or payment UI lives here (ADR-0013). CREW-014 – CREW-018 are marked tier 3 because a personal crew is single-member; the code does not block crew action items on a personal crew, it is simply a list of one.
 
 ## ADMIN
 
@@ -252,6 +254,7 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |
 | API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts`      | `CRON_SECRET` bearer   | Verified |
+| API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event | Verified |
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
 
@@ -261,15 +264,12 @@ Agent-authored notes always carry attribution, regardless of the board's attribu
 
 Where the code diverges from the model above. Each is a fact confirmed by reading the source on 2026-09-02, not an inference.
 
-| ID          | Gap                                                                                    | Affects                                                 | Consequence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GAP-005** | Nothing is payment-gated | CREW-002, and via it every tier-3 row | `crews.tsx` routes through `accountCanCreateNamedCrew` — the single seam — but it returns true for everyone until a billing provider exists, so any free account creates unlimited named crews, adds unlimited members, and turns on members-only access. API keys are capped at one per personal crew. There is no plan or subscription concept in the schema. When billing lands, the seam's body is the whole integration. |
 
-GAP-005 is the only open gap: the paywall itself, which needs a billing provider before it can close. The seam it will use already exists.
+No open gaps as of 2026-09-06. A divergence between this document and the code is recorded here first, with an ID, and closed from here.
 
 
 ## Untested paths
 
-Every row in this document is **Verified** except CREW-002, which is **Ungated** — its seam is tested, and nothing charges. Components with no dedicated test of their own: `Board`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`; `board.poll.ts` is covered only through the permission matrix.
+Every row in this document is **Verified**. Components with no dedicated test of their own: `Board`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`; `board.poll.ts` is covered only through the permission matrix.
 
 Every row marked **Verified** is named by at least one test, and `app/server/registry_linkage.test.ts` fails if that stops being true — or if a test names a row this file still marks Unverified. `app/server/permission_matrix.test.ts` asserts every server-enforced row × every actor × every board tier resolves to an explicit allow or deny; a missing cell is a failing test.

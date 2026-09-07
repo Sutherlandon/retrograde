@@ -19,12 +19,24 @@ vi.mock("~/server/entitlements", () => ({
   accountCanCreateNamedCrew: (...args: unknown[]) => mockAccountCanCreateNamedCrew(...args),
 }));
 
+const mockGetBillingForUser = vi.fn();
+vi.mock("~/server/billing_model", () => ({
+  getBillingForUser: (...args: unknown[]) => mockGetBillingForUser(...args),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireRegisteredUser.mockResolvedValue({ id: "user-1", username: "landon" });
   mockListTeamsForUser.mockResolvedValue([]);
   mockCreateTeam.mockResolvedValue("team-new");
   mockAccountCanCreateNamedCrew.mockResolvedValue(true);
+  mockGetBillingForUser.mockResolvedValue({
+    userId: "user-1",
+    email: "landon@example.com",
+    stripeCustomerId: "cus_existing",
+    stripeSubscriptionId: "sub_existing",
+    subscriptionStatus: "active",
+  });
 });
 
 function formRequest(fields: Record<string, string>) {
@@ -42,6 +54,39 @@ describe("teams loader", () => {
     const result = await loader({ request: new Request("http://x"), params: {}, context: {} } as never);
     expect(result.teams).toHaveLength(1);
     expect(mockListTeamsForUser).toHaveBeenCalledWith("user-1");
+  });
+
+  it("CREW-002: returns entitled=true and hasBilling=true when the account has an active subscription", async () => {
+    const { loader } = await import("./crews");
+    const result = await loader({ request: new Request("http://x"), params: {}, context: {} } as never);
+    expect(result.entitled).toBe(true);
+    expect(result.hasBilling).toBe(true);
+    expect(mockAccountCanCreateNamedCrew).toHaveBeenCalledWith("user-1");
+    expect(mockGetBillingForUser).toHaveBeenCalledWith("user-1");
+  });
+
+  it("CREW-002: returns entitled=false and hasBilling=false for an account with no billing record", async () => {
+    mockAccountCanCreateNamedCrew.mockResolvedValueOnce(false);
+    mockGetBillingForUser.mockResolvedValueOnce(null);
+    const { loader } = await import("./crews");
+    const result = await loader({ request: new Request("http://x"), params: {}, context: {} } as never);
+    expect(result.entitled).toBe(false);
+    expect(result.hasBilling).toBe(false);
+  });
+
+  it("CREW-002: hasBilling is true once a Stripe customer exists, even before the subscription is active", async () => {
+    mockAccountCanCreateNamedCrew.mockResolvedValueOnce(false);
+    mockGetBillingForUser.mockResolvedValueOnce({
+      userId: "user-1",
+      email: "landon@example.com",
+      stripeCustomerId: "cus_existing",
+      stripeSubscriptionId: null,
+      subscriptionStatus: null,
+    });
+    const { loader } = await import("./crews");
+    const result = await loader({ request: new Request("http://x"), params: {}, context: {} } as never);
+    expect(result.entitled).toBe(false);
+    expect(result.hasBilling).toBe(true);
   });
 });
 

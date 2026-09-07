@@ -249,6 +249,14 @@ function resolveIdentityQueries(s: string, params: unknown[], actor: ActorState)
   if (s.includes("FROM admin_users WHERE user_id")) {
     return actor.isGrantedAdmin ? { rowCount: 1, rows: [{ "?column?": 1 }] } : { rowCount: 0, rows: [] };
   }
+  if (s === "SELECT subscription_status FROM users WHERE id = $1") {
+    // entitlements.ts (CREW-002, GAP-005/ADR-0013): the matrix's expectation
+    // model for CREW-002 is RULES.registeredOnly — every registered human is
+    // entitled here, matching that model, not a real billing state.
+    return params[0] === actor.userId && isRegisteredHuman(actor)
+      ? { rowCount: 1, rows: [{ subscription_status: "active" }] }
+      : { rowCount: 0, rows: [] };
+  }
   return undefined;
 }
 

@@ -18,13 +18,8 @@ export async function action({ request }: ActionFunctionArgs) {
     return err("METHOD_NOT_ALLOWED", "Use POST", 405);
   }
 
-  const secret = cronSecret;
-  if (!secret) {
-    return err("MISCONFIGURED", "CRON_SECRET env var not set", 500);
-  }
-
   const auth = request.headers.get("Authorization");
-  if (auth !== `Bearer ${secret}`) {
+  if (auth !== `Bearer ${cronSecret}`) {
     return err("UNAUTHORIZED", "Invalid or missing CRON_SECRET", 401);
   }
 

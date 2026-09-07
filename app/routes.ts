@@ -21,6 +21,8 @@ export default [
     route("admin/admins",   "routes/app/admin.admins.ts"),
     route("crews", "routes/app/crews.tsx"),
     route("crews/:id", "routes/app/crews.$id.tsx"),
+    route("billing/checkout", "routes/app/billing.checkout.ts"),
+    route("billing/portal", "routes/app/billing.portal.ts"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */
@@ -50,6 +52,7 @@ export default [
   route("/api/v1/boards/:id/notes", "routes/api/board.notes.ts"),
   route("/api/v1/boards/:id/action-items", "routes/api/board.action-items.ts"),
   route("/api/v1/cron/archive-stale", "routes/api/cron.archive-stale.ts"),
+  route("/api/stripe/webhook", "routes/api/stripe.webhook.ts"),
 
   // legacy route for backward compatibility
   route("/board/:id", "routes/app/board.legacy.tsx"),

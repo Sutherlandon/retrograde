@@ -66,9 +66,11 @@ export const MATRIX_EXTRA_EXCLUDED_IDS = new Set([
   "DASH-002", "DASH-013", "DASH-014", "DASH-015", "DASH-017", // read-scoping / client-side, not an allow-deny gate
   "DASH-004", "DASH-005", // client-side sort/filter
   "CREW-010", "CREW-013", "CREW-018", // same loader/gate as CREW-003, not a distinct enforcement point
+  "CREW-020", "CREW-021", // redirect to Stripe-hosted pages — no allow/deny beyond "registered session", same class as API-001/API-002
   "ADMIN-002", "ADMIN-003", // inherits ADMIN-001 / no distinct code path
   "API-001", "API-002", // always succeed — no denial branch exists
   "API-006", // service bearer secret, not an actor identity
+  "API-007", // actor is Stripe itself, authenticated by signature, not a user — same class as API-006
 ]);
 
 /** Recursively find every `*.test.ts`/`*.test.tsx` file under `dir`. */
