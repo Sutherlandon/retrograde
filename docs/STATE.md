@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-06 · **Version:** 1.6.1 · **Branch:** `agent-substrate` (ahead of `main`, unreviewed)
+**Updated:** 2026-09-08 · **Version:** 1.6.1 · **Branch:** `agent-substrate` (ahead of `main`, unreviewed)
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md).
 
@@ -41,7 +41,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 ## Known rough edges
 
 1. **The app will not boot without Stripe configuration, in every environment** (ADR-0013, CLAUDE.md rule 5). `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `CRON_SECRET`, and `OAUTH_REDIRECT_URI` go through `requireEnv()` and a missing one exits the process at startup. `npm run build` does not execute `db_config.ts`, so a CI build will not catch a missing var — only a server boot does.
-2. **Stripe Tax is not enabled.** Charging US/EU customers carries sales-tax/VAT obligations; `automatic_tax` collects nothing until a registration exists, silently. Decide jurisdictions before charging real customers.
+2. **Stripe is the merchant of record** (ADR-0014). Managed Payments remits sales tax/VAT/GST in 80+ countries for 3.5% per transaction (~$1.40 on $39.99). Consequences to know: Stripe emails customers directly from Link (receipts, invoices, renewal notices), handles payment support, and may refund unilaterally if it asks you for product input and gets no reply within 48 hours. `automatic_tax` must never be set — Managed Payments forbids it, and a test enforces that.
 3. **The permission matrix has no registered-but-unsubscribed actor.** Its fixture answers the entitlement query with `active` for every registered human, so it proves "registered + active → allowed" and "everyone else → denied" for CREW-002; the not-subscribed case is covered by `entitlements.test.ts` and `crews.test.ts`, not the matrix.
 4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
 5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.

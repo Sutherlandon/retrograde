@@ -131,4 +131,47 @@ describe("billing.checkout action (CREW-002) [CREW-020]", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("https://checkout.stripe.com/session_1");
   });
+
+  it("enables Managed Payments so Stripe is merchant of record (ADR-0014)", async () => {
+    const { action } = await import("./billing.checkout");
+    await action({ request: postRequest(), params: {}, context: {} } as never);
+
+    const params = mockCheckoutSessionsCreate.mock.calls[0][0];
+    expect(params.managed_payments).toEqual({ enabled: true });
+  });
+
+  it("never sets a param forbidden alongside Managed Payments (would silently disable Stripe as merchant of record)", async () => {
+    const { action } = await import("./billing.checkout");
+    await action({ request: postRequest(), params: {}, context: {} } as never);
+
+    const params = mockCheckoutSessionsCreate.mock.calls[0][0];
+    const forbiddenWithManagedPayments = [
+      "adaptive_pricing",
+      "automatic_tax",
+      "tax_id_collection",
+      "payment_method_configuration",
+      "payment_method_options",
+      "payment_method_types",
+      "shipping_address_collection",
+      "shipping_options",
+      "invoice_creation",
+    ];
+    for (const key of forbiddenWithManagedPayments) {
+      expect(params).not.toHaveProperty(key);
+    }
+
+    const forbiddenSubscriptionDataKeys = [
+      "default_tax_rates",
+      "application_fee_percent",
+      "on_behalf_of",
+      "transfer_data",
+      "invoice_settings",
+    ];
+    for (const key of forbiddenSubscriptionDataKeys) {
+      expect(params.subscription_data ?? {}).not.toHaveProperty(key);
+    }
+
+    expect(params.customer_update?.name).toBeUndefined();
+    expect(params.customer_update?.address).toBeUndefined();
+  });
 });

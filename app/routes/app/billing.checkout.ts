@@ -60,6 +60,12 @@ export async function action({ request }: ActionFunctionArgs) {
     // from Dashboard settings; hardcoding this is the first mistake Stripe's
     // own guidance flags.
     integration_identifier: `retrograde_${randomLetters(8)}`,
+    // Stripe is merchant of record on this sale (ADR-0014): Stripe, not us,
+    // calculates and remits sales tax/VAT/GST across its 80+ supported
+    // countries. Do not also set automatic_tax, tax_id_collection, or any
+    // other param on Stripe's forbidden-with-managed_payments list — those
+    // conflict with Stripe owning tax end to end.
+    managed_payments: { enabled: true },
   });
 
   return redirect(session.url!);

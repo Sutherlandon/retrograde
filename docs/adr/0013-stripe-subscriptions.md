@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-06)
+Accepted (2026-09-06) — the deferred tax decision is made in [ADR-0014](0014-stripe-is-merchant-of-record.md): Stripe is the merchant of record via Managed Payments, so `automatic_tax` is not used and must not be added. Everything else here stands.
 
 ## Context
 
