@@ -776,6 +776,21 @@ export function LockIcon({ size = 'md', className = '' }: IconProps) {
   );
 }
 
+// ADR-0013: billing nav row — a bare $ glyph, deliberately no coin/circle
+// outline, reads as "money" at a glance without adding a second shape to
+// parse at nav-row size.
+export function DollarIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    // Cropped to the glyph's own bounding box (4.5,4.5 to 19.5,19.5), not the
+    // full 0-24 canvas: without the coin circle, the bare $ only fills about
+    // a quarter of the default viewBox width, rendering visibly smaller and
+    // thinner-stroked than every other nav icon at the same w-5 h-5 box.
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="4.5 4.5 15 15" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33" />
+    </svg>
+  );
+}
+
 // BRD-020: planted-flag glyph (pole + pennant) used on the claim controls.
 export function FlagIcon({ size = 'md', className = '' }: IconProps) {
   return (

@@ -5,7 +5,7 @@
 // inside Header's mobile slide-out menu so the same links stay reachable
 // on small screens.
 import { useLocation } from "react-router";
-import { RocketIcon, AstronautIcon, LockIcon, type IconProps } from "~/images/icons";
+import { RocketIcon, AstronautIcon, LockIcon, DollarIcon, ExternalLinkIcon, type IconProps } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
 import type { TeamSummary } from "~/server/team_model";
 
@@ -13,6 +13,10 @@ interface SidebarProps {
   isAdmin?: boolean;
   teams?: TeamSummary[];
   unassignedCount?: number;
+  /** Shows the Billing row (ADR-0013) — hidden entirely, not disabled, for
+   *  an account with no active subscription so the menu never advertises a
+   *  Stripe Billing Portal that would just bounce it back to /app/crews. */
+  isSubscribed?: boolean;
   onNavigate?: () => void;
   className?: string;
 }
@@ -107,10 +111,58 @@ export function CrewSelector({ teams = [], unassignedCount = 0, onNavigate }: {
   );
 }
 
-export default function Sidebar({ isAdmin, teams, unassignedCount, onNavigate, className = "" }: SidebarProps) {
+function NavRow({ href, label, icon: Icon, onNavigate }: {
+  href: string;
+  label: string;
+  icon: (props: IconProps) => React.ReactElement;
+  onNavigate?: () => void;
+}) {
   const location = useLocation();
-  const items = navItems.filter((item) => !item.adminOnly || isAdmin);
+  // Crew detail pages (/app/crews/:id) are highlighted in the Crews section
+  // below, not here — Mission Control's "Crews" row is only active on the
+  // index itself.
+  const active =
+    href === "/app/crews"
+      ? location.pathname === href
+      : location.pathname === href || location.pathname.startsWith(`${href}/`);
 
+  return (
+    <li>
+      <a href={href} onClick={onNavigate} aria-current={active ? "page" : undefined} className={rowClasses(active)}>
+        <Icon size="md" />
+        {label}
+      </a>
+    </li>
+  );
+}
+
+// Above Admin (so an admin still finds their own account settings before the
+// site-wide tools), below Crews. Hidden entirely, not disabled, for an
+// account with no active subscription so the menu never advertises a Stripe
+// Billing Portal that would just bounce it back to /app/crews.
+function BillingRow({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <li>
+      {/* A plain form, not react-router's Form: this always leaves the app
+          for the Stripe-hosted Billing Portal, so there's no client-side
+          pending state worth wiring up, and it needs no data-router context
+          (Sidebar also renders standalone inside Header's mobile menu). */}
+      <form method="post" action="/app/billing/portal">
+        <button
+          type="submit"
+          onClick={onNavigate}
+          className={`w-full text-left cursor-pointer ${rowClasses(false)}`}
+        >
+          <DollarIcon size="md" />
+          <span className="flex-1 min-w-0 truncate">Billing</span>
+          <ExternalLinkIcon size="sm" className="shrink-0 text-gray-400 dark:text-gray-500" />
+        </button>
+      </form>
+    </li>
+  );
+}
+
+export default function Sidebar({ isAdmin, teams, unassignedCount, isSubscribed, onNavigate, className = "" }: SidebarProps) {
   return (
     <div className={className}>
       <nav aria-label="Main">
@@ -118,29 +170,13 @@ export default function Sidebar({ isAdmin, teams, unassignedCount, onNavigate, c
           Mission Control
         </p>
         <ul className="flex flex-col gap-1">
-          {items.map(({ href, label, icon: Icon }) => {
-            // Crew detail pages (/app/crews/:id) are highlighted in the Crews
-            // section below, not here — Mission Control's "Crews" row is only
-            // active on the index itself.
-            const active =
-              href === "/app/crews"
-                ? location.pathname === href
-                : location.pathname === href || location.pathname.startsWith(`${href}/`);
-
-            return (
-              <li key={href}>
-                <a
-                  href={href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
-                  className={rowClasses(active)}
-                >
-                  <Icon size="md" />
-                  {label}
-                </a>
-              </li>
-            );
-          })}
+          {navItems.filter((item) => !item.adminOnly).map((item) => (
+            <NavRow key={item.href} {...item} onNavigate={onNavigate} />
+          ))}
+          {isSubscribed && <BillingRow onNavigate={onNavigate} />}
+          {isAdmin && navItems.filter((item) => item.adminOnly).map((item) => (
+            <NavRow key={item.href} {...item} onNavigate={onNavigate} />
+          ))}
         </ul>
       </nav>
       <CrewSelector teams={teams} unassignedCount={unassignedCount} onNavigate={onNavigate} />

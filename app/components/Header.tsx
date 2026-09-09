@@ -14,9 +14,10 @@ interface HeaderProps {
   isAdmin?: boolean;
   teams?: TeamSummary[];
   unassignedCount?: number;
+  isSubscribed?: boolean;
 }
 
-export default function Header({ user, isAdmin, teams, unassignedCount }: HeaderProps) {
+export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -158,7 +159,7 @@ export default function Header({ user, isAdmin, teams, unassignedCount }: Header
         <AccountHub user={user} closeMenu={closeMenu} />
         {user && (
           <>
-            <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} onNavigate={closeMenu} />
+            <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} onNavigate={closeMenu} />
             <div className="border-t border-gray-200 dark:border-gray-700" />
           </>
         )}

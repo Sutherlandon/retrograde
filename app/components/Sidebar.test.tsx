@@ -93,3 +93,43 @@ describe("Sidebar — crew selector", () => {
     expect(screen.getByText("Unassigned").closest("a")).toHaveAttribute("aria-current", "page");
   });
 });
+
+describe("Sidebar — billing link (ADR-0013)", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("hides the Billing link when the account is not subscribed", () => {
+    renderAt("/app/dashboard", { isSubscribed: false });
+    expect(screen.queryByText("Billing")).not.toBeInTheDocument();
+  });
+
+  it("shows a Billing link posting to the Stripe portal route when subscribed", () => {
+    renderAt("/app/dashboard", { isSubscribed: true });
+    const button = screen.getByRole("button", { name: "Billing" });
+    const form = button.closest("form");
+    expect(form).toHaveAttribute("action", "/app/billing/portal");
+    expect(form).toHaveAttribute("method", "post");
+  });
+
+  it("calls onNavigate when Billing is clicked", () => {
+    const onNavigate = vi.fn();
+    renderAt("/app/dashboard", { isSubscribed: true, onNavigate });
+    fireEvent.click(screen.getByRole("button", { name: "Billing" }));
+    expect(onNavigate).toHaveBeenCalled();
+  });
+
+  it("shows an external-link icon on Billing, signaling it leaves the app for Stripe", () => {
+    renderAt("/app/dashboard", { isSubscribed: true });
+    const button = screen.getByRole("button", { name: "Billing" });
+    expect(button.querySelectorAll("svg")).toHaveLength(2); // leading settings icon + trailing external-link icon
+  });
+
+  it("places Billing above Admin in Mission Control", () => {
+    renderAt("/app/dashboard", { isSubscribed: true, isAdmin: true });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    const rowLabels = Array.from(nav.querySelectorAll("li")).map((li) => li.textContent?.trim());
+    expect(rowLabels.indexOf("Billing")).toBeGreaterThan(-1);
+    expect(rowLabels.indexOf("Billing")).toBeLessThan(rowLabels.indexOf("Admin"));
+  });
+});
