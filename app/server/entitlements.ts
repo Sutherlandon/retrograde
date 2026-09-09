@@ -23,3 +23,22 @@ export async function accountCanCreateNamedCrew(userId: string): Promise<boolean
   );
   return res.rows[0]?.subscription_status === "active";
 }
+
+/** Whether a crew's paid features are active. True for personal crews —
+ *  tier 2 is free and never freezes — and for named crews whose OWNER
+ *  has subscription_status = 'active'. The check is on the crew owner,
+ *  not the acting user, because members are often free accounts. */
+export async function crewIsEntitled(teamId: string): Promise<boolean> {
+  const res = await pool.query<{ is_personal: boolean; subscription_status: string | null }>(
+    `SELECT t.is_personal, u.subscription_status
+     FROM teams t
+     LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.role = 'owner'
+     LEFT JOIN users u ON u.id = tm.user_id
+     WHERE t.id = $1`,
+    [teamId]
+  );
+  const row = res.rows[0];
+  if (!row) return false;
+  if (row.is_personal) return true;
+  return row.subscription_status === "active";
+}

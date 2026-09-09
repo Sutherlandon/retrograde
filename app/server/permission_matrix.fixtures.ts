@@ -330,6 +330,15 @@ function resolveMembershipQueries(
   if (s.includes("FROM team_members tm") && s.includes("JOIN users u")) {
     return { rowCount: 0, rows: [] };
   }
+  // entitlements.ts crewIsEntitled: the owner-lapse freeze check added for
+  // CREW-004..017. The matrix tests roles, not billing lapse (that's covered
+  // by crews.$id.test.ts's own route tests), so this always answers with an
+  // active owner for the matrix's crews — existing allow/deny expectations
+  // for those rows still hold.
+  if (s.includes("FROM teams t") && s.includes("LEFT JOIN team_members tm")) {
+    if (!fixture.teamId || params[0] !== fixture.teamId) return { rowCount: 0, rows: [] };
+    return { rowCount: 1, rows: [{ is_personal: fixture.isPersonal, subscription_status: "active" }] };
+  }
   // duplicateBoardServer: the original board's title + voting settings, read
   // inside the transaction after the ownership/crew checks pass.
   if (s.startsWith("SELECT title, voting_enabled, voting_allowed, voting_scope")) {

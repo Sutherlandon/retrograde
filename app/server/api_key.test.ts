@@ -249,6 +249,42 @@ describe("listApiKeysForTeam", () => {
   });
 });
 
+describe("revokeNamedCrewKeysForOwner", () => {
+  it("revokes only named-crew keys owned by the user and returns the count", async () => {
+    const { revokeNamedCrewKeysForOwner } = await import("./api_key");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 3 });
+    const count = await revokeNamedCrewKeysForOwner("user-1");
+    expect(count).toBe(3);
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("UPDATE api_keys");
+    expect(call[0]).toContain("revoked_at = NOW()");
+    expect(call[0]).toContain("revoked_at IS NULL");
+    expect(call[0]).toContain("is_personal = FALSE");
+    expect(call[0]).toContain("role = 'owner'");
+    expect(call[1]).toEqual(["user-1"]);
+  });
+
+  it("returns 0 when there is nothing to revoke", async () => {
+    const { revokeNamedCrewKeysForOwner } = await import("./api_key");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
+    const count = await revokeNamedCrewKeysForOwner("user-with-no-named-crews");
+    expect(count).toBe(0);
+  });
+
+  it("leaves personal-crew keys and already-revoked keys alone (scoped by SQL, not app logic)", async () => {
+    // This is enforced by the WHERE clause itself: is_personal = FALSE excludes
+    // personal-crew keys, and revoked_at IS NULL excludes already-revoked keys —
+    // both asserted above via the query text. This test documents the intent
+    // and guards against the WHERE clause being weakened later.
+    const { revokeNamedCrewKeysForOwner } = await import("./api_key");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    await revokeNamedCrewKeysForOwner("user-1");
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toMatch(/is_personal\s*=\s*FALSE/);
+    expect(call[0]).toMatch(/revoked_at IS NULL/);
+  });
+});
+
 describe("touchApiKeyLastUsed", () => {
   it("issues an UPDATE with NOW()", async () => {
     const { touchApiKeyLastUsed } = await import("./api_key");

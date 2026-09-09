@@ -32,6 +32,7 @@ import {
 } from "~/server/action_item_model";
 import { listApiKeysForTeam, mintApiKey, revokeApiKey, ApiKeyLimitError } from "~/server/api_key";
 import { findRegisteredUserByUsername } from "~/server/admin_model";
+import { crewIsEntitled } from "~/server/entitlements";
 import type { TeamDTO, TeamMemberDTO, DashboardBoardRow, ApiKeyDTO } from "~/server/board.types";
 import { StatusLED } from "~/components/StatusLED";
 import { SectionLabel } from "~/components/SectionLabel";
@@ -47,6 +48,26 @@ import { PlusIcon, ColumnsIcon, UserIcon, RobotIcon, SettingsIcon, CheckIcon } f
 // confirmation right next to where it happened — same reasoning as
 // BoardToolbar's post-claim confirmation.
 const RENAME_CONFIRMATION_MS = 6000;
+
+// Intents that create or manage crew work. When the crew's OWNER lapses
+// (crewIsEntitled(teamId) is false), all of these freeze — the product
+// owner's call is "freeze everything," including removeMember/deleteTeam,
+// with no per-intent exceptions. `toggleItem` is deliberately absent: it
+// only checks off an action item that already exists, not new work, so it
+// keeps working through a lapse.
+const FROZEN_WHEN_CREW_LAPSED = new Set([
+  "rename",
+  "deleteTeam",
+  "setRestrictAccess",
+  "addMember",
+  "removeMember",
+  "mintKey",
+  "revokeKey",
+  "createBoard",
+  "addItem",
+  "updateItem",
+  "deleteItem",
+]);
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const user = await requireRegisteredUser(request);
@@ -97,6 +118,15 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const role = await teamRole(teamId, user.id);
   if (!role) throw new Response("Forbidden", { status: 403 });
   const isOwner = role === "owner";
+
+  // Paid-tier gate (GAP-005/ADR-0013): the check is on the crew's OWNER, not
+  // the acting user — members are often free accounts inside a paid owner's
+  // crew. Personal crews always return true from crewIsEntitled, so this is
+  // a no-op for them. 402 (not 403) because this is a billing state, not a
+  // role failure — the existing 403s below are unaffected.
+  if (intent && FROZEN_WHEN_CREW_LAPSED.has(intent) && !(await crewIsEntitled(teamId))) {
+    throw new Response("This crew requires an active subscription", { status: 402 });
+  }
 
   // ----- owner-only lifecycle + membership -----
   if (intent === "rename") {

@@ -2,8 +2,14 @@
 // Billing fields on the users table (GAP-005 / ADR-0013). Subscription state
 // belongs to the account, not any crew — see the schema block in db_init.ts.
 // All queries are raw parameterized SQL against `users`; no ORM.
+//
+// A lapse (any status other than "active") also revokes every API key on
+// the named crews this user owns — see revokeNamedCrewKeysForOwner in
+// api_key.ts. Personal-crew keys are untouched. The status write and the
+// revocation happen in one transaction so a lapse can never half-apply.
 
 import { pool } from "./db_config";
+import { revokeNamedCrewKeysForOwner } from "./api_key";
 
 export interface BillingRow {
   userId: string;
@@ -53,17 +59,40 @@ export async function setStripeCustomerId(userId: string, customerId: string): P
 /**
  * Writes subscription state onto whichever user owns `customerId`. Returns
  * false when no user has that customer id (the webhook logs and moves on).
+ *
+ * When `status !== "active"` and a user was matched, also revokes every API
+ * key on the named crews that user owns (personal-crew keys are untouched).
+ * The status write and the revocation happen in one transaction, so a lapse
+ * can never half-apply.
  */
 export async function applySubscriptionState(
   customerId: string,
   subscriptionId: string | null,
   status: string
 ): Promise<boolean> {
-  const res = await pool.query(
-    `UPDATE users
-     SET stripe_subscription_id = $2, subscription_status = $3
-     WHERE stripe_customer_id = $1`,
-    [customerId, subscriptionId, status]
-  );
-  return (res.rowCount ?? 0) > 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const res = await client.query<{ id: string }>(
+      `UPDATE users
+       SET stripe_subscription_id = $2, subscription_status = $3
+       WHERE stripe_customer_id = $1
+       RETURNING id`,
+      [customerId, subscriptionId, status]
+    );
+
+    const matchedUserId = res.rows[0]?.id;
+    if (matchedUserId && status !== "active") {
+      await revokeNamedCrewKeysForOwner(matchedUserId, client);
+    }
+
+    await client.query("COMMIT");
+    return (res.rowCount ?? 0) > 0;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }

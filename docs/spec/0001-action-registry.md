@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-09-06 · **Branch:** `agent-substrate`
+**Updated:** 2026-09-08 · **Branch:** `agent-substrate`
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
@@ -203,23 +203,23 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | CREW-001 | List own crews                            | 2    | Registered  | `crews.tsx` loader                  | `requireRegisteredUser`              | Verified    |
 | CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` → 403 unless `users.subscription_status = 'active'`, which only the signature-verified Stripe webhook writes (ADR-0013) | Verified |
 | CREW-003 | View a crew page                          | 2    | Crew member | `crews.$id.tsx` loader              | `requireRegisteredUser` + `teamRole` | Verified    |
-| CREW-004 | Rename a crew                             | 3    | Crew owner  | `crews.$id.tsx` `rename`            | owner + `!is_personal`               | Verified    |
-| CREW-005 | Delete a crew                             | 3    | Crew owner  | `crews.$id.tsx` `deleteTeam`        | owner + `!is_personal`               | Verified    |
-| CREW-006 | Add a member by username                  | 3    | Crew owner  | `crews.$id.tsx` `addMember`         | owner + `!is_personal`               | Verified    |
-| CREW-007 | Remove a member                           | 3    | Crew owner  | `crews.$id.tsx` `removeMember`      | owner                                | Verified    |
-| CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal`               | Verified    |
-| CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed)       | Verified    |
-| CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew | Verified |
+| CREW-004 | Rename a crew                             | 3    | Crew owner  | `crews.$id.tsx` `rename`            | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-005 | Delete a crew                             | 3    | Crew owner  | `crews.$id.tsx` `deleteTeam`        | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-006 | Add a member by username                  | 3    | Crew owner  | `crews.$id.tsx` `addMember`         | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-007 | Remove a member                           | 3    | Crew owner  | `crews.$id.tsx` `removeMember`      | owner · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed) · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew · **402 when the crew's owner lapses** (ADR-0015) | Verified |
 | CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use | Verified |
 | CREW-021 | Manage billing (Stripe Billing Portal) | 3 | Subscriber | `billing.portal.ts` | `requireRegisteredUser`; redirects to `/app/crews` if no Stripe customer | Verified |
 | CREW-010 | List API keys                             | 2    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
-| CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner                                | Verified    |
-| CREW-012 | Create a board into the crew              | 2    | Crew member | `crews.$id.tsx` `createBoard`       | membership                           | Verified    |
+| CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-012 | Create a board into the crew              | 2    | Crew member | `crews.$id.tsx` `createBoard`       | membership · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-013 | View crew boards                          | 2    | Crew member | `listVisibleBoards`                 | membership                           | Verified    |
-| CREW-014 | Add a crew action item                    | 3    | Crew member | `crews.$id.tsx` `addItem`           | membership                           | Verified    |
+| CREW-014 | Add a crew action item                    | 3    | Crew member | `crews.$id.tsx` `addItem`           | membership · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-015 | Toggle a crew action item                 | 3    | Crew member | `crews.$id.tsx` `toggleItem`        | membership                           | Verified    |
-| CREW-016 | Edit a crew action item                   | 3    | Crew member | `crews.$id.tsx` `updateItem`        | membership                           | Verified    |
-| CREW-017 | Delete a crew action item                 | 3    | Crew member | `crews.$id.tsx` `deleteItem`        | membership                           | Verified    |
+| CREW-016 | Edit a crew action item                   | 3    | Crew member | `crews.$id.tsx` `updateItem`        | membership · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
+| CREW-017 | Delete a crew action item                 | 3    | Crew member | `crews.$id.tsx` `deleteItem`        | membership · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-018 | See open items rolled up from crew boards | 3    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
 
 Tier-2 rows describe the personal crew: every registered user gets one, it holds their boards, and it can mint **one** API key, since that is how a solo user brings an agent in. Tier-3 rows require a named crew, and CREW-002 is the only thing standing between a free user and one.
@@ -229,6 +229,8 @@ Tier-2 rows describe the personal crew: every registered user gets one, it holds
 Note what the cap does and does not do. It limits *fleet size*, not *volume* — a single free key can drive unlimited writes, and API-002 needs no key at all. Metering agent activity is a separate lever and neither exists today.
 
 CREW-002 is therefore the single gate that has to hold for any of this to be sellable, and it holds: `accountCanCreateNamedCrew` reads `users.subscription_status`, and only the Stripe webhook (API-007) writes it. Subscribing (CREW-020) and managing billing (CREW-021) are Stripe-hosted pages the app redirects to; no card data or payment UI lives here (ADR-0013). CREW-014 – CREW-018 are marked tier 3 because a personal crew is single-member; the code does not block crew action items on a personal crew, it is simply a list of one.
+
+Creating a crew is the gate; **staying subscribed is what keeps it working**. Every row above marked *402 when the crew's owner lapses* consults `crewIsEntitled(teamId)`, which reads the **crew owner's** `subscription_status` — not the acting user's, because members are often free accounts inside a paid owner's crew. Personal crews always pass. A lapse freezes new work and all management, revokes the crew's API keys, and leaves existing boards readable with `restrict_board_access` still enforced — a billing lapse must never widen access. CREW-015 (checking off an existing action item) stays open by design. See ADR-0015.
 
 ## ADMIN
 

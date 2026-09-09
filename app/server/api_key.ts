@@ -6,6 +6,7 @@
 // The full key is shown ONCE at mint time and never recoverable.
 
 import { createHash, randomBytes } from "crypto";
+import type { PoolClient } from "pg";
 import { pool } from "./db_config";
 import type { ApiKeyDTO } from "./board.types";
 
@@ -176,6 +177,34 @@ export async function revokeApiKey(
     `UPDATE api_keys SET revoked_at = NOW() WHERE id = $1 AND team_id = $2`,
     [apiKeyId, teamId]
   );
+}
+
+/**
+ * Revokes every active API key on the NAMED crews this user owns.
+ * Personal-crew keys are untouched — one free key is a tier-2
+ * entitlement (ADR-0011 §6). Returns the number of keys revoked.
+ *
+ * Accepts an optional transaction client (e.g. from billing_model's
+ * applySubscriptionState) so a caller can fold this into a larger
+ * transaction; defaults to the pool for standalone use.
+ */
+export async function revokeNamedCrewKeysForOwner(
+  userId: string,
+  db: Pick<PoolClient, "query"> = pool
+): Promise<number> {
+  const res = await db.query(
+    `UPDATE api_keys
+     SET revoked_at = NOW()
+     WHERE revoked_at IS NULL
+       AND team_id IN (
+         SELECT tm.team_id
+         FROM team_members tm
+         JOIN teams t ON t.id = tm.team_id
+         WHERE tm.user_id = $1 AND tm.role = 'owner' AND t.is_personal = FALSE
+       )`,
+    [userId]
+  );
+  return res.rowCount ?? 0;
 }
 
 export async function listApiKeysForTeam(teamId: string): Promise<ApiKeyDTO[]> {

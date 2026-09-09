@@ -45,6 +45,7 @@ vi.mock("~/server/api_key", () => ({
   ApiKeyLimitError: class extends Error {},
 }));
 vi.mock("~/server/admin_model", () => ({ findRegisteredUserByUsername: vi.fn() }));
+vi.mock("~/server/entitlements", () => ({ crewIsEntitled: vi.fn() }));
 vi.mock("~/server/db_config", () => ({ pool: { query: vi.fn() } }));
 vi.mock("~/server/db_init", () => ({}));
 

@@ -69,19 +69,33 @@ function TeamCard({ team, onOpen }: { team: TeamSummary; onOpen: () => void }) {
   );
 }
 
-function SubscribeExplainer() {
+function SubscribeHero() {
   return (
-    <div className="border rounded-2xl p-5 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700/60">
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Named crews are the paid tier: invite human members, keep members-only
-        boards, and bring on more AI crewmates. Your personal crew stays free.
+    <div
+      data-testid="subscribe-hero"
+      className="mb-8 rounded-2xl border border-blue-300 dark:border-blue-700/60
+        bg-blue-50 dark:bg-blue-950/40 px-6 py-8 sm:px-10 sm:py-10"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <StatusLED color="blue" active pulse size="md" />
+        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-blue-700 dark:text-blue-300">
+          Unlock Named Crews
+        </p>
+      </div>
+      <h2 className="text-2xl sm:text-3xl font-semibold text-blue-950 dark:text-blue-100 mb-3">
+        Bring your whole team onto Retrograde
+      </h2>
+      <p className="text-sm sm:text-base text-blue-900/80 dark:text-blue-200/80 mb-6 max-w-2xl">
+        Named crews unlock multi-member teams, members-only boards, crew action
+        items, and more AI crewmates — for $39.99/month.
       </p>
       <Form method="post" action="/app/billing/checkout">
         <button
           type="submit"
-          className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer"
+          className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500
+            text-white text-base font-semibold shadow-md/20 transition-colors cursor-pointer"
         >
-          Subscribe to create named crews
+          Subscribe — $39.99/month
         </button>
       </Form>
     </div>
@@ -152,6 +166,8 @@ export default function TeamsPage() {
         crew-level action items. Crew boards are permanent and visible to every member.
       </p>
 
+      {!entitled && <SubscribeHero />}
+
       {checkoutSuccess && (
         <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300 w-fit mb-4">
           <CheckIcon size="xs" />
@@ -162,16 +178,20 @@ export default function TeamsPage() {
       <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
         Your Crews
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
+      <div data-testid="crew-list" className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
         {teams.map((team) => (
           <TeamCard key={team.id} team={team} onOpen={() => navigate(`/app/crews/${team.id}`)} />
         ))}
       </div>
 
-      <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
-        Assemble a New Crew
-      </p>
-      {entitled ? <CreateCrewForm hasBilling={hasBilling} /> : <SubscribeExplainer />}
+      {entitled && (
+        <>
+          <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-gray-400 dark:text-gray-500 mb-3">
+            Assemble a New Crew
+          </p>
+          <CreateCrewForm hasBilling={hasBilling} />
+        </>
+      )}
     </div>
   );
 }

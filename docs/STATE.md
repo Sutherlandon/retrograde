@@ -13,13 +13,13 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,158 passing across 77 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,201 passing across 77 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
 ## Branch state
 
-`agent-substrate` carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, and — as of 2026-09-03 — server-side enforcement of the whole tier model with a permission-matrix proof suite. ADRs 0001–0011 cover the decisions.
+`agent-substrate` carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0015 cover the decisions.
 
 No human has looked at any of it in a browser. That review is the gate before merge:
 
@@ -36,6 +36,8 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 **Facilitator is the primitive.** Every board control is designed for the facilitator role; the owner is a facilitator who also holds lifecycle rights (delete, archive, duplicate, move) and cannot be demoted. `isOwner` is the right gate only for those lifecycle controls, which live on the dashboard. On a board page, reach for `canFacilitate`.
 
+**Lapse behavior (ADR-0015).** Entitlement covers the whole crew surface, not just creation, and is checked against the **crew owner** rather than the acting user — members are often free accounts. A lapse returns 402, freezes all crew management and new work, and revokes the owner's named-crew API keys via the webhook. It deliberately does **not** relax `restrict_board_access`: a billing lapse must never widen access. Known sharp edge, accepted deliberately: a lapsed owner cannot remove a member or delete their own crew. Revisit first if it generates support load.
+
 **The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. The paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
 
 ## Known rough edges
@@ -46,7 +48,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
 5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
 6. **No structured logging** (issue #82). `console.log` only.
-7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified except CREW-002 (Ungated — its seam is tested; nothing charges).
+7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified.
 8. **README is 11 lines** (issue #10).
 9. **~30 stale local branches** from merged PRs.
 

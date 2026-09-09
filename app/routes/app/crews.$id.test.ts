@@ -65,6 +65,11 @@ vi.mock("~/server/admin_model", () => ({
   findRegisteredUserByUsername: (...args: unknown[]) => mockFindUser(...args),
 }));
 
+const mockCrewIsEntitled = vi.fn();
+vi.mock("~/server/entitlements", () => ({
+  crewIsEntitled: (...args: unknown[]) => mockCrewIsEntitled(...args),
+}));
+
 // The page module imports the refined components at the top level, but they
 // never render in these loader/action tests. Real icons/StatusLED load fine in
 // node (they're plain components, never invoked here).
@@ -85,6 +90,7 @@ beforeEach(() => {
   mockCreateBoard.mockResolvedValue("board-new");
   mockListApiKeysForTeam.mockResolvedValue([]);
   mockMintApiKey.mockResolvedValue({ key: "rk_live_secret", apiKey: { display_name: "Claude" } });
+  mockCrewIsEntitled.mockResolvedValue(true);
 });
 
 function formRequest(fields: Record<string, string>) {
@@ -352,5 +358,88 @@ describe("teams.$id action — member abilities", () => {
       params: { id: "team-1" }, context: {},
     } as never);
     expect(mockDeleteTeamActionItem).toHaveBeenCalledWith("team-1", "i1");
+  });
+});
+
+// GAP-005/ADR-0013: when the crew's owner lapses (crewIsEntitled returns
+// false), every intent that creates or manages crew work freezes with 402 —
+// except toggleItem, which only checks off work that already exists.
+describe("crews.$id action — crew entitlement gate (owner lapse freezes management)", () => {
+  const FROZEN_CASES: Array<{
+    intent: string; fields: Record<string, string>; modelMock: ReturnType<typeof vi.fn>; label: string;
+    setup?: () => void;
+  }> = [
+    { intent: "rename", fields: { name: "New Name" }, modelMock: mockRenameTeam, label: "CREW-004" },
+    { intent: "deleteTeam", fields: {}, modelMock: mockDeleteTeamServer, label: "CREW-005" },
+    { intent: "setRestrictAccess", fields: { restrict: "true" }, modelMock: mockSetTeamBoardRestriction, label: "CREW-008" },
+    {
+      intent: "addMember", fields: { username: "sam" }, modelMock: mockAddTeamMember, label: "CREW-006",
+      setup: () => mockFindUser.mockResolvedValueOnce({ id: "user-7", username: "sam" }),
+    },
+    { intent: "removeMember", fields: { userId: "user-7" }, modelMock: mockRemoveTeamMember, label: "CREW-007" },
+    { intent: "mintKey", fields: { display_name: "Agent" }, modelMock: mockMintApiKey, label: "CREW-009" },
+    { intent: "revokeKey", fields: { api_key_id: "key-1" }, modelMock: mockRevokeApiKey, label: "CREW-011" },
+    { intent: "createBoard", fields: { title: "New Board" }, modelMock: mockCreateBoard, label: "CREW-012" },
+    { intent: "addItem", fields: { text: "Do it" }, modelMock: mockCreateTeamActionItem, label: "CREW-014" },
+    { intent: "updateItem", fields: { itemId: "i1", text: "Updated" }, modelMock: mockUpdateTeamActionItemText, label: "CREW-016" },
+    { intent: "deleteItem", fields: { itemId: "i1" }, modelMock: mockDeleteTeamActionItem, label: "CREW-017" },
+  ];
+
+  for (const { intent, fields, modelMock, label, setup } of FROZEN_CASES) {
+    it(`${label}: ${intent} returns 402 and never calls the model when the crew is not entitled`, async () => {
+      mockCrewIsEntitled.mockResolvedValueOnce(false);
+      const { action } = await import("./crews.$id");
+      try {
+        await action({
+          request: formRequest({ intent, ...fields }),
+          params: { id: "team-1" }, context: {},
+        } as never);
+        expect.unreachable("should have thrown");
+      } catch (response: unknown) {
+        expect((response as Response).status).toBe(402);
+      }
+      expect(mockCrewIsEntitled).toHaveBeenCalledWith("team-1");
+      expect(modelMock).not.toHaveBeenCalled();
+    });
+
+    it(`${label}: ${intent} proceeds as before when the crew is entitled`, async () => {
+      mockCrewIsEntitled.mockResolvedValueOnce(true);
+      setup?.();
+      const { action } = await import("./crews.$id");
+      await action({
+        request: formRequest({ intent, ...fields }),
+        params: { id: "team-1" }, context: {},
+      } as never);
+      expect(modelMock).toHaveBeenCalled();
+    });
+  }
+
+  it("CREW-015: toggleItem is not frozen — it succeeds even when the crew is not entitled", async () => {
+    // Not `.mockResolvedValueOnce`: toggleItem never calls crewIsEntitled at
+    // all (that's the point of this test), so a queued "once" value here
+    // would go unconsumed and leak into the next test's first call.
+    mockCrewIsEntitled.mockResolvedValue(false);
+    const { action } = await import("./crews.$id");
+    const result = await action({
+      request: formRequest({ intent: "toggleItem", itemId: "i1", completed: "true" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockSetTeamActionItemCompleted).toHaveBeenCalledWith("team-1", "i1", true);
+    expect((result as { success?: boolean }).success).toBe(true);
+  });
+
+  it("a personal crew is unaffected by the entitlement gate (crewIsEntitled always true for it)", async () => {
+    mockGetTeamWithMembers.mockResolvedValue({
+      team: { id: "team-1", name: "landon's Team", is_personal: true, created_at: "x" },
+      members: [],
+    });
+    mockCrewIsEntitled.mockResolvedValueOnce(true);
+    const { action } = await import("./crews.$id");
+    const result = await action({
+      request: formRequest({ intent: "createBoard", title: "Sprint 13" }),
+      params: { id: "team-1" }, context: {},
+    } as never);
+    expect(mockCreateBoard).toHaveBeenCalledWith("Sprint 13", "user-1", "team-1");
+    expect((result as Response).headers?.get("Location")).toBe("/app/board/board-new");
   });
 });
