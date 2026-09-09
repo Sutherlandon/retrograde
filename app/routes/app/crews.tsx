@@ -76,18 +76,12 @@ function SubscribeHero() {
       className="mb-8 rounded-2xl border border-blue-300 dark:border-blue-700/60
         bg-blue-50 dark:bg-blue-950/40 px-6 py-8 sm:px-10 sm:py-10"
     >
-      <div className="flex items-center gap-2 mb-4">
-        <StatusLED color="blue" active pulse size="md" />
-        <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-blue-700 dark:text-blue-300">
-          Unlock Named Crews
-        </p>
-      </div>
-      <h2 className="text-2xl sm:text-3xl font-semibold text-blue-950 dark:text-blue-100 mb-3">
+      <h2 className="text-2xl sm:text-3xl font-semibold text-blue-950 dark:text-blue-100 mb-3 pt-0">
         Bring your whole team onto Retrograde
       </h2>
       <p className="text-sm sm:text-base text-blue-900/80 dark:text-blue-200/80 mb-6 max-w-2xl">
         Named crews unlock multi-member teams, members-only boards, crew action
-        items, and more AI crewmates — for $39.99/month.
+        items, and unlimited AI crewmates — for $39.99/month.
       </p>
       <Form method="post" action="/app/billing/checkout">
         <button
@@ -161,12 +155,12 @@ export default function TeamsPage() {
   return (
     <div className="px-8 mx-auto w-full sm:w-[80%] max-w-5xl">
       <h1 className="text-3xl font-semibold mb-1">Crews</h1>
+      {!entitled && <SubscribeHero />}
+
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         Organize boards under crews, share them with your crewmates, and track
         crew-level action items. Crew boards are permanent and visible to every member.
       </p>
-
-      {!entitled && <SubscribeHero />}
 
       {checkoutSuccess && (
         <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/60 text-green-700 dark:text-green-300 w-fit mb-4">
