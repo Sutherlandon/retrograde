@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-08 · **Version:** 1.6.1 · **Branch:** `agent-substrate` (ahead of `main`, unreviewed)
+**Updated:** 2026-09-09 · **Version:** 2.0.0-rc.1 · **Branch:** `release/2.0.0-rc.1` (cut from `agent-substrate`, ahead of `main`, unreviewed)
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md).
 
@@ -13,13 +13,15 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,201 passing across 77 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,213 passing across 78 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
 ## Branch state
 
-`agent-substrate` carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0015 cover the decisions.
+`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0015 cover the decisions.
+
+**It is 2.0.0, not 1.7.0, because the boot contract changed.** `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `CRON_SECRET` and `OAUTH_REDIRECT_URI` are now required through `requireEnv()`, so an existing deployment that upgrades without setting them exits at startup rather than degrading. Self-hosted installs must change their environment before this version will run.
 
 No human has looked at any of it in a browser. That review is the gate before merge:
 
