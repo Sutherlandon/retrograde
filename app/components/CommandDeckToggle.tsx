@@ -30,6 +30,7 @@ export function CommandDeckToggle({ label, checked, onChange, disabled = false, 
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
         className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none
           ${checked ? toggleColorMap[ledColor] : "bg-gray-300 dark:bg-gray-600"}

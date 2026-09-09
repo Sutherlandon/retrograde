@@ -128,10 +128,23 @@ describe("teams.$id loader", () => {
     expect(result.openItems).toHaveLength(1);
     expect(result.teams).toHaveLength(1);
     expect(result.keys).toHaveLength(1);
+    expect(result.isEntitled).toBe(true);
     // Boards are scoped to this crew; open items and AI keys to this crew.
     expect(mockListVisibleBoards).toHaveBeenCalledWith("user-1", { teamId: "team-1" });
     expect(mockListOpenActionItemsForTeam).toHaveBeenCalledWith("team-1", "user-1");
     expect(mockListApiKeysForTeam).toHaveBeenCalledWith("team-1");
+    expect(mockCrewIsEntitled).toHaveBeenCalledWith("team-1");
+  });
+
+  it("surfaces isEntitled: false when the crew's owner has lapsed (ADR-0015), so the page can freeze itself", async () => {
+    const { loader } = await import("./crews.$id");
+    mockCrewIsEntitled.mockResolvedValueOnce(false);
+
+    const result = await loader({
+      request: new Request("http://x"), params: { id: "team-1" }, context: {},
+    } as never);
+
+    expect(result.isEntitled).toBe(false);
   });
 });
 

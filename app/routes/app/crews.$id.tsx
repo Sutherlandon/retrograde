@@ -7,7 +7,7 @@
 export const meta = () => [{ title: "Crew – Retrograde" }];
 
 import { useState, useEffect, useRef } from "react";
-import { redirect, useLoaderData, useFetcher, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import { Form, redirect, useLoaderData, useFetcher, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import {
   getTeamWithMembers,
@@ -80,11 +80,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const role = await teamRole(teamId, user.id);
   if (!role) throw new Response("Forbidden", { status: 403 });
 
-  const [boards, openItems, teams, keys] = await Promise.all([
+  const [boards, openItems, teams, keys, isEntitled] = await Promise.all([
     listVisibleBoards(user.id, { teamId }),
     listOpenActionItemsForTeam(teamId, user.id),
     listTeamsForUser(user.id), // move-to-crew destinations
     listApiKeysForTeam(teamId), // AI crewmates
+    crewIsEntitled(teamId), // ADR-0015: drives the read-only banner + disabled controls below
   ]);
 
   return {
@@ -96,6 +97,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     keys,
     isTeamOwner: role === "owner",
     currentUserId: user.id,
+    isEntitled,
   };
 }
 
@@ -235,8 +237,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 // Sections
 // ---------------------------------------------------------------------------
 
-function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
-  members: TeamMemberDTO[]; isTeamOwner: boolean; isPersonal: boolean; currentUserId: string;
+function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId, disabled }: {
+  members: TeamMemberDTO[]; isTeamOwner: boolean; isPersonal: boolean; currentUserId: string; disabled: boolean;
 }) {
   const addFetcher = useFetcher<{ error?: string; addedUsername?: string }>();
   const removeFetcher = useFetcher();
@@ -289,7 +291,11 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
                     <removeFetcher.Form method="post">
                       <input type="hidden" name="intent" value="removeMember" />
                       <input type="hidden" name="userId" value={m.user_id} />
-                      <button type="submit" className="text-sm text-red-500 hover:text-red-700 cursor-pointer">
+                      <button
+                        type="submit"
+                        disabled={disabled}
+                        className="text-sm text-red-500 hover:text-red-700 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
+                      >
                         Remove
                       </button>
                     </removeFetcher.Form>
@@ -310,14 +316,19 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
               name="username"
               placeholder="Add member by username"
               required
-              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+              disabled={disabled}
+              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {addFetcher.data?.error && <p className="text-sm text-red-500">{addFetcher.data.error}</p>}
             {addFetcher.data?.addedUsername && (
               <p className="text-sm text-green-600">Added {addFetcher.data.addedUsername}.</p>
             )}
           </div>
-          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
+          <button
+            type="submit"
+            disabled={disabled}
+            className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+          >
             Add to Crew
           </button>
         </addFetcher.Form>
@@ -331,7 +342,7 @@ function CrewRoster({ members, isTeamOwner, isPersonal, currentUserId }: {
   );
 }
 
-function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boolean }) {
+function CrewAgents({ keys, isTeamOwner, disabled }: { keys: ApiKeyDTO[]; isTeamOwner: boolean; disabled: boolean }) {
   const mintFetcher = useFetcher<{ mintedKey?: string; mintedDisplayName?: string; error?: string }>();
   const revokeFetcher = useFetcher();
   const formRef = useRef<HTMLFormElement>(null);
@@ -402,7 +413,11 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
                           <revokeFetcher.Form method="post">
                             <input type="hidden" name="intent" value="revokeKey" />
                             <input type="hidden" name="api_key_id" value={k.id} />
-                            <button type="submit" className="text-sm text-red-500 hover:text-red-700 cursor-pointer">
+                            <button
+                              type="submit"
+                              disabled={disabled}
+                              className="text-sm text-red-500 hover:text-red-700 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
+                            >
                               Revoke
                             </button>
                           </revokeFetcher.Form>
@@ -427,11 +442,16 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
               placeholder='Agent name (e.g. "Claude (roadmap)")'
               required
               maxLength={100}
-              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+              disabled={disabled}
+              className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {mintFetcher.data?.error && <p className="text-sm text-red-500">{mintFetcher.data.error}</p>}
           </div>
-          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer">
+          <button
+            type="submit"
+            disabled={disabled}
+            className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+          >
             Add AI Crewmate
           </button>
         </mintFetcher.Form>
@@ -440,7 +460,7 @@ function CrewAgents({ keys, isTeamOwner }: { keys: ApiKeyDTO[]; isTeamOwner: boo
   );
 }
 
-function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: TeamSummary[] }) {
+function CrewBoards({ boards, teams, disabled }: { boards: DashboardBoardRow[]; teams: TeamSummary[]; disabled: boolean }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const bulkFetcher = useFetcher<{ moved?: number; deleted?: number }>();
   const createFetcher = useFetcher();
@@ -468,9 +488,14 @@ function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: Tea
             type="text"
             name="title"
             placeholder="New board title"
-            className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+            disabled={disabled}
+            className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 disabled:opacity-50 disabled:cursor-not-allowed"
           />
-          <button type="submit" className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1">
+          <button
+            type="submit"
+            disabled={disabled}
+            className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+          >
             <PlusIcon size="sm" /> New Board
           </button>
         </createFetcher.Form>
@@ -510,7 +535,7 @@ function CrewBoards({ boards, teams }: { boards: DashboardBoardRow[]; teams: Tea
   );
 }
 
-function CrewAccessSetting({ restricted }: { restricted: boolean }) {
+function CrewAccessSetting({ restricted, disabled }: { restricted: boolean; disabled: boolean }) {
   const fetcher = useFetcher();
   const [on, setOn] = useState(restricted);
 
@@ -524,7 +549,7 @@ function CrewAccessSetting({ restricted }: { restricted: boolean }) {
 
   return (
     <div className="mb-6">
-      <CommandDeckToggle label="Members-only boards" checked={on} onChange={toggle} ledColor="amber" />
+      <CommandDeckToggle label="Members-only boards" checked={on} onChange={toggle} disabled={disabled} ledColor="amber" />
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md">
         When on, only crew members can open this crew's boards. Turn off to let anyone with the link view them.
       </p>
@@ -532,10 +557,10 @@ function CrewAccessSetting({ restricted }: { restricted: boolean }) {
   );
 }
 
-function DangerZone({ teamName }: { teamName: string }) {
+function DangerZone({ teamName, disabled }: { teamName: string; disabled: boolean }) {
   const deleteFetcher = useFetcher();
   const [confirmText, setConfirmText] = useState("");
-  const canDelete = confirmText === teamName;
+  const canDelete = !disabled && confirmText === teamName;
 
   return (
     <div className="border-2 border-red-300 dark:border-red-900/60 rounded-lg p-5 bg-red-50/50 dark:bg-red-950/20">
@@ -563,7 +588,8 @@ function DangerZone({ teamName }: { teamName: string }) {
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             autoComplete="off"
-            className="border rounded px-3 py-1.5 text-sm border-red-300 dark:border-red-800 bg-white dark:bg-gray-900"
+            disabled={disabled}
+            className="border rounded px-3 py-1.5 text-sm border-red-300 dark:border-red-800 bg-white dark:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
         <button
@@ -584,12 +610,15 @@ function DangerZone({ teamName }: { teamName: string }) {
 // ---------------------------------------------------------------------------
 
 export default function CrewDetailPage() {
-  const { team, members, boards, openItems, teams, keys, isTeamOwner, currentUserId } =
+  const { team, members, boards, openItems, teams, keys, isTeamOwner, currentUserId, isEntitled } =
     useLoaderData<typeof loader>() as {
       team: TeamDTO; members: TeamMemberDTO[]; boards: DashboardBoardRow[];
       openItems: UserActionItemRow[]; teams: TeamSummary[]; keys: ApiKeyDTO[];
-      isTeamOwner: boolean; currentUserId: string;
+      isTeamOwner: boolean; currentUserId: string; isEntitled: boolean;
     };
+  // ADR-0015: a personal crew's owner can never lapse (crewIsEntitled is
+  // unconditionally true for it), so this only ever fires for a named crew.
+  const lapsed = !team.is_personal && !isEntitled;
   const renameFetcher = useFetcher<{ error?: string; success?: boolean; name?: string }>();
   const [justRenamed, setJustRenamed] = useState<string | null>(null);
 
@@ -613,20 +642,41 @@ export default function CrewDetailPage() {
         <a href="/app/crews" className="text-blue-500 hover:underline">← All crews</a>
       </p>
 
+      {lapsed && (
+        <div
+          data-testid="lapsed-banner"
+          className="mb-8 rounded-lg border border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
+        >
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            This crew has been set to read-only — its subscription has lapsed. Existing boards still
+            work, but crew management and new work are frozen. Subscribe again to unlock it.
+          </p>
+          <Form method="post" action="/app/billing/checkout">
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold shadow-md/20 transition-colors cursor-pointer shrink-0"
+            >
+              Subscribe — $39.99/month
+            </button>
+          </Form>
+        </div>
+      )}
+
       <div className="mb-16">
         <DashboardActionItems
           items={openItems}
           defaultExpanded
           scopedTeamId={team.id}
-          onAddItem={(text) => addItemFetcher.submit({ intent: "addItem", text }, { method: "post" })}
+          onAddItem={lapsed ? undefined : (text) => addItemFetcher.submit({ intent: "addItem", text }, { method: "post" })}
+          forceReadOnly={lapsed}
         />
       </div>
 
-      <CrewBoards boards={boards} teams={teams} />
+      <CrewBoards boards={boards} teams={teams} disabled={lapsed} />
 
-      <CrewRoster members={members} isTeamOwner={isTeamOwner} isPersonal={team.is_personal} currentUserId={currentUserId} />
+      <CrewRoster members={members} isTeamOwner={isTeamOwner} isPersonal={team.is_personal} currentUserId={currentUserId} disabled={lapsed} />
 
-      <CrewAgents keys={keys} isTeamOwner={isTeamOwner} />
+      <CrewAgents keys={keys} isTeamOwner={isTeamOwner} disabled={lapsed} />
 
       {isTeamOwner && !team.is_personal && (
         <div className="mb-16">
@@ -639,9 +689,14 @@ export default function CrewDetailPage() {
               defaultValue={team.name}
               required
               maxLength={100}
-              className="border rounded px-3 py-1.5 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm"
+              disabled={lapsed}
+              className="border rounded px-3 py-1.5 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <button type="submit" className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm hover:border-gray-400 cursor-pointer">
+            <button
+              type="submit"
+              disabled={lapsed}
+              className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm hover:border-gray-400 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-300"
+            >
               Rename
             </button>
             {renameFetcher.data?.error && <p className="text-sm text-red-500">{renameFetcher.data.error}</p>}
@@ -653,9 +708,9 @@ export default function CrewDetailPage() {
             )}
           </renameFetcher.Form>
 
-          <CrewAccessSetting restricted={team.restrict_board_access ?? true} />
+          <CrewAccessSetting restricted={team.restrict_board_access ?? true} disabled={lapsed} />
 
-          <DangerZone teamName={team.name} />
+          <DangerZone teamName={team.name} disabled={lapsed} />
         </div>
       )}
     </div>

@@ -319,6 +319,15 @@ describe("DashboardActionItems — crew-page props", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onAddItem).not.toHaveBeenCalled();
   });
+
+  it("forceReadOnly hides edit/delete even for a manageable item, but the toggle stays enabled (ADR-0015)", () => {
+    render(<DashboardActionItems items={[teamItem]} defaultExpanded forceReadOnly />);
+    expect(screen.queryByTitle("Edit action item")).toBeNull();
+    expect(screen.queryByTitle("Delete action item")).toBeNull();
+    fireEvent.doubleClick(screen.getByText("Schedule quarterly review"));
+    expect(screen.queryByDisplayValue("Schedule quarterly review")).toBeNull();
+    expect(screen.getByRole("checkbox")).toBeEnabled();
+  });
 });
 
 describe("DashboardActionItems — smooth removal", () => {

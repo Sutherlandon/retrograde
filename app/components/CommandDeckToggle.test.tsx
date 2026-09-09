@@ -29,6 +29,7 @@ describe("CommandDeckToggle", () => {
   it("does not call onChange when disabled", () => {
     const onChange = vi.fn();
     render(<CommandDeckToggle label="Test" checked={false} onChange={onChange} ledColor="blue" disabled />);
+    expect(screen.getByRole("switch")).toBeDisabled();
     fireEvent.click(screen.getByRole("switch"));
     expect(onChange).not.toHaveBeenCalled();
   });

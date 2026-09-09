@@ -25,7 +25,9 @@ const UNDO_DELAY_MS = 3000;
 // How long a departing row takes to collapse shut once it's gone from `items`.
 const EXIT_DURATION_MS = 300;
 
-function ItemRow({ item, scopedTeamId }: { item: UserActionItemRow; scopedTeamId?: string }) {
+function ItemRow({ item, scopedTeamId, forceReadOnly = false }: {
+  item: UserActionItemRow; scopedTeamId?: string; forceReadOnly?: boolean;
+}) {
   const fetcher = useFetcher();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.text);
@@ -34,6 +36,10 @@ function ItemRow({ item, scopedTeamId }: { item: UserActionItemRow; scopedTeamId
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
 
+  // A lapsed crew freezes editing/deleting existing items (ADR-0015) even
+  // though the server would otherwise let this participant manage them —
+  // checking one off stays enabled, since that isn't new work.
+  const canManage = item.can_manage && !forceReadOnly;
   const isBoardItem = item.board_id !== null;
   const home = isBoardItem
     ? `/app/board/${item.board_id}/action-items`
@@ -151,8 +157,8 @@ function ItemRow({ item, scopedTeamId }: { item: UserActionItemRow; scopedTeamId
           />
         ) : (
           <span
-            onDoubleClick={() => { if (item.can_manage) setEditing(true); }}
-            className={`block break-words ${checked ? "line-through text-gray-400 dark:text-gray-600" : ""} ${item.can_manage ? "cursor-text" : ""}`}
+            onDoubleClick={() => { if (canManage) setEditing(true); }}
+            className={`block break-words ${checked ? "line-through text-gray-400 dark:text-gray-600" : ""} ${canManage ? "cursor-text" : ""}`}
           >
             {item.text}
           </span>
@@ -179,7 +185,7 @@ function ItemRow({ item, scopedTeamId }: { item: UserActionItemRow; scopedTeamId
         </div>
       </div>
 
-      {item.can_manage && (
+      {canManage && (
         confirmingDelete ? (
           <div ref={confirmRef} className="flex items-center gap-1 shrink-0">
             <button
@@ -308,6 +314,7 @@ export function DashboardActionItems({
   defaultExpanded = false,
   onAddItem,
   scopedTeamId,
+  forceReadOnly = false,
 }: {
   items: UserActionItemRow[];
   /** Crew page shows it open; dashboard leaves it collapsed. */
@@ -317,6 +324,11 @@ export function DashboardActionItems({
   onAddItem?: (text: string) => void;
   /** When set, hide the redundant crew pill (the list is already one crew). */
   scopedTeamId?: string;
+  /** Crew page passes true when the crew's owner has lapsed (ADR-0015) —
+   *  suppresses edit/delete on every item regardless of can_manage. Toggling
+   *  one off stays enabled; the caller omits onAddItem separately to remove
+   *  the add row. */
+  forceReadOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
@@ -393,7 +405,7 @@ export function DashboardActionItems({
               exiting={state.exiting.has(item.id)}
               onExited={() => handleExited(item.id)}
             >
-              <ItemRow item={item} scopedTeamId={scopedTeamId} />
+              <ItemRow item={item} scopedTeamId={scopedTeamId} forceReadOnly={forceReadOnly} />
             </ExitableRow>
           ))}
           {onAddItem && <AddItemRow onAdd={onAddItem} />}

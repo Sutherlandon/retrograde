@@ -20,6 +20,9 @@ vi.mock("react-router", () => ({
       <form {...props}>{children}</form>
     ),
   }),
+  Form: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <form {...props}>{children}</form>
+  ),
   redirect: vi.fn(),
 }));
 
@@ -61,6 +64,7 @@ function baseLoaderData() {
     keys: [],
     isTeamOwner: true,
     currentUserId: "user-1",
+    isEntitled: true,
   };
 }
 
