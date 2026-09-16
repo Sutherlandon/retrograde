@@ -25,7 +25,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Board ID Missing", { status: 400 });
   }
 
-  // Example / read-only boards — no DB needed (BRD-017)
+  // Resolve the caller before anything else. On a self-hosted instance this is
+  // what refuses a guest (ADR-0021) — and the example boards just below return
+  // before any access check, so it has to come first.
+  const user = await getOptionalUser(request);
+
+  // Example / read-only boards — no board query needed (BRD-017)
   if (isExampleBoardId(board_id)) {
     return board_id === exampleBoardTutorial.id ? exampleBoardTutorial : exampleBoardRealWorld;
   }
@@ -33,8 +38,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Members-only crews restrict who can open their boards. Anonymous callers who
   // might be members are sent to log in; registered non-members get a 403.
   await requireBoardAccess(request, board_id, { loginRedirect: true });
-
-  const user = await getOptionalUser(request);
   const board = await getBoardServer(board_id, user?.id);
 
   if (!board) {

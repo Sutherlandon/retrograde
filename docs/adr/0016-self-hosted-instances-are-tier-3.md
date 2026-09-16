@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-14) — narrows [ADR-0013](0013-stripe-subscriptions.md) §5: the Stripe variables are required on the hosted service only. Extends [ADR-0011](0011-three-tiers-and-ownerless-anonymous-boards.md) §1 and [ADR-0015](0015-what-happens-when-a-subscription-lapses.md); neither is contradicted. §5's statements that `CRON_SECRET` stays required and the ADR-0005 TTL applies on a self-hosted instance are amended by [ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md): a self-hosted instance runs no scheduled cleanup.
+Accepted (2026-09-14) — narrows [ADR-0013](0013-stripe-subscriptions.md) §5: the Stripe variables are required on the hosted service only. Extends [ADR-0011](0011-three-tiers-and-ownerless-anonymous-boards.md) §1 and [ADR-0015](0015-what-happens-when-a-subscription-lapses.md); neither is contradicted. §5's statements that `CRON_SECRET` stays required and the ADR-0005 TTL applies on a self-hosted instance are amended by [ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md): a self-hosted instance runs no scheduled cleanup. §5's statement that tier 1 is unchanged is amended by [ADR-0021](0021-self-hosted-instances-have-no-guests.md): a self-hosted instance has no guests.
 
 ## Context
 

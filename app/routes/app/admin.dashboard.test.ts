@@ -18,6 +18,7 @@ vi.mock("~/server/db_config", () => ({
   pool: { query: (...args: unknown[]) => mockPoolQuery(...args) },
   siteAdminIds: [SITE_ADMIN_EXT_ID],
   oauthUsernameField: "preferred_username",
+  selfHosted: false,
 }));
 
 vi.mock("~/server/db_init", () => ({}));

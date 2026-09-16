@@ -113,12 +113,13 @@ with `SITE_LOGO_LIGHT_URL=/branding/logo-light.svg` and `SITE_LOGO_DARK_URL=/bra
 ### How a self-hosted instance differs from the hosted service
 
 - **Everyone gets every feature.** Any account can create named crews, and crews never freeze for lack of a subscription. Each account's personal crew still holds one AI crewmate key, as it does for a paying account on the hosted service; more come from named crews.
+- **No guests.** Every page and API call needs a signed-in account. Agents use API keys a signed-in crew owner creates; the unauthenticated trial API is closed. Only sign-in and `/healthcheck` are open.
 - **No billing.** The billing pages and the Stripe webhook return `404`, and there is no subscribe prompt.
 - **No marketing site.** `/`, `/about`, `/contact`, `/terms-of-service` and `/privacy-policy` redirect to the dashboard, `/sitemap.xml` returns `404`, and the header has no About or Contact links.
 - **No Vercel Analytics.** The instance never loads Vercel's analytics script.
 - **No board cleanup.** Boards created without signing in are never archived automatically.
 
-Access works the same way in both. Anyone who can reach the instance and has a board's link can open that board and take part without signing in, unless the board belongs to a named crew — those are members-only by default. If boards must not be reachable by people outside your organization, keep the instance on your private network.
+On the hosted service, anyone with a board's link can open that board and take part without signing in, unless the board belongs to a named crew — those are members-only by default. A self-hosted instance has no guests: everyone signs in through your identity provider first, and boards in a named crew are still members-only among the people who have.
 
 ### Upgrading
 

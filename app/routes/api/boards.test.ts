@@ -22,6 +22,7 @@ vi.mock("~/server/db_config", () => ({
     connect: vi.fn(),
   },
   oauthUsernameField: "preferred_username",
+  selfHosted: false,
 }));
 
 vi.mock("~/server/db_init", () => ({}));

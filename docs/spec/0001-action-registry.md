@@ -20,7 +20,7 @@ Three tiers. A tier is what an **account** is entitled to; a board inherits the 
 
 The tier boundary in code is `teams.is_personal`. A personal crew is tier 2 and cannot be renamed, deleted, given human members, or restricted. A named crew is tier 3 and can do all four.
 
-**On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing and scheduled cleanup do not exist there: CREW-020, CREW-021, API-006 and API-007 return 404, and crewless boards are never archived (ADR-0020). The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). Tier 1 is unchanged.
+**On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing and scheduled cleanup do not exist there: CREW-020, CREW-021, API-006 and API-007 return 404, and crewless boards are never archived (ADR-0020). The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). There is no tier 1 there either: every page and API call needs a signed-in account, or an API key for the JSON API, so no guest user or anonymous board is ever created (ADR-0021).
 
 Tier 1 is enforced by construction, not by convention. A crewless board is created with **no owner row** and `open_facilitation = TRUE`; the open-facilitation toggle is refused on a crewless board; moving a board onto a crew closes facilitation to the role and moving it off reopens it. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) brought pre-existing anonymous boards into line. No path in the code can produce a crewless board with an owner.
 
@@ -87,7 +87,7 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
 | SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
-| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only         | Verified   |
+| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only · on a self-hosted instance the action redirects to `/app/dashboard` and creates nothing (ADR-0021) | Verified   |
 | SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Verified |
 | SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed; 404 when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
@@ -101,7 +101,7 @@ Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 
 | AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —           | Verified |
 | AUTH-002 | OAuth callback; create/refresh user; ensure personal crew | Anyone         | `routes/auth/callback.ts`    | state param | Verified |
 | AUTH-003 | Log out                                                   | Session holder | `routes/auth/logout.ts`      | —; redirects to `OAUTH_LOGOUT_REDIRECT_URL` (default `/`); the logout control is hidden when `HIDE_LOGOUT=true` (ADR-0017) | Verified |
-| AUTH-004 | Get an anonymous user record on first board visit         | Anyone         | `components/BoardLayout.tsx` | —           | Verified |
+| AUTH-004 | Get an anonymous user record on first board visit         | Anyone         | `components/BoardLayout.tsx` | —; never on a self-hosted instance, which sends the visitor to sign in instead (ADR-0021) | Verified |
 
 ## BRD — board content
 
@@ -125,7 +125,7 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | BRD-014 | Check off an action item | Session holder w/ access | `board.action-items.ts` `intent=complete` | session required · `requireUnlocked(board)` | Verified |
 | BRD-015 | View action items + progress             | Anyone w/ access   | `ActionItemsPanel` via `BoardDTO`                       | inherits BRD-001                                 | Verified   |
 | BRD-016 | View votes remaining / status indicators | Anyone w/ access   | `BoardStatusBar`                                        | inherits BRD-001                                 | Verified   |
-| BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before access check               | Verified |
+| BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before the access check, after resolving the caller — so a self-hosted instance requires sign-in (ADR-0021) | Verified |
 | BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Verified |
 | BRD-019 | List a board's attachments | Anyone w/ access | `board.attachments.ts` loader | `requireBoardAccess` | Verified |
 | BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists; assigns the personal crew (ADR-0012) | Verified |
@@ -253,7 +253,7 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | ID      | Action                                                                   | Who                      | Code path                        | Guard                  | Status   |
 | ------- | ------------------------------------------------------------------------ | ------------------------ | -------------------------------- | ---------------------- | -------- |
 | API-001 | Create a board with columns (authenticated → caller's crew; a registered cookie caller with no crew gets their personal crew) | API key or session | `api/boards.ts` POST | `getApiUser` | Verified |
-| API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone | `api/boards.ts` POST | none, by design | Verified |
+| API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone | `api/boards.ts` POST | none, by design · **401 on a self-hosted instance** (ADR-0021) | Verified |
 | API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |

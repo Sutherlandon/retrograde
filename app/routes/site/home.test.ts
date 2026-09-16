@@ -16,11 +16,15 @@ vi.mock("~/session.server", () => ({
 }));
 
 const mockPoolQuery = vi.fn();
+const hosting = vi.hoisted(() => ({ selfHosted: false }));
 vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
   oauthUsernameField: "preferred_username",
+  get selfHosted() {
+    return hosting.selfHosted;
+  },
 }));
 
 const mockCreateBoard = vi.fn();
@@ -47,6 +51,7 @@ vi.mock("react-router", async (importOriginal) => {
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
+  hosting.selfHosted = false;
   mockActionData = undefined;
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockCreateBoard.mockResolvedValue("new-board-id");
@@ -165,5 +170,27 @@ describe("homepage [SITE-001]", () => {
     render(React.createElement(Home));
 
     expect(screen.getByText("Title must be at least 3 characters.")).toBeInTheDocument();
+  });
+});
+
+// A self-hosted instance has no marketing site (ADR-0017) and no guests
+// (ADR-0021): the homepage's board form does not exist there, so posting to it
+// creates nothing, even for a signed-in user.
+describe("home page action on a self-hosted instance [SITE-003]", () => {
+  it("creates no board and sends the caller to the dashboard", async () => {
+    hosting.selfHosted = true;
+    sessionData["userId"] = "user-1";
+    const { action } = await import("./home");
+    const request = new Request("http://localhost:3000/", {
+      method: "POST",
+      body: makeFormData({ title: "Sneaky Retro", no_jerks: "on" }),
+    });
+
+    const response = (await action({ request, params: {}, context: {} } as never)) as unknown as Response;
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/app/dashboard");
+    expect(mockCreateBoard).not.toHaveBeenCalled();
+    expect(mockPoolQuery).not.toHaveBeenCalled();
   });
 });

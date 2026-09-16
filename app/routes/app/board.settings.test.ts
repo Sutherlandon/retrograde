@@ -18,6 +18,7 @@ vi.mock("~/server/db_config", () => ({
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
   oauthUsernameField: "preferred_username",
+  selfHosted: false,
 }));
 
 const mockUpdateSettings = vi.fn();

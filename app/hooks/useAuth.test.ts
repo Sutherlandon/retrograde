@@ -15,13 +15,16 @@ vi.mock("~/session.server", () => ({
 const mockPoolQuery = vi.fn();
 // The claim used as the username comes from OAUTH_USERNAME_FIELD (ADR-0017);
 // mutable so a test can configure a different one.
-const auth = vi.hoisted(() => ({ usernameField: "preferred_username" }));
+const auth = vi.hoisted(() => ({ usernameField: "preferred_username", selfHosted: false }));
 vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
   get oauthUsernameField() {
     return auth.usernameField;
+  },
+  get selfHosted() {
+    return auth.selfHosted;
   },
 }));
 
@@ -37,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
   auth.usernameField = "preferred_username";
+  auth.selfHosted = false;
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockTouchApiKeyLastUsed.mockResolvedValue(undefined);
 });
@@ -383,5 +387,129 @@ describe("username claim (ADR-0017)", () => {
 
     const result = await getOptionalUser(new Request("http://localhost:3000/app/board/123"));
     expect(result?.username).toBe("test@example.com");
+  });
+});
+
+// ADR-0021: a self-hosted instance has no guests. The identity resolvers every
+// route goes through refuse anyone without a signed-in account — a redirect to
+// sign-in for pages, a 401 for the JSON API — and never create a guest. An
+// agent still gets in with an API key a signed-in crew owner minted.
+describe("self-hosted instance: no guests (ADR-0021)", () => {
+  beforeEach(() => {
+    auth.selfHosted = true;
+  });
+
+  async function thrown(promise: Promise<unknown>): Promise<Response> {
+    try {
+      await promise;
+    } catch (error) {
+      return error as Response;
+    }
+    throw new Error("expected the call to throw a Response");
+  }
+
+  function loginRedirectTarget(response: Response): string | null {
+    const location = response.headers.get("Location") ?? "";
+    return new URL(location, "http://localhost:3000").searchParams.get("returnTo");
+  }
+
+  it("sends a visitor with no session to sign in, returning to the page they asked for", async () => {
+    const { getOptionalUser } = await import("./useAuth");
+    const response = await thrown(getOptionalUser(new Request("http://localhost:3000/app/board/b1?view=grid")));
+    expect(response.status).toBe(302);
+    expect(new URL(response.headers.get("Location")!, "http://x").pathname).toBe("/auth/login");
+    expect(loginRedirectTarget(response)).toBe("/app/board/b1?view=grid");
+  });
+
+  it("treats an anonymous session from before the upgrade as signed out", async () => {
+    const { getOptionalUser } = await import("./useAuth");
+    sessionData["userId"] = "anon-1";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "anon-1", preferred_username: "Guest", is_anonymous: true }],
+      rowCount: 1,
+    });
+    const response = await thrown(getOptionalUser(new Request("http://localhost:3000/app/board/b1")));
+    expect(response.status).toBe(302);
+  });
+
+  it("returns a signed-in user", async () => {
+    const { getOptionalUser } = await import("./useAuth");
+    sessionData["userId"] = "user-1";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "user-1", preferred_username: "testuser", is_anonymous: false }],
+      rowCount: 1,
+    });
+    expect(await getOptionalUser(new Request("http://localhost:3000/app/board/b1"))).toEqual({
+      id: "user-1",
+      username: "testuser",
+      is_anonymous: false,
+    });
+  });
+
+  it("returns a background data request to its page after sign-in, not to the .data URL", async () => {
+    const { getOptionalUser } = await import("./useAuth");
+    const response = await thrown(
+      getOptionalUser(new Request("http://localhost:3000/app/board/b1.data?_routes=routes%2Fapp%2Fboard"))
+    );
+    expect(loginRedirectTarget(response)).toBe("/app/board/b1");
+  });
+
+  it("returns to the dashboard instead of a marketing page, which a self-hosted instance does not serve", async () => {
+    const { getOptionalUser } = await import("./useAuth");
+    for (const url of ["http://localhost:3000/", "http://localhost:3000/_root.data", "http://localhost:3000/about"]) {
+      expect(loginRedirectTarget(await thrown(getOptionalUser(new Request(url))))).toBe("/app/dashboard");
+    }
+  });
+
+  it("answers the JSON API with 401 rather than a redirect", async () => {
+    const { getApiUser } = await import("./useAuth");
+    const response = await thrown(getApiUser(new Request("http://localhost:3000/api/v1/boards", { method: "POST" })));
+    expect(response.status).toBe(401);
+    expect((await response.json()).error.code).toBe("UNAUTHORIZED");
+  });
+
+  it("still lets an agent in with an API key", async () => {
+    const { getApiUser } = await import("./useAuth");
+    mockFindApiKeyByValue.mockResolvedValueOnce({ id: "key-1", team_id: "team-1", agent_user_id: "agent-1" });
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "agent-1", display_name: "Claude", is_anonymous: true, is_agent: true }],
+      rowCount: 1,
+    });
+    const request = new Request("http://localhost:3000/api/v1/boards", {
+      method: "POST",
+      headers: { Authorization: "Bearer rk_live_valid" },
+    });
+    expect(await getApiUser(request)).toEqual({ id: "agent-1", username: "Claude", teamId: "team-1" });
+  });
+
+  it("refuses an API key that does not resolve", async () => {
+    const { getApiUser } = await import("./useAuth");
+    mockFindApiKeyByValue.mockResolvedValueOnce(null);
+    const request = new Request("http://localhost:3000/api/v1/boards/b1", {
+      headers: { Authorization: "Bearer rk_live_revoked" },
+    });
+    expect((await thrown(getApiUser(request))).status).toBe(401);
+  });
+
+  it("refuses a legacy agent_token, which belongs to an anonymous agent", async () => {
+    const { getApiUser } = await import("./useAuth");
+    sessionData["userId"] = "agent-1";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "agent-1", display_name: "Agent", is_anonymous: true, is_agent: true }],
+      rowCount: 1,
+    });
+    const request = new Request("http://localhost:3000/api/v1/boards/b1/notes", {
+      method: "POST",
+      headers: { Authorization: "Bearer legacy-session-token" },
+    });
+    expect((await thrown(getApiUser(request))).status).toBe(401);
+  });
+
+  it("never creates a guest for a board visit [AUTH-004]", async () => {
+    const { getOrCreateUser } = await import("./useAuth");
+    const response = await thrown(getOrCreateUser(new Request("http://localhost:3000/app/board/b1"), "b1"));
+    expect(response.status).toBe(302);
+    const inserts = mockPoolQuery.mock.calls.filter(([sql]) => String(sql).includes("INSERT INTO users"));
+    expect(inserts).toHaveLength(0);
   });
 });

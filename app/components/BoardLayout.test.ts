@@ -18,6 +18,7 @@ vi.mock("~/server/db_config", () => ({
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
   oauthUsernameField: "preferred_username",
+  selfHosted: false,
   // Non-default values, so the test below proves pass-through, not a default.
   hostingConfig: { selfHosted: true, hideLogout: true, siteLogo: null },
 }));

@@ -150,8 +150,9 @@ CRON_SECRET=
 
 # Deployment mode (optional) — ADR-0016, ADR-0017. Unset or "false" is the
 # hosted service. "true" is a self-hosted instance: every account is tier 3,
-# billing does not exist, the dashboard is home with no marketing site, and
-# the Stripe variables below must NOT be set. Any other value refuses to boot.
+# there are no guests (everyone signs in; ADR-0021), billing does not exist,
+# the dashboard is home with no marketing site, and the Stripe variables below
+# must NOT be set. Any other value refuses to boot.
 SELF_HOSTED=
 
 # Hosting presentation (optional) — ADR-0017. Configured here so a deployment

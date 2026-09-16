@@ -6,6 +6,7 @@ import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, 
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
+import { selfHosted } from "~/server/db_config";
 
 export const meta = () => {
   return [
@@ -36,6 +37,10 @@ export const meta = () => {
 };
 
 export async function action({ request }: ActionFunctionArgs) {
+  // A self-hosted instance serves no marketing site (ADR-0017) and has no
+  // guests (ADR-0021), so this board form does not exist there.
+  if (selfHosted) return redirect("/app/dashboard");
+
   const formData = await request.formData();
   const title = formData.get("title")?.toString().trim();
   const no_jerks = formData.get("no_jerks");
