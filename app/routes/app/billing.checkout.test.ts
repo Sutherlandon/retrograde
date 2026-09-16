@@ -20,17 +20,28 @@ vi.mock("~/server/billing_model", () => ({
 
 const mockCustomersCreate = vi.fn();
 const mockCheckoutSessionsCreate = vi.fn();
+// A self-hosted instance has no Stripe client and no Price (ADR-0016).
+const billing = vi.hoisted(() => ({ configured: true }));
 vi.mock("~/server/stripe_client", () => ({
-  stripe: {
-    customers: { create: (...args: unknown[]) => mockCustomersCreate(...args) },
-    checkout: { sessions: { create: (...args: unknown[]) => mockCheckoutSessionsCreate(...args) } },
+  get stripe() {
+    return billing.configured
+      ? {
+          customers: { create: (...args: unknown[]) => mockCustomersCreate(...args) },
+          checkout: { sessions: { create: (...args: unknown[]) => mockCheckoutSessionsCreate(...args) } },
+        }
+      : null;
   },
 }));
 
-vi.mock("~/server/db_config", () => ({ stripePriceId: "price_test_123" }));
+vi.mock("~/server/db_config", () => ({
+  get stripePriceId() {
+    return billing.configured ? "price_test_123" : null;
+  },
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  billing.configured = true;
   mockRequireRegisteredUser.mockResolvedValue({ id: "user-1", username: "landon" });
   mockGetBillingForUser.mockResolvedValue({
     userId: "user-1",
@@ -173,5 +184,20 @@ describe("billing.checkout action (CREW-002) [CREW-020]", () => {
 
     expect(params.customer_update?.name).toBeUndefined();
     expect(params.customer_update?.address).toBeUndefined();
+  });
+});
+
+describe("billing.checkout on a self-hosted instance (ADR-0016) [CREW-020]", () => {
+  it("returns 404 before authenticating or touching Stripe, because billing does not exist there", async () => {
+    billing.configured = false;
+    const { action } = await import("./billing.checkout");
+    const res = (await action({ request: postRequest(), params: {}, context: {} } as never)) as Response;
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).error.code).toBe("NOT_FOUND");
+    expect(mockRequireRegisteredUser).not.toHaveBeenCalled();
+    expect(mockGetBillingForUser).not.toHaveBeenCalled();
+    expect(mockCustomersCreate).not.toHaveBeenCalled();
+    expect(mockCheckoutSessionsCreate).not.toHaveBeenCalled();
   });
 });

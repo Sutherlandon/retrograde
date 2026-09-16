@@ -6,6 +6,7 @@
 import { useLoaderData, Outlet } from "react-router";
 import { getOrCreateUser } from "~/hooks/useAuth";
 import { commitSession } from "~/session.server";
+import { hostingConfig } from "~/server/db_config";
 import { UserProvider } from "~/context/userContext";
 import Header from "./Header";
 
@@ -15,16 +16,16 @@ export async function loader({ request, params }: { request: Request; params: { 
   if (isNew) {
     headers["Set-Cookie"] = await commitSession(session);
   }
-  return Response.json({ user }, { headers });
+  return Response.json({ user, hosting: hostingConfig }, { headers });
 }
 
 export default function BoardLayout() {
-  const { user } = useLoaderData<typeof loader>();
+  const { user, hosting } = useLoaderData<typeof loader>();
 
   return (
     <UserProvider user={user}>
       <div className='min-h-screen flex flex-col'>
-        <Header user={user} />
+        <Header user={user} hosting={hosting} />
         <Outlet />
       </div>
     </UserProvider>

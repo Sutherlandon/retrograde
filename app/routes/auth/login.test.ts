@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
+// OAuth settings are read and validated once in db_config.ts (CLAUDE.md rule 5).
 vi.mock("~/server/db_config", () => ({
   oauthRedirectUri: "http://localhost:3000/auth/callback",
+  oauthClientId: "test-client-id",
+  oauthScopes: "openid profile email",
+  oauthAuthorizationUrl: "https://auth.example.com/authorize",
 }));
 
 vi.mock("~/session.server", () => ({
@@ -16,14 +20,6 @@ vi.mock("~/session.server", () => ({
   }),
   commitSession: vi.fn(async () => "session-cookie-value"),
 }));
-
-beforeEach(() => {
-  process.env.OAUTH_CLIENT_ID = "test-client-id";
-  process.env.OAUTH_REDIRECT_URI = "http://localhost:3000/auth/callback";
-  process.env.OAUTH_SCOPES = "openid profile email";
-  process.env.OAUTH_AUTHORIZATION_URL = "https://auth.example.com/authorize";
-  process.env.SESSION_SECRET = "test-secret";
-});
 
 describe("GET /auth/login", () => {
   it("redirects to the OAuth authorization URL with correct params [AUTH-001]", async () => {

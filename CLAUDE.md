@@ -38,7 +38,9 @@ Wire domains together with minimal integration points at the top level. Avoid cr
 
 ### 5. Centralized Configuration
 
-All environment variables must be **defined, validated, and loaded in one place at startup** (`app/server/db_config.ts`, `app/config/siteConfig.ts`). If a required variable is missing, the app must fail loudly at startup with a clear error — not silently at runtime.
+All environment variables must be **defined, validated, and loaded in one place at startup** (`app/server/db_config.ts`). If a required variable is missing, the app must fail loudly at startup with a clear error — not silently at runtime.
+
+Anything that varies by deployment — hosted or self-hosted, logout visibility, the OIDC username claim, branding — is an environment variable, never a source edit a customer has to carry through upgrades (ADR-0017). Values the browser needs reach it as props from the layout loaders; `process.env` does not exist on the client.
 
 Never scatter `process.env` references throughout the codebase. Import config values from the config modules.
 
@@ -83,7 +85,7 @@ app/
 ├── hooks/            # Custom React hooks (useAuth, useTheme)
 ├── server/           # Backend server code & PostgreSQL models
 ├── utils/            # Helper functions (exportBoard CSV/Markdown)
-├── config/           # App config (siteConfig, db_config)
+├── config/           # Product constants (grandfather.ts); deployment config is env, read in server/db_config.ts
 ├── images/           # SVG icon components
 ├── example-data/     # Sample boards for onboarding/tutorials
 ├── root.tsx          # Root layout & error boundary
@@ -123,34 +125,66 @@ OAUTH_TOKEN_URL=
 OAUTH_USERINFO_URL=
 OAUTH_REDIRECT_URI=http://localhost:3000/auth/callback
 OAUTH_SCOPES=openid profile email
+# Optional — where logout sends the browser: an http(s) URL (e.g. the IdP's
+# end-session endpoint) or a path. Default "/".
+OAUTH_LOGOUT_REDIRECT_URL=
 
 # Session (required)
 SESSION_SECRET=
 
-# Database — use DATABASE_URL OR the individual PG_* vars
+# Database (required) — DATABASE_URL, OR all four PG_* vars (not both). The
+# connection uses TLS with the server certificate verified whenever NODE_ENV is
+# not development; sslmode=disable / ssl=false in the URL are refused there
+# (ADR-0018). A private CA goes in the URL as sslrootcert=/path/to/ca.pem.
 DATABASE_URL=
 PG_HOST=
 PG_USER=
 PG_PASSWORD=
 PG_SCHEMA=
 
-# Cron (required) — bearer secret for POST /api/v1/cron/archive-stale
+# Cron (required) — bearer secret for /api/v1/cron/archive-stale. Vercel's
+# scheduler sends it automatically as an Authorization header, and invokes the
+# path with GET.
 CRON_SECRET=
 
-# Stripe (required) — ADR-0013. A RESTRICTED key (rk_…), never the account
-# secret key; the webhook signing secret; the id of the single monthly Price.
+# Deployment mode (optional) — ADR-0016, ADR-0017. Unset or "false" is the
+# hosted service. "true" is a self-hosted instance: every account is tier 3,
+# billing does not exist, the dashboard is home with no marketing site, and
+# the Stripe variables below must NOT be set. Any other value refuses to boot.
+SELF_HOSTED=
+
+# Hosting presentation (optional) — ADR-0017. Configured here so a deployment
+# never edits code. HIDE_LOGOUT=true hides logout, for SSO that signs users
+# straight back in. OAUTH_USERNAME_FIELD is the stored profile field shown as
+# the username: preferred_username (default), email, name, given_name or
+# family_name. A site logo needs all three SITE_LOGO_* values or none; the
+# URLs must be reachable from users' browsers.
+HIDE_LOGOUT=
+OAUTH_USERNAME_FIELD=
+SITE_LOGO_LIGHT_URL=
+SITE_LOGO_DARK_URL=
+SITE_LOGO_ALT=
+
+# Stripe (required on the hosted service; refused when SELF_HOSTED=true) —
+# ADR-0013. A RESTRICTED key (rk_…), never the account secret key; the webhook
+# signing secret; the id of the single monthly Price.
 STRIPE_RESTRICTED_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_ID=
 
-# Admin (optional) — comma-separated OAuth external_ids that are always site
-# admins. Empty is a supported state: the admin dashboard is just unreachable.
+# Admin (required) — comma-separated OAuth sub values (users.external_id) of
+# the site admins. At least one.
 SITE_ADMIN_IDS=
+
+# Server (optional) — PORT is read by react-router-serve; validated as 1–65535.
+PORT=
 ```
 
-Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them.
+Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them. The Stripe variables are the one mode-dependent set: required unless `SELF_HOSTED=true`, and refused when it is (ADR-0016). Optional variables are validated the same way: a malformed value exits at startup. Nothing warns and carries on (ADR-0018).
 
-`NODE_ENV=production` auto-enables SSL on the database connection.
+`NODE_ENV` must be `development`, `production` or `test`. Anything but `development` requires TLS to the database with the certificate verified, so `npm start` against a local Postgres without TLS will not connect — use `npm run dev` locally. `production`, the default under `npm start`, also marks the session cookie `Secure`, so production needs HTTPS.
+
+Self-hosting is documented for operators in [`README.md`](README.md).
 
 ---
 
@@ -311,9 +345,8 @@ docker run -p 3000:3000 --env-file .env retrograde
 | `app/context/BoardContext.tsx` | Board state management (central hub) |
 | `app/server/board_model.ts` | All board-related SQL queries |
 | `app/server/db_init.ts` | Schema initialization (run on startup) |
-| `app/server/db_config.ts` | Database connection pool |
+| `app/server/db_config.ts` | Database pool and every environment variable, validated at startup |
 | `app/server/board.types.ts` | Shared type definitions (4-layer system) |
-| `app/config/siteConfig.ts` | OAuth field mapping, logo, branding |
 | `app/components/CommandDeck.tsx` | Facilitator control panel UI |
 | `vite.config.ts` | Vite + React Router + Tailwind plugin config |
 | `react-router.config.ts` | SSR enabled |
@@ -330,7 +363,8 @@ docker run -p 3000:3000 --env-file .env retrograde
 - Do not commit `.env` files or hardcode any secret in source code.
 - Do not collapse the 4-layer type system in `board.types.ts`.
 - Do not add migration files — schema changes go in `db_init.ts` as idempotent DDL.
-- Do not scatter `process.env` references — read config from `app/server/db_config.ts` or `app/config/siteConfig.ts`.
+- Do not scatter `process.env` references — read config from `app/server/db_config.ts`.
+- Do not make a deployment edit source to configure itself — add an environment variable (ADR-0017).
 - Do not write functions longer than 150 lines — break them up.
 - Do not ship a feature without a corresponding test.
 - Do not introduce a new language without strong justification — default to TypeScript.

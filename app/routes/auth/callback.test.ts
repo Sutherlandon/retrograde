@@ -22,6 +22,11 @@ vi.mock("~/server/db_config", () => ({
     })),
   },
   oauthRedirectUri: "http://localhost:3000/auth/callback",
+  // OAuth settings are read and validated once in db_config.ts (CLAUDE.md rule 5).
+  oauthTokenUrl: "https://auth.example.com/token",
+  oauthUserinfoUrl: "https://auth.example.com/userinfo",
+  oauthClientId: "test-client-id",
+  oauthClientSecret: "test-client-secret",
 }));
 
 const mockEnsurePersonalTeam = vi.fn();
@@ -60,12 +65,6 @@ beforeEach(() => {
   sessionData = {};
   mockEnsurePersonalTeam.mockResolvedValue("personal-team-id");
 
-  process.env.OAUTH_TOKEN_URL = "https://auth.example.com/token";
-  process.env.OAUTH_REDIRECT_URI = "http://localhost:3000/auth/callback";
-  process.env.OAUTH_CLIENT_ID = "test-client-id";
-  process.env.OAUTH_CLIENT_SECRET = "test-client-secret";
-  process.env.OAUTH_USERINFO_URL = "https://auth.example.com/userinfo";
-  process.env.SESSION_SECRET = "test-secret";
 
   mockQuery.mockResolvedValue({ rows: [{ id: 42 }] });
 });

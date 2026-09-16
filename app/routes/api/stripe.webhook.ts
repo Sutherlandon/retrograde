@@ -90,6 +90,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return err("METHOD_NOT_ALLOWED", "Use POST", 405);
   }
 
+  // A self-hosted instance has no billing at all (ADR-0016): answer as if the
+  // route did not exist, before reading the body or verifying any signature.
+  if (!stripe || !stripeWebhookSecret) {
+    return err("NOT_FOUND", "Billing is not available on this instance", 404);
+  }
+
   const raw = await request.text();
   const sig = request.headers.get("stripe-signature");
   if (!sig) {

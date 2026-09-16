@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-09 · **Version:** 2.0.0-rc.1 · **Branch:** `release/2.0.0-rc.1` (cut from `agent-substrate`, ahead of `main`, unreviewed)
+**Updated:** 2026-09-14 · **Version:** 2.0.0-rc.1 · **Branch:** `release/2.0.0-rc.1` (cut from `agent-substrate`, ahead of `main`, unreviewed)
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md).
 
@@ -13,15 +13,15 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,213 passing across 78 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,300 passing across 84 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
 ## Branch state
 
-`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0015 cover the decisions.
+`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0018 cover the decisions.
 
-**It is 2.0.0, not 1.7.0, because the boot contract changed.** `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `CRON_SECRET` and `OAUTH_REDIRECT_URI` are now required through `requireEnv()`, so an existing deployment that upgrades without setting them exits at startup rather than degrading. Self-hosted installs must change their environment before this version will run.
+**It is 2.0.0, not 1.7.0, because the boot contract changed.** Every environment variable is validated at startup, so a deployment that upgrades with missing or malformed configuration exits instead of degrading — `SITE_ADMIN_IDS` included — and the database connection requires TLS outside local development (ADR-0018). The hosted service also needs the three Stripe variables; a self-hosted install sets `SELF_HOSTED=true` and must not set them (ADR-0016). Nothing is configured by editing code: `app/config/siteConfig.ts` is gone, so a deployment that used `dashboardHome` to hide logout now sets `HIDE_LOGOUT=true`, and its logo comes from the `SITE_LOGO_*` URLs. The logout redirect is read from `OAUTH_LOGOUT_REDIRECT_URL` (ADR-0017). [`README.md`](../README.md) is the self-hosting guide.
 
 No human has looked at any of it in a browser. That review is the gate before merge:
 
@@ -40,19 +40,22 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 **Lapse behavior (ADR-0015).** Entitlement covers the whole crew surface, not just creation, and is checked against the **crew owner** rather than the acting user — members are often free accounts. A lapse returns 402, freezes all crew management and new work, and revokes the owner's named-crew API keys via the webhook. It deliberately does **not** relax `restrict_board_access`: a billing lapse must never widen access. Known sharp edge, accepted deliberately: a lapsed owner cannot remove a member or delete their own crew. Revisit first if it generates support load. The crew page (`crews.$id.tsx`) mirrors this in the UI: a lapsed named crew shows a read-only banner with a "Subscribe" CTA and disables every frozen control (rename, roster, AI crew, boards, settings, danger zone, and add/edit/delete on crew action items) — only checking an item off stays interactive, per CREW-015.
 
-**The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. The paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
+**Self-hosted instances (ADR-0016).** `SELF_HOSTED=true` makes every account tier 3: the entitlement seam returns true without reading billing state, so every account can create named crews and lapse never applies. Billing does not exist there — the Stripe variables are refused at startup, the three billing routes return 404, and the sidebar hides Billing. The personal crew's one-key cap still applies, as it does to a paying hosted account. The dashboard is also home: every marketing page redirects to it, the sitemap returns 404, and the header drops About and Contact. Vercel Analytics does not load there (ADR-0017).
+
+**The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. On the hosted service the paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
 
 ## Known rough edges
 
-1. **The app will not boot without Stripe configuration, in every environment** (ADR-0013, CLAUDE.md rule 5). `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `CRON_SECRET`, and `OAUTH_REDIRECT_URI` go through `requireEnv()` and a missing one exits the process at startup. `npm run build` does not execute `db_config.ts`, so a CI build will not catch a missing var — only a server boot does.
+1. **Every environment variable is validated at startup** (ADR-0013, ADR-0016, ADR-0018, CLAUDE.md rule 5). Required ones exit when missing and optional ones exit when malformed; the Stripe variables are required on the hosted service and refused when `SELF_HOSTED=true`. `npm run build` does not execute `db_config.ts`, so a CI build catches none of this — only a server boot does. Vercel production needs `SITE_ADMIN_IDS` set before this branch deploys.
 2. **Stripe is the merchant of record** (ADR-0014). Managed Payments remits sales tax/VAT/GST in 80+ countries for 3.5% per transaction (~$1.40 on $39.99). Consequences to know: Stripe emails customers directly from Link (receipts, invoices, renewal notices), handles payment support, and may refund unilaterally if it asks you for product input and gets no reply within 48 hours. `automatic_tax` must never be set — Managed Payments forbids it, and a test enforces that.
 3. **The permission matrix has no registered-but-unsubscribed actor.** Its fixture answers the entitlement query with `active` for every registered human, so it proves "registered + active → allowed" and "everyone else → denied" for CREW-002; the not-subscribed case is covered by `entitlements.test.ts` and `crews.test.ts`, not the matrix.
 4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
 5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
 6. **No structured logging** (issue #82). `console.log` only.
-7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `AppLayout`, `ThemeToggle` have no component tests. Every registry row is Verified.
-8. **README is 11 lines** (issue #10).
+7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `ThemeToggle` have no component tests, and `AppLayout` has loader tests but none of its rendering. Every registry row is Verified.
+8. **The README covers self-hosting only** (issue #10). Development setup lives in `CLAUDE.md`. The Docker instructions in it have not been run against a Docker build of this branch.
 9. **~30 stale local branches** from merged PRs.
+10. **Database TLS has been exercised against a local TLS-only Postgres, not against Neon.** Outside development the pool connects with `ssl: { rejectUnauthorized: true }`. Neon's certificates chain to public CAs, so the hosted connection should verify, but the first deploy of this branch is the first time it runs against Neon. `npm start` against a local Postgres without TLS does not connect; develop with `npm run dev`.
 
 ## Behavioral notes that are easy to get wrong
 
@@ -74,4 +77,5 @@ Recorded so they aren't rediscovered as gaps: annual billing (a second Price on 
 - Vercel + Neon; preview deploys stand in for staging.
 - `initializeDatabase()` runs on every startup — idempotent, but startup always touches the DB.
 - A dev seed board (`dev-test`) is created at the bottom of `db_init.ts` and runs in production too. Harmless, noisy.
+- The auto-archive cron (API-006) is invoked by Vercel with a **GET**; it previously implemented POST only, so it answered 405 and never ran. The first successful run archives the whole backlog of eligible crewless boards at once.
 - Honeypot on free-board creation is the only bot defense. Turnstile was removed deliberately (issue #87) — an agent must be able to create a board without solving a captcha. If bots become a problem, the answer is rate limiting, not a captcha.

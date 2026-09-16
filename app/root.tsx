@@ -5,14 +5,25 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 import { Analytics } from "@vercel/analytics/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import ThemeInitializer from "./components/ThemeInitializer";
+import { selfHosted } from "~/server/db_config";
+
+// Vercel Analytics belongs to the hosted service, which runs on Vercel. A
+// self-hosted instance must never load its script (ADR-0017).
+export function loader() {
+  return { vercelAnalytics: !selfHosted };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  // Undefined only if the root loader never ran; analytics stays off then.
+  const rootData = useRouteLoaderData<typeof loader>("root");
+
   return (
     <html lang="en">
       <head>
@@ -71,7 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
         <ScrollRestoration />
         <Scripts />
-        <Analytics />
+        {rootData?.vercelAnalytics && <Analytics />}
       </body>
     </html>
   );

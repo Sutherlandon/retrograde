@@ -1,7 +1,6 @@
 import { redirect } from "react-router";
 import { getSession } from "~/session.server";
-import { pool } from "~/server/db_config";
-import { siteConfig } from "~/config/siteConfig";
+import { pool, oauthUsernameField } from "~/server/db_config";
 import { isApiKey, findApiKeyByValue, touchApiKeyLastUsed } from "~/server/api_key";
 import { isExampleBoardId } from "~/example-data/example_board_ids";
 
@@ -21,7 +20,7 @@ export async function getOptionalUser(request: Request) {
   }
 
   const id = user.id;
-  const username = user[siteConfig.usernameField];
+  const username = user[oauthUsernameField];
 
   return { id, username, is_anonymous: Boolean(user.is_anonymous) };
 }
@@ -78,7 +77,7 @@ export async function getApiUser(request: Request) {
         if (user) {
           return {
             id: user.id,
-            username: user.display_name || user[siteConfig.usernameField] || "Agent",
+            username: user.display_name || user[oauthUsernameField] || "Agent",
             teamId: apiKey.team_id,
           };
         }
@@ -95,7 +94,7 @@ export async function getApiUser(request: Request) {
       const userRows = await pool.query("SELECT * FROM users WHERE id = $1", [userId]);
       const user = userRows.rows[0];
       if (user) {
-        return { id: user.id, username: user[siteConfig.usernameField] || user.display_name || "Guest" };
+        return { id: user.id, username: user[oauthUsernameField] || user.display_name || "Guest" };
       }
     }
   }
@@ -114,7 +113,7 @@ export async function getOrCreateUser(request: Request, boardId: string) {
       return {
         user: {
           id: user.id,
-          username: user[siteConfig.usernameField] || "Guest",
+          username: user[oauthUsernameField] || "Guest",
           is_anonymous: Boolean(user.is_anonymous),
         },
         session,

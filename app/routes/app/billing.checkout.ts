@@ -30,6 +30,12 @@ export async function action({ request }: ActionFunctionArgs) {
     return err("METHOD_NOT_ALLOWED", "Use POST", 405);
   }
 
+  // A self-hosted instance has no billing at all (ADR-0016): answer as if the
+  // route did not exist, before authenticating anyone or touching Stripe.
+  if (!stripe || !stripePriceId) {
+    return err("NOT_FOUND", "Billing is not available on this instance", 404);
+  }
+
   const user = await requireRegisteredUser(request);
   const billing = await getBillingForUser(user.id);
 

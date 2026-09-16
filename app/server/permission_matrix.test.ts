@@ -57,7 +57,11 @@ vi.mock("~/server/db_config", () => ({
     }),
   },
   siteAdminIds: [SITE_ADMIN_EXTERNAL_ID],
+  // The matrix proves the hosted service's rules. Self-hosted entitlement
+  // (every account tier 3, ADR-0016) is proven in entitlements.test.ts.
+  selfHosted: false,
   cronSecret: "test-cron-secret",
+  oauthUsernameField: "preferred_username",
 }));
 
 vi.mock("~/session.server", () => ({
@@ -71,10 +75,6 @@ vi.mock("~/session.server", () => ({
     };
   }),
   commitSession: vi.fn(async () => "cookie-value"),
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
 }));
 
 vi.mock("~/server/db_init", () => ({}));

@@ -4,13 +4,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockPoolQuery = vi.fn();
+let selfHosted = false;
 vi.mock("~/server/db_config", () => ({
   pool: { query: (...args: unknown[]) => mockPoolQuery(...args) },
+  get selfHosted() {
+    return selfHosted;
+  },
 }));
 vi.mock("~/server/db_init", () => ({}));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  selfHosted = false;
 });
 
 describe("accountCanCreateNamedCrew (CREW-002)", () => {
@@ -100,5 +105,29 @@ describe("crewIsEntitled (CREW-002)", () => {
       rows: [{ is_personal: false, subscription_status: null }],
     });
     expect(await crewIsEntitled("team-orphaned")).toBe(false);
+  });
+});
+
+// ADR-0016: every account on a self-hosted instance is tier 3. The instance
+// is licensed outside Stripe, so billing state is never consulted.
+describe("self-hosted instance (ADR-0016)", () => {
+  it("CREW-002: lets every account create a named crew without reading billing state", async () => {
+    const { accountCanCreateNamedCrew } = await import("./entitlements");
+    selfHosted = true;
+    expect(await accountCanCreateNamedCrew("user-1")).toBe(true);
+    expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+
+  it("treats every crew as entitled, so a named crew never freezes for lack of a subscription", async () => {
+    const { crewIsEntitled } = await import("./entitlements");
+    selfHosted = true;
+    expect(await crewIsEntitled("team-1")).toBe(true);
+    expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+
+  it("still denies an unsubscribed account on the hosted service", async () => {
+    const { accountCanCreateNamedCrew } = await import("./entitlements");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ subscription_status: null }] });
+    expect(await accountCanCreateNamedCrew("user-1")).toBe(false);
   });
 });

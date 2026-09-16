@@ -1,13 +1,21 @@
+import type { PoolClient } from "pg";
 import { pool } from "./db_config.js";
 
 /**
- * Database initialization function, only run initial startup of the application. If th
- * queries fail, noting happens so it's only to run on every startup.
- *
- * ONLY RUN ONCE PER DEPLOYMENT!
+ * Creates and upgrades the schema, idempotently, every time the server starts.
+ * Any failure — including failing to connect — exits the process.
  */
 export async function initializeDatabase() {
-  const client = await pool.connect();
+  let client: PoolClient;
+  try {
+    client = await pool.connect();
+  } catch (error) {
+    // A bad host, bad credentials or a TLS failure: stop here rather than run a
+    // server that fails on every request.
+    console.error("FATAL: could not connect to the database:", error);
+    process.exit(1);
+    return;
+  }
 
   try {
     // Begin transaction

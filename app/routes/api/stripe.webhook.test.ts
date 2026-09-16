@@ -4,12 +4,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockConstructEvent = vi.fn();
+// A self-hosted instance has no Stripe client and no signing secret (ADR-0016).
+const billing = vi.hoisted(() => ({ configured: true }));
 vi.mock("~/server/stripe_client", () => ({
-  stripe: { webhooks: { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) } },
+  get stripe() {
+    return billing.configured
+      ? { webhooks: { constructEvent: (...args: unknown[]) => mockConstructEvent(...args) } }
+      : null;
+  },
 }));
 
 vi.mock("~/server/db_config", () => ({
-  stripeWebhookSecret: "whsec_test_secret",
+  get stripeWebhookSecret() {
+    return billing.configured ? "whsec_test_secret" : null;
+  },
 }));
 
 const mockApplySubscriptionState = vi.fn();
@@ -21,6 +29,7 @@ import { action, loader } from "./stripe.webhook";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  billing.configured = true;
   mockApplySubscriptionState.mockResolvedValue(true);
 });
 
@@ -235,5 +244,20 @@ describe("CREW-002 POST /api/stripe/webhook [API-007]", () => {
     expect(response.status).toBe(200);
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+describe("POST /api/stripe/webhook on a self-hosted instance (ADR-0016) [API-007]", () => {
+  it("returns 404 without reading the signature or writing subscription state", async () => {
+    billing.configured = false;
+    const response = (await action({
+      request: req("{}", { "stripe-signature": "sig_any" }),
+      params: {}, context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe("NOT_FOUND");
+    expect(mockConstructEvent).not.toHaveBeenCalled();
+    expect(mockApplySubscriptionState).not.toHaveBeenCalled();
   });
 });

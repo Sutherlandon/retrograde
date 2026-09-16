@@ -15,9 +15,13 @@ vi.mock("~/server/billing_model", () => ({
 }));
 
 const mockPortalSessionsCreate = vi.fn();
+// A self-hosted instance has no Stripe client (ADR-0016).
+const billing = vi.hoisted(() => ({ configured: true }));
 vi.mock("~/server/stripe_client", () => ({
-  stripe: {
-    billingPortal: { sessions: { create: (...args: unknown[]) => mockPortalSessionsCreate(...args) } },
+  get stripe() {
+    return billing.configured
+      ? { billingPortal: { sessions: { create: (...args: unknown[]) => mockPortalSessionsCreate(...args) } } }
+      : null;
   },
 }));
 
@@ -25,6 +29,7 @@ vi.mock("~/server/db_config", () => ({ stripePriceId: "price_test_123" }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  billing.configured = true;
   mockRequireRegisteredUser.mockResolvedValue({ id: "user-1", username: "landon" });
   mockGetBillingForUser.mockResolvedValue({
     userId: "user-1",
@@ -85,5 +90,19 @@ describe("billing.portal action (CREW-002) [CREW-021]", () => {
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("https://billing.stripe.com/session_1");
+  });
+});
+
+describe("billing.portal on a self-hosted instance (ADR-0016) [CREW-021]", () => {
+  it("returns 404 before authenticating or touching Stripe, because billing does not exist there", async () => {
+    billing.configured = false;
+    const { action } = await import("./billing.portal");
+    const res = (await action({ request: postRequest(), params: {}, context: {} } as never)) as Response;
+
+    expect(res.status).toBe(404);
+    expect((await res.json()).error.code).toBe("NOT_FOUND");
+    expect(mockRequireRegisteredUser).not.toHaveBeenCalled();
+    expect(mockGetBillingForUser).not.toHaveBeenCalled();
+    expect(mockPortalSessionsCreate).not.toHaveBeenCalled();
   });
 });

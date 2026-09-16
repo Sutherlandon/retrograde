@@ -37,8 +37,7 @@ vi.mock("~/session.server", () => ({
   getSession: vi.fn(async () => ({ get: () => undefined, set: vi.fn(), unset: vi.fn() })),
   commitSession: vi.fn(async () => "session-cookie-value"),
 }));
-vi.mock("~/server/db_config", () => ({ pool: { query: vi.fn() } }));
-vi.mock("~/config/siteConfig", () => ({ siteConfig: { usernameField: "preferred_username" } }));
+vi.mock("~/server/db_config", () => ({ pool: { query: vi.fn() }, oauthUsernameField: "preferred_username" }));
 vi.mock("~/server/board_model", () => ({
   createBoard: vi.fn(),
   listVisibleBoards: vi.fn(),

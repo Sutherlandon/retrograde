@@ -17,10 +17,9 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
+  oauthUsernameField: "preferred_username",
+  // Non-default values, so the test below proves pass-through, not a default.
+  hostingConfig: { selfHosted: true, hideLogout: true, siteLogo: null },
 }));
 
 vi.mock("~/server/db_init", () => ({}));
@@ -128,5 +127,18 @@ describe("BoardLayout loader", () => {
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toEqual([expect.stringMatching(/^anon-/), null]);
+  });
+});
+
+describe("BoardLayout loader — hosting config", () => {
+  it("hands the header the deployment's hosting config (ADR-0017)", async () => {
+    const { loader } = await import("./BoardLayout");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "anon-uuid-new" }] });
+
+    const request = new Request("http://localhost:3000/app/board/board-42");
+    const response = await loader({ request, params: { id: "board-42" } });
+    const body = await response.json();
+
+    expect(body.hosting).toEqual({ selfHosted: true, hideLogout: true, siteLogo: null });
   });
 });

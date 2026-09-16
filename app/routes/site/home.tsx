@@ -6,7 +6,6 @@ import { RocketIcon, ServerIcon, CloudIcon, AstronautIcon, BookIcon, StartIcon, 
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Button from "~/components/Button";
 import Card from '~/components/Card';
-import { siteConfig } from "~/config/siteConfig";
 
 export const meta = () => {
   return [
@@ -35,12 +34,6 @@ export const meta = () => {
     { tagName: "link", rel: "canonical", href: "https://retrograde.sh" },
   ];
 };
-
-export async function loader() {
-  if (siteConfig.dashboardHome) {
-    return redirect('/app/dashboard');
-  }
-}
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();

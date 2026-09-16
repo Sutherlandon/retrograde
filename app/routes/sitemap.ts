@@ -1,9 +1,13 @@
 import type { LoaderFunctionArgs } from "react-router";
+import { selfHosted } from "~/server/db_config";
 
 // Ideally, import your database client here
 // import { db } from "~/utils/db.server"; 
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  // A self-hosted instance has no public site to index (ADR-0017).
+  if (selfHosted) return new Response("Not Found", { status: 404 });
+
   const baseUrl = "https://retrograde.sh";
 
   // 1. Define your static pages manually

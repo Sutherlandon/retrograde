@@ -17,10 +17,7 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
+  oauthUsernameField: "preferred_username",
 }));
 
 const mockRequireBoardAccess = vi.fn();

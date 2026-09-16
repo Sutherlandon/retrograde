@@ -21,13 +21,10 @@ vi.mock("~/server/db_config", () => ({
     query: (...args: unknown[]) => mockPoolQuery(...args),
     connect: vi.fn(),
   },
+  oauthUsernameField: "preferred_username",
 }));
 
 vi.mock("~/server/db_init", () => ({}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
-}));
 
 const mockCreateAgentUser = vi.fn();
 const mockGetApiUser = vi.fn();

@@ -82,6 +82,7 @@ const mockConnect = vi.fn(async () => ({ query: mockClientQuery, release: vi.fn(
 
 vi.mock("~/server/db_config", () => ({
   pool: { query: mockPoolQuery, connect: mockConnect },
+  oauthUsernameField: "preferred_username",
 }));
 
 // Cookie-backed sessions: commitSession serializes the session's data into

@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-09-08 · **Branch:** `agent-substrate`
+**Updated:** 2026-09-14 · **Branch:** `release/2.0.0-rc.1`
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
@@ -19,6 +19,8 @@ Three tiers. A tier is what an **account** is entitled to; a board inherits the 
 | **3 · Paid**       | subscriber       | named crews                | Named multi-member crews, crew action items, and members-only board access.                          |
 
 The tier boundary in code is `teams.is_personal`. A personal crew is tier 2 and cannot be renamed, deleted, given human members, or restricted. A named crew is tier 3 and can do all four.
+
+**On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing does not exist there: CREW-020, CREW-021 and API-007 return 404. The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). Tier 1 is unchanged.
 
 Tier 1 is enforced by construction, not by convention. A crewless board is created with **no owner row** and `open_facilitation = TRUE`; the open-facilitation toggle is refused on a crewless board; moving a board onto a crew closes facilitation to the role and moving it off reopens it. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) brought pre-existing anonymous boards into line. No path in the code can produce a crewless board with an owner.
 
@@ -83,11 +85,11 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 
 | ID       | Action                                 | Who    | Code path                | Guard                       | Status     |
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
-| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed                 | Verified |
-| SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed                 | Verified |
+| SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
+| SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only         | Verified   |
 | SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Verified |
-| SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed                 | Verified |
+| SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed; 404 when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
 
 Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 30-day TTL (ADR-0005).
@@ -98,7 +100,7 @@ Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 
 | -------- | --------------------------------------------------------- | -------------- | ---------------------------- | ----------- | -------- |
 | AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —           | Verified |
 | AUTH-002 | OAuth callback; create/refresh user; ensure personal crew | Anyone         | `routes/auth/callback.ts`    | state param | Verified |
-| AUTH-003 | Log out                                                   | Session holder | `routes/auth/logout.ts`      | —           | Verified |
+| AUTH-003 | Log out                                                   | Session holder | `routes/auth/logout.ts`      | —; redirects to `OAUTH_LOGOUT_REDIRECT_URL` (default `/`); the logout control is hidden when `HIDE_LOGOUT=true` (ADR-0017) | Verified |
 | AUTH-004 | Get an anonymous user record on first board visit         | Anyone         | `components/BoardLayout.tsx` | —           | Verified |
 
 ## BRD — board content
@@ -201,7 +203,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | ID       | Action                                    | Tier | Who         | Code path                           | Guard                                | Status      |
 | -------- | ----------------------------------------- | ---- | ----------- | ----------------------------------- | ------------------------------------ | ----------- |
 | CREW-001 | List own crews                            | 2    | Registered  | `crews.tsx` loader                  | `requireRegisteredUser`              | Verified    |
-| CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` → 403 unless `users.subscription_status = 'active'`, which only the signature-verified Stripe webhook writes (ADR-0013) | Verified |
+| CREW-002 | **Create a named crew** | 3 | Paid | `crews.tsx` action | `accountCanCreateNamedCrew` → 403 unless `users.subscription_status = 'active'`, which only the signature-verified Stripe webhook writes (ADR-0013) · **always allowed on a self-hosted instance** (ADR-0016) | Verified |
 | CREW-003 | View a crew page                          | 2    | Crew member | `crews.$id.tsx` loader              | `requireRegisteredUser` + `teamRole` | Verified    |
 | CREW-004 | Rename a crew                             | 3    | Crew owner  | `crews.$id.tsx` `rename`            | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-005 | Delete a crew                             | 3    | Crew owner  | `crews.$id.tsx` `deleteTeam`        | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
@@ -210,8 +212,8 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed) · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew · **402 when the crew's owner lapses** (ADR-0015) | Verified |
-| CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use | Verified |
-| CREW-021 | Manage billing (Stripe Billing Portal) | 3 | Subscriber | `billing.portal.ts` | `requireRegisteredUser`; redirects to `/app/crews` if no Stripe customer | Verified |
+| CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | **404 on a self-hosted instance** (ADR-0016); `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use | Verified |
+| CREW-021 | Manage billing (Stripe Billing Portal) | 3 | Subscriber | `billing.portal.ts` | **404 on a self-hosted instance** (ADR-0016); `requireRegisteredUser`; redirects to `/app/crews` if no Stripe customer | Verified |
 | CREW-010 | List API keys                             | 2    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
 | CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-012 | Create a board into the crew              | 2    | Crew member | `crews.$id.tsx` `createBoard`       | membership · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
@@ -228,9 +230,9 @@ Tier-2 rows describe the personal crew: every registered user gets one, it holds
 
 Note what the cap does and does not do. It limits *fleet size*, not *volume* — a single free key can drive unlimited writes, and API-002 needs no key at all. Metering agent activity is a separate lever and neither exists today.
 
-CREW-002 is therefore the single gate that has to hold for any of this to be sellable, and it holds: `accountCanCreateNamedCrew` reads `users.subscription_status`, and only the Stripe webhook (API-007) writes it. Subscribing (CREW-020) and managing billing (CREW-021) are Stripe-hosted pages the app redirects to; no card data or payment UI lives here (ADR-0013). CREW-014 – CREW-018 are marked tier 3 because a personal crew is single-member; the code does not block crew action items on a personal crew, it is simply a list of one.
+CREW-002 is therefore the single gate that has to hold for any of this to be sellable, and on the hosted service it holds: `accountCanCreateNamedCrew` reads `users.subscription_status`, and only the Stripe webhook (API-007) writes it. Subscribing (CREW-020) and managing billing (CREW-021) are Stripe-hosted pages the app redirects to; no card data or payment UI lives here (ADR-0013). CREW-014 – CREW-018 are marked tier 3 because a personal crew is single-member; the code does not block crew action items on a personal crew, it is simply a list of one.
 
-Creating a crew is the gate; **staying subscribed is what keeps it working**. Every row above marked *402 when the crew's owner lapses* consults `crewIsEntitled(teamId)`, which reads the **crew owner's** `subscription_status` — not the acting user's, because members are often free accounts inside a paid owner's crew. Personal crews always pass. A lapse freezes new work and all management, revokes the crew's API keys, and leaves existing boards readable with `restrict_board_access` still enforced — a billing lapse must never widen access. CREW-015 (checking off an existing action item) stays open by design. See ADR-0015.
+Creating a crew is the gate; **staying subscribed is what keeps it working**. Every row above marked *402 when the crew's owner lapses* consults `crewIsEntitled(teamId)`, which reads the **crew owner's** `subscription_status` — not the acting user's, because members are often free accounts inside a paid owner's crew. Personal crews always pass. A lapse freezes new work and all management, revokes the crew's API keys, and leaves existing boards readable with `restrict_board_access` still enforced — a billing lapse must never widen access. CREW-015 (checking off an existing action item) stays open by design. See ADR-0015. A self-hosted instance never freezes: `crewIsEntitled` is always true there (ADR-0016).
 
 ## ADMIN
 
@@ -255,8 +257,8 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |
-| API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts`      | `CRON_SECRET` bearer   | Verified |
-| API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event | Verified |
+| API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts` GET (Vercel cron) or POST | `CRON_SECRET` bearer, which Vercel sends automatically | Verified |
+| API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | **404 on a self-hosted instance** (ADR-0016); signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event | Verified |
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
 

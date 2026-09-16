@@ -4,7 +4,7 @@
 import { useLoaderData, Outlet } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { UserProvider } from "~/context/userContext";
-import { pool, siteAdminIds } from "~/server/db_config";
+import { pool, siteAdminIds, selfHosted, hostingConfig } from "~/server/db_config";
 import { isGrantedAdmin } from "~/server/admin_model";
 import { listTeamsForUser } from "~/server/team_model";
 import { countUnassignedBoardsForUser } from "~/server/board_model";
@@ -27,19 +27,22 @@ export async function loader({ request }: { request: Request }) {
   const [teams, unassignedCount, isSubscribed] = await Promise.all([
     listTeamsForUser(user.id),
     countUnassignedBoardsForUser(user.id),
-    accountCanCreateNamedCrew(user.id), // gates the sidebar's Billing link (ADR-0013)
+    // Gates the sidebar's Billing link (ADR-0013). Billing only exists on the
+    // hosted service: a self-hosted instance entitles every account without a
+    // Stripe subscription, so there is no portal to link to (ADR-0016).
+    selfHosted ? false : accountCanCreateNamedCrew(user.id),
   ]);
 
-  return { user, isAdmin, teams, unassignedCount, isSubscribed };
+  return { user, isAdmin, teams, unassignedCount, isSubscribed, hosting: hostingConfig };
 }
 
 export default function AppLayout() {
-  const { user, isAdmin, teams, unassignedCount, isSubscribed } = useLoaderData();
+  const { user, isAdmin, teams, unassignedCount, isSubscribed, hosting } = useLoaderData();
 
   return (
     <UserProvider user={user}>
       <div className='min-h-screen flex flex-col'>
-        <Header user={user} isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} />
+        <Header user={user} isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} hosting={hosting} />
         <div className="flex flex-1 min-h-0">
           <aside className="hidden sm:block w-56 shrink-0 border-r border-gray-200 dark:border-gray-700/50 py-4 px-2">
             <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} />

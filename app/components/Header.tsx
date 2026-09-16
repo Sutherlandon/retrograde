@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from "react-router";
 import { Logo } from '~/images/icons';
-import { siteConfig } from '~/config/siteConfig';
 import AccountHub from './AccountHub';
 import Sidebar from './Sidebar';
 import type { TeamSummary } from '~/server/team_model';
+import type { HostingConfig } from '~/server/db_config';
 
 interface HeaderProps {
   user?: {
@@ -15,13 +15,16 @@ interface HeaderProps {
   teams?: TeamSummary[];
   unassignedCount?: number;
   isSubscribed?: boolean;
+  /** How this deployment is hosted (ADR-0017). Required, so no layout can
+   *  forget it and silently show a self-hosted user dead marketing links. */
+  hosting: HostingConfig;
 }
 
-export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed }: HeaderProps) {
+export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed, hosting }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const siteLogo = siteConfig.logoLight && siteConfig.logoDark;
+  const siteLogo = hosting.siteLogo;
 
   const location = useLocation();
   const home = location.pathname === "/";
@@ -82,13 +85,13 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
         {siteLogo && (
           <div className="ml-4 border-l-2 border-gray-900 dark:border-gray-100 px-4 py-1">
             <img
-              src={siteConfig.logoLight}
-              alt={siteConfig.logoAlt}
+              src={siteLogo.light}
+              alt={siteLogo.alt}
               className="h-8 dark:hidden"
             />
             <img
-              src={siteConfig.logoDark}
-              alt={siteConfig.logoAlt}
+              src={siteLogo.dark}
+              alt={siteLogo.alt}
               className="h-8 hidden dark:block"
             />
           </div>
@@ -99,18 +102,23 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
 
       {/* Desktop Nav */}
       <nav className="hidden sm:flex items-center gap-6 mr-4">
-        <a href="/about" className="hover:underline">
-          About
-        </a>
-        <a href="/contact" className="hover:underline">
-          Contact
-        </a>
+        {/* A self-hosted instance has no marketing site to link to. */}
+        {!hosting.selfHosted && (
+          <>
+            <a href="/about" className="hover:underline">
+              About
+            </a>
+            <a href="/contact" className="hover:underline">
+              Contact
+            </a>
+          </>
+        )}
         {user && (
           <a href="/app/dashboard" className="hover:underline">
             Dashboard
           </a>
         )}
-        <AccountHub user={user} />
+        <AccountHub user={user} hideLogout={hosting.hideLogout} />
       </nav>
 
       {/* Hamburger */}
@@ -156,19 +164,23 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
           }`}
         role="menu"
       >
-        <AccountHub user={user} closeMenu={closeMenu} />
+        <AccountHub user={user} hideLogout={hosting.hideLogout} closeMenu={closeMenu} />
         {user && (
           <>
             <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} onNavigate={closeMenu} />
             <div className="border-t border-gray-200 dark:border-gray-700" />
           </>
         )}
-        <a href="/about" className="hover:underline" onClick={closeMenu}>
-          About
-        </a>
-        <a href="/contact" className="hover:underline" onClick={closeMenu}>
-          Contact
-        </a>
+        {!hosting.selfHosted && (
+          <>
+            <a href="/about" className="hover:underline" onClick={closeMenu}>
+              About
+            </a>
+            <a href="/contact" className="hover:underline" onClick={closeMenu}>
+              Contact
+            </a>
+          </>
+        )}
       </div>
     </header>
   );

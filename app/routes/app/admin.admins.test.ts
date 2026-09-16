@@ -17,6 +17,7 @@ const SITE_ADMIN_EXT_ID = "site-admin-ext-123";
 vi.mock("~/server/db_config", () => ({
   pool: { query: (...args: unknown[]) => mockPoolQuery(...args) },
   siteAdminIds: [SITE_ADMIN_EXT_ID],
+  oauthUsernameField: "preferred_username",
 }));
 
 vi.mock("~/server/db_init", () => ({}));
@@ -29,10 +30,6 @@ vi.mock("~/server/admin_model", () => ({
   addGrantedAdmin:               (...args: unknown[]) => mockAdd(...args),
   removeGrantedAdmin:            (...args: unknown[]) => mockRemove(...args),
   findRegisteredUserByUsername:  (...args: unknown[]) => mockFind(...args),
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
 }));
 
 beforeEach(() => {

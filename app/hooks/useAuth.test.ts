@@ -13,15 +13,15 @@ vi.mock("~/session.server", () => ({
 }));
 
 const mockPoolQuery = vi.fn();
+// The claim used as the username comes from OAUTH_USERNAME_FIELD (ADR-0017);
+// mutable so a test can configure a different one.
+const auth = vi.hoisted(() => ({ usernameField: "preferred_username" }));
 vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: {
-    usernameField: "preferred_username",
+  get oauthUsernameField() {
+    return auth.usernameField;
   },
 }));
 
@@ -36,6 +36,7 @@ vi.mock("~/server/api_key", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
+  auth.usernameField = "preferred_username";
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockTouchApiKeyLastUsed.mockResolvedValue(undefined);
 });
@@ -158,7 +159,7 @@ describe("getOrCreateUser", () => {
     expect(sessionData["userId"]).toBe(anonId);
   });
 
-  it("uses siteConfig.usernameField for existing users", async () => {
+  it("uses the configured username claim for existing users", async () => {
     const { getOrCreateUser } = await import("./useAuth");
     sessionData["userId"] = "user-1";
     mockPoolQuery.mockResolvedValueOnce({
@@ -367,5 +368,20 @@ describe("requireRegisteredUser", () => {
       expect(res.status).toBe(302);
       expect(res.headers.get("Location")).toContain("/auth/login");
     }
+  });
+});
+
+describe("username claim (ADR-0017)", () => {
+  it("takes the username from the claim named by OAUTH_USERNAME_FIELD", async () => {
+    auth.usernameField = "email";
+    const { getOptionalUser } = await import("./useAuth");
+    sessionData["userId"] = "user-1";
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "user-1", preferred_username: "testuser", email: "test@example.com", is_anonymous: false }],
+      rowCount: 1,
+    });
+
+    const result = await getOptionalUser(new Request("http://localhost:3000/app/board/123"));
+    expect(result?.username).toBe("test@example.com");
   });
 });

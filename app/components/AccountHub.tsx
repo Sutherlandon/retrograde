@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { MoonIcon, SunIcon, UserIcon, ComputerIcon } from '~/images/icons';
 import { useTheme } from '~/hooks/useTheme';
 import Button from './Button';
-import { siteConfig } from '~/config/siteConfig';
 
 interface AccountHubProps {
   user?: {
@@ -10,9 +9,12 @@ interface AccountHubProps {
     username: string;
   };
   closeMenu?: () => void;
+  /** HIDE_LOGOUT (ADR-0017): an SSO deployment that signs users straight back
+   *  in hides logout, since the button would only bounce them. */
+  hideLogout: boolean;
 }
 
-export default function AccountHub({ user, closeMenu }: AccountHubProps) {
+export default function AccountHub({ user, closeMenu, hideLogout }: AccountHubProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -108,7 +110,7 @@ export default function AccountHub({ user, closeMenu }: AccountHubProps) {
           </div>
 
           {/* Log Out */}
-          {!siteConfig.dashboardHome &&
+          {!hideLogout &&
             <>
               <div className="border-t border-gray-200 dark:border-gray-700" />
               <Button

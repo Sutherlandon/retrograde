@@ -20,18 +20,7 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-// Mutable so SITE-001's loader tests can flip it per-test; `siteConfig`
-// resolves it via a getter so the change is visible without re-mocking.
-let dashboardHome = false;
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: {
-    get dashboardHome() {
-      return dashboardHome;
-    },
-    usernameField: "preferred_username",
-  },
+  oauthUsernameField: "preferred_username",
 }));
 
 const mockCreateBoard = vi.fn();
@@ -58,7 +47,6 @@ vi.mock("react-router", async (importOriginal) => {
 beforeEach(() => {
   vi.clearAllMocks();
   sessionData = {};
-  dashboardHome = false;
   mockActionData = undefined;
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockCreateBoard.mockResolvedValue("new-board-id");
@@ -153,21 +141,6 @@ describe("home page action", () => {
 });
 
 describe("homepage [SITE-001]", () => {
-  it("loader renders the homepage (no redirect) when dashboardHome is disabled", async () => {
-    const { loader } = await import("./home");
-    const result = await loader();
-    expect(result).toBeUndefined();
-  });
-
-  it("loader redirects to /app/dashboard when dashboardHome is enabled", async () => {
-    dashboardHome = true;
-    const { loader } = await import("./home");
-    const result = (await loader()) as unknown as Response;
-    expect(result).toBeInstanceOf(Response);
-    expect(result.status).toBe(302);
-    expect(result.headers.get("Location")).toBe("/app/dashboard");
-  });
-
   it("renders the hero heading, tutorial link, and board-creation form", async () => {
     const { default: Home } = await import("./home");
     render(React.createElement(Home));

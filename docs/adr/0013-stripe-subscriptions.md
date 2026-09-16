@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-06) — the deferred tax decision is made in [ADR-0014](0014-stripe-is-merchant-of-record.md): Stripe is the merchant of record via Managed Payments, so `automatic_tax` is not used and must not be added. Everything else here stands.
+Accepted (2026-09-06) — the deferred tax decision is made in [ADR-0014](0014-stripe-is-merchant-of-record.md): Stripe is the merchant of record via Managed Payments, so `automatic_tax` is not used and must not be added. §5's startup requirement is narrowed by [ADR-0016](0016-self-hosted-instances-are-tier-3.md): the Stripe variables are required on the hosted service only, and refused on a self-hosted instance. §5's note that `SITE_ADMIN_IDS` stays a warning is superseded by [ADR-0018](0018-every-setting-validated-and-database-tls.md): it is required. Everything else here stands.
 
 ## Context
 
