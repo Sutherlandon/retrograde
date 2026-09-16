@@ -354,38 +354,20 @@ describe("moveBoardsToTeamServer", () => {
     expect(params).toEqual([["board-1", "board-2"], "team-9", "user-1"]);
   });
 
-  // GAP-002: the transition on move must keep the invariant "crewless boards
-  // are always open_facilitation = TRUE" true, without clobbering a named
-  // crew's own facilitator choice on a crew-to-crew move.
-  it("opens facilitation in the same UPDATE when the board becomes crewless (teamId null)", async () => {
+  // ADR-0022: only an owner can move a board, so every moved board is owned,
+  // and on an owned board open facilitation is the facilitator's choice. A
+  // move, onto a crew or off one, never changes it.
+  it("leaves open_facilitation alone when a board moves onto or off a crew", async () => {
     const { moveBoardsToTeamServer } = await import("./board_model");
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
+    mockPoolQuery.mockResolvedValue({ rows: [{ id: "board-1" }], rowCount: 1 });
 
     await moveBoardsToTeamServer(["board-1"], null, "user-1");
-
-    const [sql] = mockPoolQuery.mock.calls[0];
-    expect(sql).toContain("open_facilitation");
-    expect(sql).toContain("WHEN $2::uuid IS NULL THEN TRUE");
-  });
-
-  it("closes facilitation in the same UPDATE when a crewless board joins a team", async () => {
-    const { moveBoardsToTeamServer } = await import("./board_model");
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
-
     await moveBoardsToTeamServer(["board-1"], "team-9", "user-1");
 
-    const [sql] = mockPoolQuery.mock.calls[0];
-    expect(sql).toContain("WHEN b.team_id IS NULL THEN FALSE");
-  });
-
-  it("preserves the facilitator's existing choice on a crew-to-crew move", async () => {
-    const { moveBoardsToTeamServer } = await import("./board_model");
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
-
-    await moveBoardsToTeamServer(["board-1"], "team-9", "user-1");
-
-    const [sql] = mockPoolQuery.mock.calls[0];
-    expect(sql).toContain("ELSE b.open_facilitation END");
+    for (const [sql] of mockPoolQuery.mock.calls) {
+      expect(sql).toContain("SET team_id = $2");
+      expect(sql).not.toContain("open_facilitation");
+    }
   });
 
   it("moves a board to no team (unassigned) with a null teamId", async () => {
@@ -631,22 +613,25 @@ describe("facilitators", () => {
     expect(applied).toBe(true);
   });
 
-  // GAP-002 invariant: a crewless board can never have facilitation closed.
-  // The guard lives in the WHERE clause so no caller can bypass it from the UI.
-  it("setOpenFacilitationServer refuses to close facilitation and the guard is in SQL, not just app code", async () => {
+  // ADR-0022: an ownerless (anonymous) board can never have facilitation
+  // closed, since no role would be left to reach the Command Deck. The guard
+  // lives in the WHERE clause so no caller can bypass it from the UI.
+  it("setOpenFacilitationServer refuses to close facilitation on an ownerless board, in SQL", async () => {
     const { setOpenFacilitationServer } = await import("./board_model");
     // Simulates the DB-side guard rejecting the write: 0 rows matched because
-    // the board is crewless and the caller asked for open=false.
+    // the board has no owner row and the caller asked for open=false.
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
-    const applied = await setOpenFacilitationServer("crewless-board", false);
-    expect(mockPoolQuery.mock.calls[0][0]).toContain("team_id IS NOT NULL");
+    const applied = await setOpenFacilitationServer("ownerless-board", false);
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("role = 'owner'");
     expect(applied).toBe(false);
   });
 
-  it("setOpenFacilitationServer allows closing facilitation on a board with a team", async () => {
+  it("setOpenFacilitationServer keys the guard on ownership, not on the board's crew", async () => {
     const { setOpenFacilitationServer } = await import("./board_model");
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
-    const applied = await setOpenFacilitationServer("teamed-board", false);
+    const applied = await setOpenFacilitationServer("owned-crewless-board", false);
+    expect(mockPoolQuery.mock.calls[0][0]).not.toContain("team_id");
     expect(applied).toBe(true);
   });
 

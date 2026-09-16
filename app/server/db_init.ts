@@ -424,7 +424,9 @@ export async function initializeDatabase() {
     //    createBoard/createBoardWithColumns) is automatically exempt.
     //    Registered users' owner rows on crewless boards (grandfathered by
     //    the ADR-0009 reset) are untouched — only rows whose user is
-    //    anonymous or an agent are removed.
+    //    anonymous or an agent are removed — and so is those boards'
+    //    facilitation: a board with an owner is not anonymous (ADR-0022), so
+    //    only a crewless board left with no owner row is opened.
     await client.query(`
       ALTER TABLE boards
       ADD COLUMN IF NOT EXISTS anonymous_ownership_cleared BOOLEAN NOT NULL DEFAULT FALSE;
@@ -444,7 +446,13 @@ export async function initializeDatabase() {
     await client.query(`
       UPDATE boards
       SET anonymous_ownership_cleared = TRUE,
-          open_facilitation = CASE WHEN team_id IS NULL THEN TRUE ELSE open_facilitation END
+          open_facilitation = CASE
+            WHEN team_id IS NULL AND NOT EXISTS (
+              SELECT 1 FROM board_members bm
+              WHERE bm.board_id = boards.id AND bm.role = 'owner'
+            ) THEN TRUE
+            ELSE open_facilitation
+          END
       WHERE NOT anonymous_ownership_cleared;
     `);
 

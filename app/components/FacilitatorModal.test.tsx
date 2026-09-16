@@ -19,11 +19,13 @@ vi.mock("react-router", () => ({
   ),
 }));
 
-// teamName === null means a crewless board — GAP-002's invariant means the
-// open-facilitation toggle must not even be reachable from this UI there.
+// hasOwner === false is an anonymous board (ADR-0022): everyone there already
+// has the Command Deck, so Crew Access has nothing to manage. Whether the board
+// is on a crew does not matter — every board before 2.0 is crewless and owned.
 let mockTeamName: string | null = "Acme Crew";
+let mockHasOwner = true;
 vi.mock("~/context/BoardContext", () => ({
-  useBoard: () => ({ teamName: mockTeamName }),
+  useBoard: () => ({ teamName: mockTeamName, hasOwner: mockHasOwner }),
 }));
 
 // Drives DECK-022's crewless CTA — anonymous/no user vs. registered viewer.
@@ -38,6 +40,7 @@ describe("FacilitatorModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTeamName = "Acme Crew";
+    mockHasOwner = true;
     mockFetcherState = "idle";
     mockFetcherData = {
       facilitators: [
@@ -107,13 +110,14 @@ describe("FacilitatorModal", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  // GAP-002 / DECK-008 / DECK-022: the invariant is enforced server-side too
+  // DECK-022: the invariant is enforced server-side too
   // (setOpenFacilitationServer refuses the write), but the control — and the
   // now-meaningless FACILITATORS list and GRANT ACCESS form — shouldn't even
-  // be offered on a crewless board, where everyone with the link already
+  // be offered on an anonymous board, where everyone with the link already
   // facilitates.
-  it("DECK-022: hides the open-facilitation toggle, facilitator list, and grant form on a crewless board and explains why", () => {
+  it("DECK-022: hides the open-facilitation toggle, facilitator list, and grant form on an ownerless board and explains why", () => {
     mockTeamName = null;
+    mockHasOwner = false;
     render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
     expect(screen.queryByText("Open Deck to Everyone")).toBeNull();
     expect(screen.queryByText("Facilitators")).toBeNull();
@@ -124,16 +128,18 @@ describe("FacilitatorModal", () => {
     ).toBeInTheDocument();
   });
 
-  it("DECK-022: crewless + anonymous viewer sees a link to create an account and claim the board", () => {
+  it("DECK-022: ownerless + anonymous viewer sees a link to create an account and claim the board", () => {
     mockTeamName = null;
+    mockHasOwner = false;
     mockUseOptionalUser.mockReturnValue(null);
     render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
     const link = screen.getByText("Create an account to claim this board");
     expect(link.getAttribute("href")).toContain("/auth/login?returnTo=");
   });
 
-  it("DECK-022: crewless + registered viewer is told to claim from the toolbar, with no login link or grant form", () => {
+  it("DECK-022: ownerless + registered viewer is told to claim from the toolbar, with no login link or grant form", () => {
     mockTeamName = null;
+    mockHasOwner = false;
     mockUseOptionalUser.mockReturnValue({ id: "u1", username: "landon", is_anonymous: false });
     render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
     expect(
@@ -141,6 +147,18 @@ describe("FacilitatorModal", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Create an account to claim this board")).toBeNull();
     expect(screen.queryByPlaceholderText("Username")).toBeNull();
+  });
+
+  // ADR-0022: a board with an owner is not anonymous, crew or no crew.
+  it("DECK-022: an owned board with no crew gets the full Crew Access controls", () => {
+    mockTeamName = null;
+    mockHasOwner = true;
+    render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);
+    expect(screen.queryByText(/this board is anonymous/i)).toBeNull();
+    expect(screen.getByText("Open Deck to Everyone")).toBeInTheDocument();
+    expect(screen.getByText("Facilitators")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Username")).toBeInTheDocument();
+    expect(screen.getByText("Grant")).toBeInTheDocument();
   });
 
   it("shows the open-facilitation toggle on a board that belongs to a crew", () => {
@@ -151,6 +169,7 @@ describe("FacilitatorModal", () => {
 
   it("DECK-020: shows None in the facilitator list when a crew board has no facilitators after load, with the grant form present", () => {
     mockTeamName = "Acme Crew";
+    mockHasOwner = true;
     mockFetcherState = "idle";
     mockFetcherData = { facilitators: [], openFacilitation: false };
     render(<FacilitatorModal boardId="b1" isOpen onClose={() => {}} />);

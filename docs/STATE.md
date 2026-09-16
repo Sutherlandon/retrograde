@@ -13,7 +13,7 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,341 passing across 86 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,340 passing across 86 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
@@ -50,7 +50,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 2. **Stripe is the merchant of record** (ADR-0014). Managed Payments remits sales tax/VAT/GST in 80+ countries for 3.5% per transaction (~$1.40 on $39.99). Consequences to know: Stripe emails customers directly from Link (receipts, invoices, renewal notices), handles payment support, and may refund unilaterally if it asks you for product input and gets no reply within 48 hours. `automatic_tax` must never be set — Managed Payments forbids it, and a test enforces that.
 3. **The permission matrix has no registered-but-unsubscribed actor.** Its fixture answers the entitlement query with `active` for every registered human, so it proves "registered + active → allowed" and "everyone else → denied" for CREW-002; the not-subscribed case is covered by `entitlements.test.ts` and `crews.test.ts`, not the matrix.
 4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
-5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens their facilitation, gated so it runs once. Nothing observable changes for those boards, but it is a data mutation — read it before the first production deploy of this branch.
+5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens facilitation on the ones left with no owner, gated so it runs once. Boards with a registered owner keep their owner and their facilitation setting (ADR-0022). Nothing observable changes for any board, but it is a data mutation — read it before the first production deploy of this branch.
 6. **No structured logging** (issue #82). `console.log` only.
 7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `ThemeToggle` have no component tests, and `AppLayout` has loader tests but none of its rendering. Every registry row is Verified.
 8. **The README covers self-hosting only** (issue #10). Development setup lives in `CLAUDE.md`. The Docker instructions in it have not been run against a Docker build of this branch.
@@ -63,7 +63,8 @@ Board access is a separate axis from the tier: a board is members-only only when
 - Any session user can un-check another user's completed action item. Per-item assignees are the refinement (ADR-0006).
 - Crew action items have no attribution display.
 - Facilitator grants are **not** copied when a board is duplicated.
-- Claiming a board assigns it to the claimer's personal crew, which makes it permanent (the 30-day TTL only touches crewless boards), but deliberately leaves `open_facilitation` alone so a claim never takes the Command Deck away from a live retro (ADR-0012). `moveBoardsToTeamServer` *does* close facilitation on a crewless→crew move; the claim path is the intentional exception.
+- Claiming a board assigns it to the claimer's personal crew, which makes it permanent (the 30-day TTL only touches crewless boards), but deliberately leaves `open_facilitation` alone so a claim never takes the Command Deck away from a live retro (ADR-0012). Moving a board never changes it either (ADR-0022).
+- "Anonymous" means **no owner row**, not "no crew" (ADR-0022). Every pre-2.0 board is crewless and most have a registered owner; those get full Crew Access. Check `hasOwner`, never `team_id`/`teamName`, when deciding whether a board is anonymous.
 - Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
 - Personal crews cannot be renamed, deleted, restricted, or given human members — but they can mint exactly one API key; the second is a named-crew (tier 3) action.
 

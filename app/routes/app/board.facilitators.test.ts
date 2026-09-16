@@ -106,10 +106,10 @@ describe("board.facilitators action", () => {
     expect(body.error).toBeUndefined();
   });
 
-  // GAP-002: the invariant is enforced on write. A crewless board's
+  // ADR-0022: the invariant is enforced on write. An ownerless board's
   // open_facilitation can never be closed — setOpenFacilitationServer
   // reports that the write was refused, and this route surfaces it.
-  it("PATCH refuses to close facilitation on a crewless board and leaves it TRUE", async () => {
+  it("PATCH refuses to close facilitation on an ownerless board and leaves it TRUE", async () => {
     const { action } = await import("./board.facilitators");
     mockSetOpen.mockResolvedValue(false); // refused: the model's invariant guard
     mockGetOpen.mockResolvedValue(true); // still TRUE — the write never applied

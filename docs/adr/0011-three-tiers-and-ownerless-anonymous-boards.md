@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-03) — §5 amended by [ADR-0012](0012-claiming-assigns-the-personal-crew.md): a claimed board now joins the claimer's personal crew instead of staying crewless. The agent-continuity guarantee in §5 is unchanged; the mechanism is.
+Accepted (2026-09-03) — §5 amended by [ADR-0012](0012-claiming-assigns-the-personal-crew.md): a claimed board now joins the claimer's personal crew instead of staying crewless. The agent-continuity guarantee in §5 is unchanged; the mechanism is. §4 amended by [ADR-0022](0022-anonymous-means-ownerless.md): a board is anonymous when it has no owner, not when it has no crew; only an ownerless board's facilitation is locked open, and moving a board never changes it.
 
 ## Context
 

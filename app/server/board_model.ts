@@ -668,10 +668,9 @@ export async function duplicateBoardServer(
  * moving TO a team, must be a member of that team. Boards that fail either
  * guard are silently skipped; the returned ids are the boards actually moved.
  *
- * GAP-002: open_facilitation transitions in the same UPDATE — becoming
- * crewless opens facilitation (the invariant for tier 1), leaving crewless
- * closes it back to the role, and a crew-to-crew move preserves whatever the
- * facilitator had chosen. See ADR-0011.
+ * A move never changes open_facilitation (ADR-0022). Only an owner can move
+ * a board, so every moved board is owned, and on an owned board opening the
+ * Command Deck is the facilitator's choice, crew or no crew.
  */
 export async function moveBoardsToTeamServer(
   boardIds: string[],
@@ -681,10 +680,7 @@ export async function moveBoardsToTeamServer(
   if (boardIds.length === 0) return [];
 
   const res = await pool.query<{ id: string }>(
-    `UPDATE boards b SET team_id = $2, open_facilitation = CASE
-       WHEN $2::uuid IS NULL THEN TRUE
-       WHEN b.team_id IS NULL THEN FALSE
-       ELSE b.open_facilitation END
+    `UPDATE boards b SET team_id = $2
      WHERE b.id = ANY($1)
        AND EXISTS (
          SELECT 1 FROM board_members bm
@@ -838,15 +834,20 @@ export async function removeFacilitatorServer(boardId: string, userId: string) {
 }
 
 /**
- * GAP-002 invariant, enforced on write: a crewless board can never have
+ * Invariant, enforced on write: an ownerless (anonymous) board can never have
  * open_facilitation set to FALSE — that would strip everyone's Command Deck
- * access with no owner row to fall back on (ADR-0011). The guard is the WHERE
- * clause itself, not an app-level check, so no caller can bypass it. Returns
- * whether the write actually applied.
+ * access with no owner row to fall back on (ADR-0011, ADR-0022). Whether the
+ * board is on a crew does not matter. The guard is the WHERE clause itself,
+ * not an app-level check, so no caller can bypass it. Returns whether the
+ * write actually applied.
  */
 export async function setOpenFacilitationServer(boardId: string, open: boolean): Promise<boolean> {
   const res = await pool.query(
-    `UPDATE boards SET open_facilitation = $1 WHERE id = $2 AND ($1 OR team_id IS NOT NULL)`,
+    `UPDATE boards b SET open_facilitation = $1
+     WHERE b.id = $2
+       AND ($1 OR EXISTS (
+         SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.role = 'owner'
+       ))`,
     [open, boardId]
   );
   return (res.rowCount ?? 0) > 0;

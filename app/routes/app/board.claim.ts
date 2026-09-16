@@ -59,8 +59,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // moveBoardsToTeamServer's. A claim must not yank the Command Deck away
     // from everyone mid-retro; the board keeps whatever facilitation state
     // it had, and the new owner can close it deliberately via Crew Access,
-    // which becomes available to them once the board is on a crew. Do not
-    // "fix" this to match moveBoardsToTeamServer.
+    // which the owner row unlocks (ADR-0022).
     await client.query(
       `UPDATE boards SET team_id = $1 WHERE id = $2`,
       [teamId, boardId]

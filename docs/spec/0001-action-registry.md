@@ -22,7 +22,7 @@ The tier boundary in code is `teams.is_personal`. A personal crew is tier 2 and 
 
 **On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing and scheduled cleanup do not exist there: CREW-020, CREW-021, API-006 and API-007 return 404, and crewless boards are never archived (ADR-0020). The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). There is no tier 1 there either: every page and API call needs a signed-in account, or an API key for the JSON API, so no guest user or anonymous board is ever created (ADR-0021).
 
-Tier 1 is enforced by construction, not by convention. A crewless board is created with **no owner row** and `open_facilitation = TRUE`; the open-facilitation toggle is refused on a crewless board; moving a board onto a crew closes facilitation to the role and moving it off reopens it. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) brought pre-existing anonymous boards into line. No path in the code can produce a crewless board with an owner.
+Tier 1 is enforced by construction, not by convention. **A board is anonymous if and only if it has no owner row** (ADR-0022). A crewless board is created with no owner row and `open_facilitation = TRUE`, and the open-facilitation toggle is refused on any board without an owner. A crewless board *can* have an owner: every board created before 2.0 is crewless, and a registered owner's row on one is kept. Such a board is not anonymous, and its owner has full Crew Access. Moving a board, onto a crew or off one, never changes `open_facilitation`. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) removes anonymous and agent owner rows from crewless boards and opens facilitation on the ones left with no owner.
 
 ### Board access is a separate axis
 
@@ -161,7 +161,7 @@ Facilitators — granted, or the owner in their capacity as one, or everyone whe
 | DECK-019 | Delete an attachment | Facilitator | `board.attachments.ts` DELETE · `AttachmentsList.tsx` | `requireFacilitator`; UI gates on `canFacilitate` | Verified |
 | DECK-020 | Grant a facilitator by username                 | Facilitator        | `board.facilitators.ts` POST                          | `requireFacilitator`                        | Verified   |
 | DECK-021 | Revoke a facilitator (never the owner)          | Facilitator        | `board.facilitators.ts` DELETE                        | `requireFacilitator`                        | Verified   |
-| DECK-022 | Toggle open facilitation | Facilitator | `board.facilitators.ts` PATCH | `requireFacilitator`; refused on a crewless board, which is always open | Verified |
+| DECK-022 | Toggle open facilitation | Facilitator | `board.facilitators.ts` PATCH | `requireFacilitator`; refused on a board with no owner, which is always open | Verified |
 | DECK-023 | Create an action item | Facilitator | `board.action-items.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
 | DECK-024 | Edit an action item | Facilitator | `board.action-items.ts` `intent=text` | `requireFacilitator` · `requireUnlocked(board)` | Verified |
 | DECK-025 | Delete an action item | Facilitator | `board.action-items.ts` DELETE | `requireFacilitator` · `requireUnlocked(board)` | Verified |

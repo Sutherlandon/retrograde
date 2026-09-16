@@ -29,14 +29,15 @@ export function FacilitatorModal({
   const fetcher = useFetcher<CrewData>();
   const [username, setUsername] = useState("");
   const action = `/app/board/${boardId}/facilitators`;
-  // GAP-002: a crewless board (teamName === null) is invariantly open —
-  // the toggle to close it doesn't exist here, and the server refuses the
-  // write anyway (setOpenFacilitationServer). DECK-022: on a crewless board
-  // the whole notion of granting/revoking facilitators is meaningless
-  // (everyone with the link already has the Command Deck), so the body is
-  // replaced with an explanation instead of an empty roster and form.
-  const { teamName } = useBoard();
-  const isCrewless = teamName === null;
+  // ADR-0022: a board with no owner is anonymous and invariantly open — the
+  // toggle to close it doesn't exist here, and the server refuses the write
+  // anyway (setOpenFacilitationServer). DECK-022: on an anonymous board the
+  // whole notion of granting/revoking facilitators is meaningless (everyone
+  // with the link already has the Command Deck), so the body is replaced
+  // with an explanation instead of an empty roster and form. An owned board
+  // gets the full controls whether or not it is on a crew.
+  const { hasOwner } = useBoard();
+  const isAnonymous = !hasOwner;
   const user = useOptionalUser();
   const location = useLocation();
 
@@ -93,7 +94,7 @@ export function FacilitatorModal({
           </button>
         </div>
 
-        {isCrewless ? (
+        {isAnonymous ? (
           <div className="px-4 py-4 space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-300">
               On a claimed board, Crew Access hands the Command Deck to
@@ -113,13 +114,13 @@ export function FacilitatorModal({
                   Create an account to claim this board
                 </Link>
                 <p className="text-xs text-gray-400 dark:text-gray-600 mt-2">
-                  Claim it, move it to a crew, and Crew Access unlocks.
+                  Claim it and Crew Access unlocks.
                 </p>
               </div>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                You're signed in. Claim this board from the toolbar, then
-                move it to a crew to use Crew Access.
+                You're signed in. Claim this board from the toolbar to use
+                Crew Access.
               </p>
             )}
           </div>

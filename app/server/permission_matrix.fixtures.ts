@@ -57,7 +57,7 @@ export interface FixtureState {
 }
 
 // Matches ADR-0011 / the registry's tier table exactly:
-//   anonymous:     crewless, no owner possible, open_facilitation TRUE.
+//   anonymous:     crewless, no owner row, open_facilitation TRUE (ADR-0022).
 //   personal:      personal crew, restrict_board_access forced FALSE (ADR-0010).
 //   members-only:  named crew, restrict_board_access TRUE (the default).
 export const FIXTURE_DATA: Record<BoardFixtureId, FixtureState> = {
@@ -370,7 +370,7 @@ function resolveDashboardLifecycleQueries(
   const isTeamMember = actor.teamRole !== null; // destination team is abstract — see actorState's doc comment
 
   // moveBoardsToTeamServer (DASH-010/011): UPDATE ... WHERE EXISTS(owner) AND (teamId IS NULL OR EXISTS(team_members))
-  if (s.includes("SET team_id = $2") && s.includes("open_facilitation = CASE")) {
+  if (s.includes("UPDATE boards b SET team_id = $2")) {
     const boardIds = (params[0] as string[]) ?? [];
     const teamId = params[1] as string | null;
     const ok = isOwner && (teamId === null || isTeamMember);

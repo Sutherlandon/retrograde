@@ -64,7 +64,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     case "PATCH": {
       const open = data.get("openFacilitation") === "true";
-      // GAP-002 invariant: a crewless board can never close facilitation.
+      // ADR-0022 invariant: an ownerless board can never close facilitation.
       // setOpenFacilitationServer refuses the write in SQL and reports it
       // here rather than throwing, so the caller sees the current (still
       // TRUE) state alongside the reason.

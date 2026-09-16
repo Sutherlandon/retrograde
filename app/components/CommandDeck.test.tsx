@@ -27,6 +27,7 @@ const defaultBoard = {
   id: "board-1",
   title: "Test Board",
   isOwner: true,
+  hasOwner: true,
   timerRunning: false,
   timeLeft: null,
   startTimer: vi.fn(),
