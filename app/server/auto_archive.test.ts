@@ -6,7 +6,7 @@ vi.mock("~/server/db_config", () => ({
 }));
 vi.mock("~/server/db_init", () => ({}));
 vi.mock("~/config/grandfather", () => ({
-  GRANDFATHER_CUTOFF: "2026-06-22T00:00:00Z",
+  GRANDFATHER_CUTOFF: "2026-10-01T00:00:00Z",
   FREE_TIER_TTL_DAYS: 30,
 }));
 
@@ -29,7 +29,7 @@ describe("archiveStaleBoards", () => {
     expect(call[0]).toContain("archived_at IS NULL");
     expect(call[0]).toContain("created_at >");
     expect(call[0]).toContain("created_at <");
-    expect(call[1]).toEqual(["2026-06-22T00:00:00Z", "30"]);
+    expect(call[1]).toEqual(["2026-10-01T00:00:00Z", "30"]);
   });
 
   it("returns 0 when no rows match", async () => {

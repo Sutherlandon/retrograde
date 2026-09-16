@@ -98,7 +98,7 @@ Then open `https://retro.example.com/`. On a self-hosted instance `/` goes strai
 
 ### Scheduled cleanup
 
-Boards created without signing in, and not in any crew, are archived 30 days after they were created. Boards in a crew are never archived, and neither are boards created before 22 June 2026. The hosted service runs this on Vercel's scheduler; on your instance, send one request a day:
+Boards created without signing in, and not in any crew, are archived 30 days after they were created. Boards in a crew are never archived, and neither are boards created before 1 October 2026. The hosted service runs this on Vercel's scheduler; on your instance, send one request a day:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://retro.example.com/api/v1/cron/archive-stale

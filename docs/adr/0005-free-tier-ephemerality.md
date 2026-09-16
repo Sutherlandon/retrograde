@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-06-22)
+Accepted (2026-06-22) — the grandfather cutoff moves to 2026-10-01 in [ADR-0019](0019-grandfather-cutoff-moves-to-release.md), because the archive job never ran against the original date. The TTL policy here stands.
 
 ## Context
 

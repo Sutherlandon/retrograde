@@ -13,13 +13,13 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,300 passing across 84 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,302 passing across 85 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
 ## Branch state
 
-`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0018 cover the decisions.
+`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0019 cover the decisions.
 
 **It is 2.0.0, not 1.7.0, because the boot contract changed.** Every environment variable is validated at startup, so a deployment that upgrades with missing or malformed configuration exits instead of degrading — `SITE_ADMIN_IDS` included — and the database connection requires TLS outside local development (ADR-0018). The hosted service also needs the three Stripe variables; a self-hosted install sets `SELF_HOSTED=true` and must not set them (ADR-0016). Nothing is configured by editing code: `app/config/siteConfig.ts` is gone, so a deployment that used `dashboardHome` to hide logout now sets `HIDE_LOGOUT=true`, and its logo comes from the `SITE_LOGO_*` URLs. The logout redirect is read from `OAUTH_LOGOUT_REDIRECT_URL` (ADR-0017). [`README.md`](../README.md) is the self-hosting guide.
 
@@ -77,5 +77,5 @@ Recorded so they aren't rediscovered as gaps: annual billing (a second Price on 
 - Vercel + Neon; preview deploys stand in for staging.
 - `initializeDatabase()` runs on every startup — idempotent, but startup always touches the DB.
 - A dev seed board (`dev-test`) is created at the bottom of `db_init.ts` and runs in production too. Harmless, noisy.
-- The auto-archive cron (API-006) is invoked by Vercel with a **GET**; it previously implemented POST only, so it answered 405 and never ran. The first successful run archives the whole backlog of eligible crewless boards at once.
+- The auto-archive cron (API-006) is invoked by Vercel with a **GET**; it previously implemented POST only, so it answered 405 and never ran. Boards created before 2026-10-01 are exempt (ADR-0019), so the first run archives nothing that exists at release; the earliest archive is 2026-10-31.
 - Honeypot on free-board creation is the only bot defense. Turnstile was removed deliberately (issue #87) — an agent must be able to create a board without solving a captcha. If bots become a problem, the answer is rate limiting, not a captcha.
