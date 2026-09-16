@@ -14,7 +14,6 @@ A self-hosted instance is one Node.js server backed by PostgreSQL, with sign-in 
 - **PostgreSQL with TLS enabled.** Retrograde always connects over TLS and verifies the server's certificate. It creates and upgrades its own schema every time it starts, so its database user needs permission to create and alter tables.
 - **An OpenID Connect provider** (Keycloak, Okta, Microsoft Entra ID, Auth0, …) that supports the authorization code flow with a client secret and has a userinfo endpoint.
 - **HTTPS in front of the app.** The server runs in production mode, where the session cookie is marked `Secure`. Over plain HTTP, browsers drop that cookie and nobody stays signed in.
-- **A scheduler** such as cron or a Kubernetes CronJob, for one request a day. See [Scheduled cleanup](#scheduled-cleanup).
 
 ### 1. Register Retrograde with your identity provider
 
@@ -41,10 +40,9 @@ Retrograde does not read a `.env` file itself. Pass variables through your proce
 | `OAUTH_AUTHORIZATION_URL`, `OAUTH_TOKEN_URL`, `OAUTH_USERINFO_URL` | Your provider's endpoints, listed in its `/.well-known/openid-configuration`. |
 | `OAUTH_REDIRECT_URI` | `https://retro.example.com/auth/callback`. It must match the provider's setting exactly. |
 | `OAUTH_SCOPES` | `openid profile email` |
-| `CRON_SECRET` | A long random string that authorizes the [scheduled cleanup](#scheduled-cleanup) request. |
 | `SITE_ADMIN_IDS` | Comma-separated `sub` values of the accounts that administer this instance — at least one. |
 
-**Must not be set:** `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`. A self-hosted instance takes no payments, and startup refuses to continue if any of them is present.
+**Must not be set:** `STRIPE_RESTRICTED_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` and `CRON_SECRET`. A self-hosted instance takes no payments and runs no scheduled cleanup, and startup refuses to continue if any of them is present.
 
 **Optional**
 
@@ -92,19 +90,14 @@ If a setting is missing, malformed or contradictory, the server logs a line begi
 | `missing database configuration …` | Set `DATABASE_URL`, or all four `PG_*` variables. |
 | `could not connect to the database` | Check the host and credentials, and that the database accepts TLS with a certificate this server trusts. |
 | `SELF_HOSTED=true but STRIPE_… is set` | Remove the Stripe variables. |
+| `SELF_HOSTED=true but CRON_SECRET is set` | Remove `CRON_SECRET`. |
 | `incomplete site logo (missing …)` | Set all three `SITE_LOGO_*` variables, or none. |
 
 Then open `https://retro.example.com/`. On a self-hosted instance `/` goes straight to the dashboard, which sends you to your provider to sign in.
 
-### Scheduled cleanup
+### Board cleanup
 
-Boards created without signing in, and not in any crew, are archived 30 days after they were created. Boards in a crew are never archived, and neither are boards created before 1 October 2026. The hosted service runs this on Vercel's scheduler; on your instance, send one request a day:
-
-```bash
-curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://retro.example.com/api/v1/cron/archive-stale
-```
-
-It responds with `{"archived": N}`. POST works too, for a scheduler that prefers it. If you never schedule it, those boards simply stay open.
+On the hosted service, boards created without signing in and not in any crew are archived 30 days after they were created. A self-hosted instance does not do this: those boards stay open until someone archives or deletes them, and there is nothing to schedule.
 
 ### Branding
 
@@ -123,6 +116,7 @@ with `SITE_LOGO_LIGHT_URL=/branding/logo-light.svg` and `SITE_LOGO_DARK_URL=/bra
 - **No billing.** The billing pages and the Stripe webhook return `404`, and there is no subscribe prompt.
 - **No marketing site.** `/`, `/about`, `/contact`, `/terms-of-service` and `/privacy-policy` redirect to the dashboard, `/sitemap.xml` returns `404`, and the header has no About or Contact links.
 - **No Vercel Analytics.** The instance never loads Vercel's analytics script.
+- **No board cleanup.** Boards created without signing in are never archived automatically.
 
 Access works the same way in both. Anyone who can reach the instance and has a board's link can open that board and take part without signing in, unless the board belongs to a named crew — those are members-only by default. If boards must not be reachable by people outside your organization, keep the instance on your private network.
 

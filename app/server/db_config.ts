@@ -174,9 +174,18 @@ export const stripeRestrictedKey: string | null = selfHosted ? null : requireStr
 export const stripeWebhookSecret: string | null = selfHosted ? null : requireStripeEnv("STRIPE_WEBHOOK_SECRET");
 export const stripePriceId: string | null = selfHosted ? null : requireStripeEnv("STRIPE_PRICE_ID");
 
-// Shared secret for the cron request that auto-archives stale boards
-// (app/routes/api/cron.archive-stale.ts, ADR-0005).
-export const cronSecret = requireEnv("CRON_SECRET");
+// Shared secret for the scheduled cleanup (app/routes/api/cron.archive-stale.ts,
+// ADR-0005), which Vercel's cron sends with every invocation. A self-hosted
+// instance runs no scheduled cleanup (ADR-0020), so there it is refused like
+// the Stripe variables rather than sitting set and unused.
+if (selfHosted && process.env.CRON_SECRET) {
+  fatal(
+    "SELF_HOSTED=true but CRON_SECRET is set. A self-hosted instance runs no scheduled cleanup: " +
+      "unset CRON_SECRET, or unset SELF_HOSTED for the hosted service."
+  );
+}
+
+export const cronSecret: string | null = selfHosted ? null : requireEnv("CRON_SECRET");
 
 // OAuth client (the identity provider's authorization code flow).
 export const oauthClientId = requireEnv("OAUTH_CLIENT_ID");

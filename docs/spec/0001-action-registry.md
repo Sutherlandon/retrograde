@@ -20,7 +20,7 @@ Three tiers. A tier is what an **account** is entitled to; a board inherits the 
 
 The tier boundary in code is `teams.is_personal`. A personal crew is tier 2 and cannot be renamed, deleted, given human members, or restricted. A named crew is tier 3 and can do all four.
 
-**On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing does not exist there: CREW-020, CREW-021 and API-007 return 404. The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). Tier 1 is unchanged.
+**On a self-hosted instance every account is tier 3** (`SELF_HOSTED=true`, ADR-0016). The entitlement seam returns true without reading billing state, so CREW-002 always allows and the ADR-0015 lapse freeze never applies. Billing and scheduled cleanup do not exist there: CREW-020, CREW-021, API-006 and API-007 return 404, and crewless boards are never archived (ADR-0020). The dashboard is home and the marketing site does not render (SITE-001, SITE-002, SITE-005; ADR-0017). Tier 1 is unchanged.
 
 Tier 1 is enforced by construction, not by convention. A crewless board is created with **no owner row** and `open_facilitation = TRUE`; the open-facilitation toggle is refused on a crewless board; moving a board onto a crew closes facilitation to the role and moving it off reopens it. A one-time gated reset (`db_init.ts` block 32, ADR-0009 pattern) brought pre-existing anonymous boards into line. No path in the code can produce a crewless board with an owner.
 
@@ -257,7 +257,7 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |
-| API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts` GET (Vercel cron) or POST | `CRON_SECRET` bearer, which Vercel sends automatically | Verified |
+| API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts` GET (Vercel cron) or POST | **404 on a self-hosted instance** (ADR-0020); `CRON_SECRET` bearer, which Vercel sends automatically | Verified |
 | API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | **404 on a self-hosted instance** (ADR-0016); signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event | Verified |
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).

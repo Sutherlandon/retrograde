@@ -142,9 +142,10 @@ PG_USER=
 PG_PASSWORD=
 PG_SCHEMA=
 
-# Cron (required) — bearer secret for /api/v1/cron/archive-stale. Vercel's
-# scheduler sends it automatically as an Authorization header, and invokes the
-# path with GET.
+# Cron (required on the hosted service; refused when SELF_HOSTED=true) — bearer
+# secret for /api/v1/cron/archive-stale. Vercel's scheduler sends it
+# automatically as an Authorization header, and invokes the path with GET. A
+# self-hosted instance runs no scheduled cleanup (ADR-0020).
 CRON_SECRET=
 
 # Deployment mode (optional) — ADR-0016, ADR-0017. Unset or "false" is the
@@ -180,7 +181,7 @@ SITE_ADMIN_IDS=
 PORT=
 ```
 
-Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them. The Stripe variables are the one mode-dependent set: required unless `SELF_HOSTED=true`, and refused when it is (ADR-0016). Optional variables are validated the same way: a malformed value exits at startup. Nothing warns and carries on (ADR-0018).
+Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them. The Stripe variables and `CRON_SECRET` are the mode-dependent set: required unless `SELF_HOSTED=true`, and refused when it is (ADR-0016, ADR-0020). Optional variables are validated the same way: a malformed value exits at startup. Nothing warns and carries on (ADR-0018).
 
 `NODE_ENV` must be `development`, `production` or `test`. Anything but `development` requires TLS to the database with the certificate verified, so `npm start` against a local Postgres without TLS will not connect — use `npm run dev` locally. `production`, the default under `npm start`, also marks the session cookie `Secure`, so production needs HTTPS.
 

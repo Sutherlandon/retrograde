@@ -167,6 +167,7 @@ describe("SELF_HOSTED deployment mode", () => {
 
   it("boots a self-hosted instance with no Stripe variables, exporting null Stripe config", async () => {
     process.env.SELF_HOSTED = "true";
+    delete process.env.CRON_SECRET;
     delete process.env.STRIPE_RESTRICTED_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_PRICE_ID;
@@ -177,22 +178,34 @@ describe("SELF_HOSTED deployment mode", () => {
     expect(config.stripePriceId).toBeNull();
   });
 
-  it("still requires CRON_SECRET on a self-hosted instance", async () => {
-    const { exitSpy, errorSpy } = spyExit();
-    process.env.SELF_HOSTED = "true";
+  it("does not require CRON_SECRET on a self-hosted instance, which runs no scheduled cleanup (ADR-0020)", async () => {
+    process.env.SELF_HOSTED = "true"; // CRON_SECRET deleted explicitly below
     delete process.env.STRIPE_RESTRICTED_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_PRICE_ID;
     delete process.env.CRON_SECRET;
+    const config = await import("./db_config");
+    expect(config.cronSecret).toBeNull();
+  });
+
+  it("refuses to boot when SELF_HOSTED=true but CRON_SECRET is set", async () => {
+    const { exitSpy, errorSpy } = spyExit();
+    process.env.SELF_HOSTED = "true"; // CRON_SECRET stays set from beforeEach
+    delete process.env.STRIPE_RESTRICTED_KEY;
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    delete process.env.STRIPE_PRICE_ID;
 
     await expect(import("./db_config")).rejects.toThrow("exit");
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("CRON_SECRET"));
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0][0]).toContain("SELF_HOSTED=true");
+    expect(errorSpy.mock.calls[0][0]).toContain("CRON_SECRET");
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
   it("refuses to boot when SELF_HOSTED=true but a Stripe variable is also set", async () => {
     const { exitSpy, errorSpy } = spyExit();
     process.env.SELF_HOSTED = "true";
+    delete process.env.CRON_SECRET;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_PRICE_ID;
 
@@ -315,6 +328,7 @@ describe("hosting configuration from the environment", () => {
 
   it("carries SELF_HOSTED into the hosting config the client receives", async () => {
     process.env.SELF_HOSTED = "true";
+    delete process.env.CRON_SECRET;
     delete process.env.STRIPE_RESTRICTED_KEY;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_PRICE_ID;

@@ -4,8 +4,8 @@
 // Vercel's scheduler (vercel.json `crons`) invokes a cron path with an HTTP
 // GET, and sends CRON_SECRET as an `Authorization: Bearer` header
 // automatically when that variable is set on the project — so GET is the
-// method that has to work. A self-hosted instance calls the same URL from its
-// own scheduler and may use either method.
+// method that has to work; POST is accepted too. A self-hosted instance runs
+// no scheduled cleanup and answers 404 (ADR-0020).
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { archiveStaleBoards } from "~/server/auto_archive";
@@ -16,6 +16,12 @@ function err(code: string, message: string, status: number) {
 }
 
 async function archiveIfAuthorized(request: Request): Promise<Response> {
+  // A self-hosted instance runs no scheduled cleanup: answer as if the route did
+  // not exist, before looking at any credential.
+  if (!cronSecret) {
+    return err("NOT_FOUND", "Scheduled cleanup does not run on this instance", 404);
+  }
+
   if (request.method !== "GET" && request.method !== "POST") {
     return err("METHOD_NOT_ALLOWED", "Use GET or POST", 405);
   }

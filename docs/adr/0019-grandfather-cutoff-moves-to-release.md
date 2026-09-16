@@ -17,7 +17,7 @@ The archive job never actually ran in production. Vercel invokes a cron path wit
 ## Consequences
 
 - Nothing that exists at release is archived. The earliest a board can be archived is 31 October 2026.
-- The date is fixed in code and applies to every deployment. A self-hosted instance that upgrades after 1 October and schedules the job grandfathers boards created before that date, not before its own upgrade.
+- The date is fixed in code. It only matters on the hosted service: a self-hosted instance runs no scheduled cleanup at all ([ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md)).
 
 ## Alternatives Considered
 
