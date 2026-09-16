@@ -1,11 +1,13 @@
 // app/routes/api/cron.archive-stale.ts
-// Daily cron endpoint that auto-archives stale free-tier boards. See ADR-0005.
+// Daily cleanup of stale free-tier boards. See ADR-0005.
 //
-// Triggered by Vercel cron (configured in vercel.json) which sends
-//   Authorization: Bearer <CRON_SECRET>
-// The CRON_SECRET env var must be set on the deployment.
+// Vercel's scheduler (vercel.json `crons`) invokes a cron path with an HTTP
+// GET, and sends CRON_SECRET as an `Authorization: Bearer` header
+// automatically when that variable is set on the project — so GET is the
+// method that has to work. A self-hosted instance calls the same URL from its
+// own scheduler and may use either method.
 
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { archiveStaleBoards } from "~/server/auto_archive";
 import { cronSecret } from "~/server/db_config";
 
@@ -13,13 +15,12 @@ function err(code: string, message: string, status: number) {
   return Response.json({ error: { code, message } }, { status });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  if (request.method !== "POST") {
-    return err("METHOD_NOT_ALLOWED", "Use POST", 405);
+async function archiveIfAuthorized(request: Request): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "POST") {
+    return err("METHOD_NOT_ALLOWED", "Use GET or POST", 405);
   }
 
-  const auth = request.headers.get("Authorization");
-  if (auth !== `Bearer ${cronSecret}`) {
+  if (request.headers.get("Authorization") !== `Bearer ${cronSecret}`) {
     return err("UNAUTHORIZED", "Invalid or missing CRON_SECRET", 401);
   }
 
@@ -27,6 +28,10 @@ export async function action({ request }: ActionFunctionArgs) {
   return Response.json(result, { status: 200 });
 }
 
-export function loader() {
-  return err("METHOD_NOT_ALLOWED", "Use POST", 405);
+export function loader({ request }: LoaderFunctionArgs) {
+  return archiveIfAuthorized(request);
+}
+
+export function action({ request }: ActionFunctionArgs) {
+  return archiveIfAuthorized(request);
 }

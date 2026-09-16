@@ -1,3 +1,8 @@
+// app/routes/api/cron.archive-stale.test.ts
+// API-006. Vercel's scheduler invokes a cron path with an HTTP GET and sends
+// CRON_SECRET as an Authorization: Bearer header automatically, so GET is the
+// method that has to work. POST stays supported for a self-hosted instance
+// calling it from its own scheduler.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockArchiveStaleBoards = vi.fn();
@@ -11,60 +16,78 @@ beforeEach(() => {
 });
 
 function req(method: string, headers: Record<string, string> = {}) {
-  return new Request("http://localhost:3000/api/v1/cron/archive-stale", {
-    method,
-    headers,
-  });
+  return new Request("http://localhost:3000/api/v1/cron/archive-stale", { method, headers });
 }
 
-// cronSecret is loaded once at module init (app/server/db_config.ts), so each
-// test that needs a different value mocks the module and re-imports the
-// route fresh via vi.resetModules(). db_config now fails loudly at startup
-// (requireEnv) if CRON_SECRET is unset, so cronSecret here is always a string.
+// cronSecret is read once at module init (app/server/db_config.ts), so a test
+// that needs a different value re-imports the route with the module mocked.
 async function loadRoute(cronSecret: string) {
   vi.resetModules();
   vi.doMock("~/server/db_config", () => ({ cronSecret }));
   return import("./cron.archive-stale");
 }
 
-describe("POST /api/v1/cron/archive-stale", () => {
-  it("returns 200 and the archive count when the secret matches (API-006)", async () => {
-    const { action } = await loadRoute("test-secret");
+function call(handler: unknown, request: Request) {
+  return (handler as (args: { request: Request }) => Promise<Response> | Response)({ request });
+}
+
+describe("GET /api/v1/cron/archive-stale — how Vercel invokes it [API-006]", () => {
+  it("archives and returns the count when the bearer secret matches", async () => {
+    const { loader } = await loadRoute("test-secret");
     mockArchiveStaleBoards.mockResolvedValueOnce({ archived: 7 });
 
-    const response = (await action({
-      request: req("POST", { Authorization: "Bearer test-secret" }),
-      params: {}, context: {},
-    } as never)) as Response;
+    const response = (await call(loader, req("GET", { Authorization: "Bearer test-secret" }))) as Response;
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ archived: 7 });
     expect(mockArchiveStaleBoards).toHaveBeenCalledTimes(1);
   });
 
-  it("returns 401 when the secret is missing", async () => {
-    const { action } = await loadRoute("test-secret");
-    const response = (await action({
-      request: req("POST"),
-      params: {}, context: {},
-    } as never)) as Response;
-    expect(response.status).toBe(401);
-    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
-  });
-
-  it("returns 401 when the secret is wrong", async () => {
-    const { action } = await loadRoute("test-secret");
-    const response = (await action({
-      request: req("POST", { Authorization: "Bearer wrong" }),
-      params: {}, context: {},
-    } as never)) as Response;
-    expect(response.status).toBe(401);
-    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
-  });
-
-  it("rejects GET with 405", async () => {
+  it("returns 401 and archives nothing without the secret", async () => {
     const { loader } = await loadRoute("test-secret");
-    const response = loader() as Response;
+
+    const response = (await call(loader, req("GET"))) as Response;
+
+    expect(response.status).toBe(401);
+    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 and archives nothing when the secret is wrong", async () => {
+    const { loader } = await loadRoute("test-secret");
+
+    const response = (await call(loader, req("GET", { Authorization: "Bearer wrong-secret" }))) as Response;
+
+    expect(response.status).toBe(401);
+    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/cron/archive-stale — a self-hosted scheduler [API-006]", () => {
+  it("archives and returns the count when the bearer secret matches", async () => {
+    const { action } = await loadRoute("test-secret");
+    mockArchiveStaleBoards.mockResolvedValueOnce({ archived: 3 });
+
+    const response = (await call(action, req("POST", { Authorization: "Bearer test-secret" }))) as Response;
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ archived: 3 });
+  });
+
+  it("returns 401 without the secret", async () => {
+    const { action } = await loadRoute("test-secret");
+
+    const response = (await call(action, req("POST"))) as Response;
+
+    expect(response.status).toBe(401);
+    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
+  });
+
+  it("rejects any other method with 405", async () => {
+    const { action } = await loadRoute("test-secret");
+
+    const response = (await call(action, req("DELETE", { Authorization: "Bearer test-secret" }))) as Response;
+
     expect(response.status).toBe(405);
+    expect(mockArchiveStaleBoards).not.toHaveBeenCalled();
   });
 });
