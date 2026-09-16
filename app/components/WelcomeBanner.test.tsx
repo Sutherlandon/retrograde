@@ -43,4 +43,28 @@ describe("WelcomeBanner (DASH-017)", () => {
     render(<WelcomeBanner id="test-banner" title="Welcome!" message="Hello there." />);
     expect(screen.getByText("Welcome!")).toBeInTheDocument();
   });
+
+  it("lists each highlight's title and description when given", () => {
+    render(
+      <WelcomeBanner
+        id="test-banner"
+        title="Version 2.0.0 Released"
+        message="Here's what's new."
+        highlights={[
+          { title: "Crews", description: "Group boards and bring your team." },
+          { title: "Board facilitators", description: "Share the Command Deck." },
+        ]}
+      />
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent("Crews");
+    expect(items[0]).toHaveTextContent("Group boards and bring your team.");
+    expect(items[1]).toHaveTextContent("Board facilitators");
+  });
+
+  it("renders no list when there are no highlights", () => {
+    render(<WelcomeBanner id="test-banner" title="Welcome!" message="Hello there." />);
+    expect(screen.queryByRole("list")).toBeNull();
+  });
 });

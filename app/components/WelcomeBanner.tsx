@@ -2,16 +2,22 @@ import { useState, useEffect } from "react";
 import Button from "~/components/Button";
 import { CloseIcon } from "~/images/icons";
 
+export interface WelcomeHighlight {
+  title: string;
+  description: string;
+}
+
 export interface WelcomeMessage {
   id: string;
   title: string;
   message: string;
+  highlights?: WelcomeHighlight[];
   link?: string;
 }
 
 const STORAGE_KEY = (id: string) => `welcome_dismissed:${id}`;
 
-export function WelcomeBanner({ id, title, message, link }: WelcomeMessage) {
+export function WelcomeBanner({ id, title, message, highlights, link }: WelcomeMessage) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -38,6 +44,15 @@ export function WelcomeBanner({ id, title, message, link }: WelcomeMessage) {
       <div>
         <h5 className="mb-4">{title}</h5>
         <p>{message}</p>
+        {highlights && highlights.length > 0 && (
+          <ul className="mt-3 space-y-2 list-disc pl-5">
+            {highlights.map((h) => (
+              <li key={h.title}>
+                <span className="font-semibold">{h.title}.</span> {h.description}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="flex justify-end items-center gap-2 w-full">
         {link &&

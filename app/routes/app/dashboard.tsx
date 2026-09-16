@@ -9,6 +9,7 @@ import { PlusIcon, CheckIcon, SearchIcon, ColumnsIcon, ArchiveIcon, CloseIcon } 
 import Button from "~/components/Button";
 import { WelcomeBanner } from "~/components/WelcomeBanner";
 import pkg from "~/../package.json";
+import { RELEASE_ANNOUNCEMENT } from "~/config/release_announcement";
 import { NewButton } from "~/components/NewButton";
 import { ClaimModal } from "~/components/ClaimModal";
 import { SectionLabel } from "~/components/SectionLabel";
@@ -318,8 +319,9 @@ export default function AppDashboard() {
       <WelcomeBanner
         id={`${pkg.version}-release`}
         title={`Version ${pkg.version} Released`}
-        message="This release we've rebuild the voting system - You can now limit votes on a per board, column, or note basis and multiple votes can be cast per note! We've also added board filtering and archiving in the dashboard, board titles now set web page titles, and lots of usability improvements. Check out the release notes for all the details!"
-        link="https://github.com/Sutherlandon/retrograde/releases"
+        message={RELEASE_ANNOUNCEMENT.message}
+        highlights={RELEASE_ANNOUNCEMENT.highlights}
+        link={RELEASE_ANNOUNCEMENT.link}
       />
 
       <SortBoardsBanner count={unassignedCount} onSort={showUnassigned} />
