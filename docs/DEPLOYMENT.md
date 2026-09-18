@@ -41,7 +41,7 @@ different values. That table is below, and it is the thing to keep current.
 | **Auth0** | its own app | not configured | its own app | its own app |
 | **Stripe** | sandbox + `stripe listen` | not configured | sandbox | live |
 | **Scheduled cleanup** | never | never | never | daily, 03:00 UTC |
-| **Deployment protection** | — | on (Vercel default) | **off** | off |
+| **Deployment protection** | — | on (generated URLs) | off on its custom domain | off |
 
 **Preview deployments are throwaway.** Each gets a hostname nobody can register
 in advance, so Auth0 and Stripe are not wired to them: the app builds its OAuth
@@ -62,11 +62,14 @@ sign in, subscribe, webhook, entitlement — is exercised before production.
 3. **Domain.** Add `staging.retrograde.sh` and assign it to that environment.
    DNS lives at Porkbun; pointing the nameservers at Vercel keeps domains and
    DNS in one place.
-4. **Deployment protection: off for this environment.** Vercel protects
-   non-production deployments with its own login wall, which answers Stripe's
-   webhook and Auth0's callback with a login page instead of the app. Turning
-   protection off is what makes an end-to-end test real. Staging then is
-   publicly reachable, which is why it uses a sandbox and its own database.
+4. **Deployment protection: nothing to change.** Vercel Authentication guards
+   non-production deployments with a login wall that would answer Stripe's
+   webhook with a login page. This project's setting is
+   `all_except_custom_domains`, so generated `*.vercel.app` URLs stay
+   protected and `staging.retrograde.sh` is reachable the moment it is
+   assigned — no setting changed, no bypass token. Staging is therefore public,
+   which is why it uses a sandbox and a database of its own. Check this before
+   trusting it: Settings → Deployment Protection → Vercel Authentication.
 5. **Database.** Create a Neon branch for staging and use its connection string
    as `DATABASE_URL`. The schema builds itself on first boot.
 6. **Auth0.** A separate application, with
@@ -127,8 +130,10 @@ nothing.**
    reads `VERCEL_TARGET_ENV` instead, so only an unnamed preview generates its
    callback and every named environment uses `OAUTH_REDIRECT_URI` (ADR-0023).
    Setting `OAUTH_REDIRECT_URI` for the Preview environment does nothing.
-2. **Deployment protection answers webhooks with a login page.** Off for
-   staging. Leave it on for previews, which nothing calls back into.
+2. **Deployment protection answers webhooks with a login page.** The project
+   is set to `all_except_custom_domains`, so a custom domain is exempt and a
+   generated preview URL is not. Point Stripe and Auth0 at
+   `staging.retrograde.sh`, never at a `*.vercel.app` hostname.
 3. **Stripe ids are per-mode.** A sandbox `price_…` does not exist in live. The
    failure shows up at Checkout, not at startup.
 4. **Sandbox, not Test Mode.** Test Mode shares settings with the live account;
