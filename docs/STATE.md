@@ -2,7 +2,7 @@
 
 **Updated:** 2026-09-14 · **Version:** 2.0.0-rc.1 · **Branch:** `release/2.0.0-rc.1` (cut from `agent-substrate`, ahead of `main`, unreviewed)
 
-Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md).
+Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md). For *where it runs* — providers, environments, and which secret lives where — see [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ---
 
@@ -11,9 +11,9 @@ Where the project is right now. For *what* the product does, action by action, s
 | | |
 |---|---|
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
-| Hosting | Vercel (web) + Neon (Postgres) |
+| Hosting | Vercel (web) + Neon (Postgres); Auth0, Stripe, Porkbun — see [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,340 passing across 86 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,350 passing across 87 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
@@ -75,7 +75,7 @@ Recorded so they aren't rediscovered as gaps: annual billing (a second Price on 
 ## Operational reality
 
 - Solo developer with AI-assisted commits.
-- Vercel + Neon; preview deploys stand in for staging.
+- Vercel + Neon + Auth0 + Stripe, domains at Porkbun, source on GitHub. Four environments: local, throwaway previews, `staging.retrograde.sh` (a Vercel custom environment on the `staging` branch, with real Auth0 and a Stripe sandbox), and production. [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) holds the matrix; ADR-0023 says why.
 - `initializeDatabase()` runs on every startup — idempotent, but startup always touches the DB.
 - A dev seed board (`dev-test`) is created at the bottom of `db_init.ts` and runs in production too. Harmless, noisy.
 - The auto-archive cron (API-006) is invoked by Vercel with a **GET**; it previously implemented POST only, so it answered 405 and never ran. Boards created before 2026-10-01 are exempt (ADR-0019), so the first run archives nothing that exists at release; the earliest archive is 2026-10-31.

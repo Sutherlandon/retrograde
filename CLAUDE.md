@@ -186,7 +186,7 @@ Every variable marked required is read through `requireEnv()` in `app/server/db_
 
 `NODE_ENV` must be `development`, `production` or `test`. Anything but `development` requires TLS to the database with the certificate verified, so `npm start` against a local Postgres without TLS will not connect — use `npm run dev` locally. `production`, the default under `npm start`, also marks the session cookie `Secure`, so production needs HTTPS.
 
-Self-hosting is documented for operators in [`README.md`](README.md).
+Self-hosting is documented for operators in [`README.md`](README.md). Where the hosted service runs — providers, its four environments, and which secret comes from which dashboard — is [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 

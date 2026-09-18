@@ -33,7 +33,7 @@ beforeEach(() => {
   process.env.OAUTH_TOKEN_URL = "https://auth.example.com/token";
   process.env.OAUTH_USERINFO_URL = "https://auth.example.com/userinfo";
   process.env.SITE_ADMIN_IDS = "admin-sub-1";
-  for (const name of ["VERCEL_URL", "VERCEL_ENV", "OAUTH_REDIRECT_URI", "PG_HOST", "PG_USER", "PG_PASSWORD", "PG_SCHEMA", "PORT"]) {
+  for (const name of ["VERCEL_URL", "VERCEL_ENV", "VERCEL_TARGET_ENV", "OAUTH_REDIRECT_URI", "PG_HOST", "PG_USER", "PG_PASSWORD", "PG_SCHEMA", "PORT"]) {
     delete process.env[name];
   }
 });
@@ -49,8 +49,9 @@ describe("oauthRedirectUri", () => {
     expect(oauthRedirectUri).toBe("http://localhost:3000/auth/callback");
   });
 
-  it("uses VERCEL_URL when VERCEL_ENV is preview", async () => {
+  it("uses VERCEL_URL for an unnamed preview deployment", async () => {
     process.env.VERCEL_ENV = "preview";
+    process.env.VERCEL_TARGET_ENV = "preview";
     process.env.VERCEL_URL = "retrograde-abc123.vercel.app";
     process.env.OAUTH_REDIRECT_URI = "https://retrograde.example.com/auth/callback";
     const { oauthRedirectUri } = await import("./db_config");
@@ -63,6 +64,26 @@ describe("oauthRedirectUri", () => {
     process.env.OAUTH_REDIRECT_URI = "https://retrograde.example.com/auth/callback";
     const { oauthRedirectUri } = await import("./db_config");
     expect(oauthRedirectUri).toBe("https://retrograde.example.com/auth/callback");
+  });
+
+  // A named Vercel environment such as staging keeps one stable domain, so its
+  // OAuth callback is configured, not generated — VERCEL_ENV reports "preview"
+  // there, and only VERCEL_TARGET_ENV tells the two apart (ADR-0023).
+  it("uses OAUTH_REDIRECT_URI in a named environment, though VERCEL_ENV is preview", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.VERCEL_TARGET_ENV = "staging";
+    process.env.VERCEL_URL = "retrograde-abc123.vercel.app";
+    process.env.OAUTH_REDIRECT_URI = "https://staging.retrograde.sh/auth/callback";
+    const { oauthRedirectUri } = await import("./db_config");
+    expect(oauthRedirectUri).toBe("https://staging.retrograde.sh/auth/callback");
+  });
+
+  it("falls back to VERCEL_ENV when VERCEL_TARGET_ENV is not set", async () => {
+    process.env.VERCEL_ENV = "preview";
+    process.env.VERCEL_URL = "retrograde-abc123.vercel.app";
+    process.env.OAUTH_REDIRECT_URI = "https://retrograde.example.com/auth/callback";
+    const { oauthRedirectUri } = await import("./db_config");
+    expect(oauthRedirectUri).toBe("https://retrograde-abc123.vercel.app/auth/callback");
   });
 
   it("refuses to boot a preview deployment without VERCEL_URL, rather than sending sign-in callbacks elsewhere", async () => {

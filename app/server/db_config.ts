@@ -195,12 +195,17 @@ export const oauthAuthorizationUrl = requireUrlEnv("OAUTH_AUTHORIZATION_URL");
 export const oauthTokenUrl = requireUrlEnv("OAUTH_TOKEN_URL");
 export const oauthUserinfoUrl = requireUrlEnv("OAUTH_USERINFO_URL");
 
-// OAuth redirect URI. A Vercel preview deployment gets a unique hostname, so
-// its callback is built from VERCEL_URL — which must then be present, or
-// sign-in callbacks would go to some other deployment. Everywhere else,
-// including Vercel production, it is the stable OAUTH_REDIRECT_URI.
+// OAuth redirect URI. An unnamed Vercel preview deployment gets a throwaway
+// hostname, so its callback is built from VERCEL_URL — which must then be
+// present, or sign-in callbacks would go to some other deployment. Everywhere
+// else it is the stable OAUTH_REDIRECT_URI: local development, Vercel
+// production, and any named Vercel environment such as staging, which keeps one
+// domain and one registered callback. VERCEL_ENV reports "preview" for a named
+// environment too, so VERCEL_TARGET_ENV — the environment's own name — is what
+// tells them apart (ADR-0023).
 function parseOauthRedirectUri(): string {
-  if (process.env.VERCEL_ENV === "preview") {
+  const target = process.env.VERCEL_TARGET_ENV ?? process.env.VERCEL_ENV;
+  if (target === "preview") {
     const host = process.env.VERCEL_URL;
     if (!host) fatal("VERCEL_ENV is preview but VERCEL_URL is not set, so this deployment's OAuth callback URL is unknown");
     return `https://${host}/auth/callback`;
