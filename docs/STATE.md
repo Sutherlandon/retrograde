@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-14 · **Version:** 2.0.0-rc.1 · **Branch:** `release/2.0.0-rc.1` (cut from `agent-substrate`, ahead of `main`, unreviewed)
+**Updated:** 2026-09-21 · **Version:** 2.0.0 · **Branch:** `staging`, live on `staging.retrograde.sh`, in review to merge to `main`
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md). For *where it runs* — providers, environments, and which secret lives where — see [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
@@ -19,11 +19,11 @@ Where the project is right now. For *what* the product does, action by action, s
 
 ## Branch state
 
-`release/2.0.0-rc.1`, cut from `agent-substrate`, carries the whole agent-substrate arc and **has not shipped to production or been reviewed by a human**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0021 cover the decisions.
+`staging` (fast-forwarded from `release/2.0.0-rc.1`, which was cut from `agent-substrate`) carries the whole agent-substrate arc and **has not shipped to production**: the agent JSON API, mandatory agent attribution, teams as the billing unit, API keys, free-tier ephemerality, multi-member crews, the facilitator role, action items, the crew-centric dashboard, members-only crew boards, server-side enforcement of the whole tier model with a permission-matrix proof suite, and a live Stripe paywall with Stripe as merchant of record. ADRs 0001–0025 cover the decisions. It runs on `staging.retrograde.sh`, where sign-in through Auth0 and a sandbox subscription through Checkout and the webhook have been exercised end to end.
 
 **It is 2.0.0, not 1.7.0, because the boot contract changed.** Every environment variable is validated at startup, so a deployment that upgrades with missing or malformed configuration exits instead of degrading — `SITE_ADMIN_IDS` included — and the database connection requires TLS outside local development (ADR-0018). The hosted service also needs the three Stripe variables and `CRON_SECRET`; a self-hosted install sets `SELF_HOSTED=true` and must not set them (ADR-0016, ADR-0020). Nothing is configured by editing code: `app/config/siteConfig.ts` is gone, so a deployment that used `dashboardHome` to hide logout now sets `HIDE_LOGOUT=true`, and its logo comes from the `SITE_LOGO_*` URLs. The logout redirect is read from `OAUTH_LOGOUT_REDIRECT_URL` (ADR-0017). [`README.md`](../README.md) is the self-hosting guide.
 
-No human has looked at any of it in a browser. That review is the gate before merge:
+Still open before merge:
 
 1. Eyeball in light + dark, desktop + mobile: Mission Objectives panel, Crew Access modal, crew pages, dashboard columns.
 2. Run the facilitator grant flow end to end with two real registered accounts.

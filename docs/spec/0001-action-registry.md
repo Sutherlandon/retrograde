@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-09-14 · **Branch:** `release/2.0.0-rc.1`
+**Updated:** 2026-09-21 · **Branch:** `staging` (2.0.0)
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
