@@ -7,6 +7,7 @@
 import { type ActionFunctionArgs } from "react-router";
 import { getOptionalUser } from "~/hooks/useAuth";
 import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
+import { logMetric } from "~/server/logger";
 import {
   addColumnServer,
   updateColumnTitleServer,
@@ -68,6 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const columnId = data.get("columnId") as string;
       if (!columnId) throw new Response("Missing columnId", { status: 422 });
+      logMetric("Delete Column", { userId: viewerId, boardId, columnId });
       return deleteColumnServer(boardId, columnId, viewerId);
     }
 

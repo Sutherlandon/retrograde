@@ -9,8 +9,9 @@ import { useEffect, useRef } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool, siteAdminIds } from "~/server/db_config";
-import { getMetrics, type MetricsDTO } from "~/server/metrics_model";
+import { getMetrics, getMetricsTrends, type MetricsDTO, type TrendPoint } from "~/server/metrics_model";
 import { isGrantedAdmin, listGrantedAdmins, type GrantedAdmin } from "~/server/admin_model";
+import TrendChart from "~/components/TrendChart";
 
 export async function loader({ request }: { request: Request }) {
   const user = await requireRegisteredUser(request);
@@ -26,12 +27,13 @@ export async function loader({ request }: { request: Request }) {
     throw new Response("Forbidden", { status: 403 });
   }
 
-  const [metrics, grantedAdmins] = await Promise.all([
+  const [metrics, trends, grantedAdmins] = await Promise.all([
     getMetrics(),
+    getMetricsTrends(),
     isSiteAdmin ? listGrantedAdmins() : Promise.resolve([]),
   ]);
 
-  return { metrics, isSiteAdmin, grantedAdmins };
+  return { metrics, trends, isSiteAdmin, grantedAdmins };
 }
 
 // ---------------------------------------------------------------------------
@@ -135,8 +137,9 @@ function ManageAdmins({ grantedAdmins }: { grantedAdmins: GrantedAdmin[] }) {
 // ---------------------------------------------------------------------------
 
 export default function AdminDashboard() {
-  const { metrics, isSiteAdmin, grantedAdmins } = useLoaderData<typeof loader>() as {
+  const { metrics, trends, isSiteAdmin, grantedAdmins } = useLoaderData<typeof loader>() as {
     metrics: MetricsDTO;
+    trends: TrendPoint[];
     isSiteAdmin: boolean;
     grantedAdmins: GrantedAdmin[];
   };
@@ -150,9 +153,36 @@ export default function AdminDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-10">
         <StatCard label="Registered Users"  value={metrics.registeredUsers} description="Non-anonymous accounts created via OAuth." />
-        <StatCard label="Notes Created"     value={metrics.totalNotes}      description="Total sticky notes across all boards." />
+        <StatCard label="Notes Created"     value={metrics.totalNotes}      description="Total sticky notes across all boards (seed data excluded)." />
         <StatCard label="Active Boards"     value={metrics.activeBoards}    description="Boards with real usage: a second contributor added a note, or the owner created 5 or more notes." />
         <StatCard label="Engaged Users"     value={metrics.engagedUsers}    description="Registered users who are members of at least one active board." />
+      </div>
+
+      <h2 className="text-xl font-semibold mb-1">Growth — last 12 weeks</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        Weekly counts of new signups, boards, and notes. All values are anonymous aggregates.
+      </p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+        <TrendChart
+          title="New registered users"
+          description="OAuth accounts created each week."
+          points={trends.map((t) => ({ label: t.weekStart, value: t.newUsers }))}
+        />
+        <TrendChart
+          title="Total registered users"
+          description="Cumulative registered accounts over time."
+          points={trends.map((t) => ({ label: t.weekStart, value: t.totalUsers }))}
+        />
+        <TrendChart
+          title="New boards"
+          description="Boards created each week."
+          points={trends.map((t) => ({ label: t.weekStart, value: t.newBoards }))}
+        />
+        <TrendChart
+          title="Notes created"
+          description="Sticky notes written each week across all boards."
+          points={trends.map((t) => ({ label: t.weekStart, value: t.newNotes }))}
+        />
       </div>
 
       {isSiteAdmin && (
@@ -162,7 +192,8 @@ export default function AdminDashboard() {
       )}
 
       <p className="text-xs text-gray-400 dark:text-gray-600 mt-8">
-        Data reflects the current state of the database.
+        Counts reflect the current state of the database. Trends are bucketed by week (starting Monday);
+        the last bucket is the current, partial week.
       </p>
     </div>
   );

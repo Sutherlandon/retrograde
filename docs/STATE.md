@@ -13,7 +13,7 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres); Auth0, Stripe, Porkbun — see [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,356 passing across 87 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,378 passing across 89 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
@@ -51,7 +51,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 3. **The permission matrix has no registered-but-unsubscribed actor.** Its fixture answers the entitlement query with `active` for every registered human, so it proves "registered + active → allowed" and "everyone else → denied" for CREW-002; the not-subscribed case is covered by `entitlements.test.ts` and `crews.test.ts`, not the matrix.
 4. **Entitlement is `active` only.** A `past_due` renewal (still inside Stripe's retry window) closes the gate immediately. One-line change in `entitlements.ts` if a grace period is wanted.
 5. **The one-time reset in `db_init.ts` block 32 has not run against production.** It strips anonymous/agent owner rows from crewless boards and opens facilitation on the ones left with no owner, gated so it runs once. Boards with a registered owner keep their owner and their facilitation setting (ADR-0022). Nothing observable changes for any board, but it is a data mutation — read it before the first production deploy of this branch.
-6. **No structured logging** (issue #82). `console.log` only.
+6. **Logging is stdout only** (issue #82). Key actions print `[METRIC] <action> - key=value …` through `app/server/logger.ts`, and unexpected loader/action errors print `[ERROR] <path>:` from `handleError` in `app/entry.server.tsx`. Nothing stores them: they live as long as Vercel keeps runtime logs, so they cannot power history.
 7. **Test coverage gaps:** `board.poll.ts` has no direct route test beyond the permission matrix; `Board`, `ClaimModal`, `AttachmentModal`, `ThemeToggle` have no component tests, and `AppLayout` has loader tests but none of its rendering. Every registry row is Verified.
 8. **The README covers self-hosting only** (issue #10). Development setup lives in `CLAUDE.md`. The Docker instructions in it have not been run against a Docker build of this branch.
 9. **~30 stale local branches** from merged PRs.
@@ -59,6 +59,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 ## Behavioral notes that are easy to get wrong
 
+- The admin dashboard's growth charts (`getMetricsTrends`, 12 weekly buckets) are counted from surviving rows' timestamps, so deleting a board or note removes it from past weeks too. The `dev-test` seed board is excluded from every count. The charts are plain SVG (`TrendChart.tsx`), no charting library.
 - Dashboard `role='team'` is a presentation-only pseudo-role from a `COALESCE` — never write it to `board_members`.
 - Any session user can un-check another user's completed action item. Per-item assignees are the refinement (ADR-0006).
 - Crew action items have no attribution display.

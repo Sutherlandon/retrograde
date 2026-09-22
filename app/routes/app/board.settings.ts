@@ -10,6 +10,7 @@ import {
   getBoardServer,
 } from "~/server/board_model";
 import { requireFacilitator } from "~/server/board_permissions";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -35,12 +36,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
+      logMetric("Update Board Settings", { userId: viewerId, boardId, votingEnabled, notesLocked, boardLocked });
       return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, hideOthersNotes }, viewerId);
     }
 
     case "POST": {
       // Clear all votes/likes — called when enabling voting to wipe existing likes
       const viewerId = (await requireFacilitator(request, boardId))?.id;
+      logMetric("Clear Board Votes", { userId: viewerId, boardId });
       await clearBoardVotesServer(boardId);
       return getBoardServer(boardId, viewerId);
     }

@@ -12,6 +12,7 @@ import {
   deleteAttachmentServer,
 } from "~/server/attachment_model";
 import { requireBoardAccess, requireFacilitator } from "~/server/board_permissions";
+import { logMetric } from "~/server/logger";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id: boardId } = params;
@@ -28,7 +29,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  await requireFacilitator(request, boardId);
+  const user = await requireFacilitator(request, boardId);
   const data = await request.formData();
 
   switch (request.method.toUpperCase()) {
@@ -43,7 +44,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!imageData) throw new Response("Image data is required", { status: 422 });
 
         try {
-          return Response.json(await addImageAttachmentServer(boardId, filename, imageData));
+          const result = await addImageAttachmentServer(boardId, filename, imageData);
+          logMetric("Add Image Attachment", { userId: user?.id, boardId, filename });
+          return Response.json(result);
         } catch (err) {
           const message = (err as Error).message;
           if (message.includes("Maximum") || message.includes("exceeds")) {
@@ -61,6 +64,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "DELETE": {
       const attachmentId = data.get("attachmentId") as string;
       if (!attachmentId) throw new Response("Attachment ID is required", { status: 422 });
+      logMetric("Delete Attachment", { userId: user?.id, boardId, attachmentId });
       return Response.json(await deleteAttachmentServer(boardId, attachmentId));
     }
 

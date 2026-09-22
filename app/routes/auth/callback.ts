@@ -2,6 +2,7 @@ import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
 import { pool, oauthClientId, oauthClientSecret, oauthRedirectUri, oauthTokenUrl, oauthUserinfoUrl } from "~/server/db_config";
 import { ensurePersonalTeam } from "~/server/team_model";
+import { logMetric } from "~/server/logger";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
@@ -86,6 +87,7 @@ export async function loader({ request }: { request: Request }) {
 
     const userId = result.rows[0].id;
     session.set("userId", userId);
+    logMetric("Login", { userId });
 
     // Ensure the user has a personal team (ADR-0003). Idempotent on returning
     // logins; only does work for brand-new users not covered by the backfill.

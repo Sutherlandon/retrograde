@@ -2,6 +2,7 @@ import { type ActionFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { ensurePersonalTeam } from "~/server/team_model";
+import { logMetric } from "~/server/logger";
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireRegisteredUser(request);
@@ -73,5 +74,6 @@ export async function action({ request }: ActionFunctionArgs) {
     client.release();
   }
 
+  logMetric("Claim Board", { userId: user.id, boardId });
   return { success: true };
 }

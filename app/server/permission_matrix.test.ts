@@ -161,6 +161,7 @@ vi.mock("~/server/team_model", async (importOriginal) => {
 
 vi.mock("~/server/metrics_model", () => ({
   getMetrics: vi.fn(async () => ({ registeredUsers: 0, totalNotes: 0, activeBoards: 0, engagedUsers: 0 })),
+  getMetricsTrends: vi.fn(async () => []),
 }));
 
 beforeEach(() => {

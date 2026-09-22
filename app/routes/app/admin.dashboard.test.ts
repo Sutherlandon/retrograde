@@ -23,12 +23,14 @@ vi.mock("~/server/db_config", () => ({
 
 vi.mock("~/server/db_init", () => ({}));
 
-const mockGetMetrics      = vi.fn();
-const mockIsGrantedAdmin  = vi.fn();
-const mockListGranted     = vi.fn();
+const mockGetMetrics       = vi.fn();
+const mockGetMetricsTrends = vi.fn();
+const mockIsGrantedAdmin   = vi.fn();
+const mockListGranted      = vi.fn();
 
 vi.mock("~/server/metrics_model", () => ({
-  getMetrics: (...args: unknown[]) => mockGetMetrics(...args),
+  getMetrics:       (...args: unknown[]) => mockGetMetrics(...args),
+  getMetricsTrends: (...args: unknown[]) => mockGetMetricsTrends(...args),
 }));
 
 vi.mock("~/server/admin_model", () => ({
@@ -37,6 +39,10 @@ vi.mock("~/server/admin_model", () => ({
 }));
 
 const SAMPLE_METRICS = { registeredUsers: 10, totalNotes: 50, activeBoards: 3, engagedUsers: 7 };
+const SAMPLE_TRENDS  = [
+  { weekStart: "2026-07-06", newUsers: 1, newBoards: 2, newNotes: 3, totalUsers: 9 },
+  { weekStart: "2026-07-13", newUsers: 1, newBoards: 0, newNotes: 5, totalUsers: 10 },
+];
 const SAMPLE_GRANTED = [{ id: "au-1", userId: "u-2", username: "alice", grantedBy: SITE_ADMIN_EXT_ID, createdAt: "2025-01-01T00:00:00Z" }];
 
 beforeEach(() => {
@@ -44,6 +50,7 @@ beforeEach(() => {
   sessionData = {};
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockGetMetrics.mockResolvedValue(SAMPLE_METRICS);
+  mockGetMetricsTrends.mockResolvedValue(SAMPLE_TRENDS);
   mockListGranted.mockResolvedValue(SAMPLE_GRANTED);
   mockIsGrantedAdmin.mockResolvedValue(false);
 });
@@ -72,6 +79,7 @@ describe("admin dashboard loader — site admin", () => {
 
     expect(result).toEqual({
       metrics: SAMPLE_METRICS,
+      trends: SAMPLE_TRENDS,
       isSiteAdmin: true,
       grantedAdmins: SAMPLE_GRANTED,
     });
@@ -98,6 +106,7 @@ describe("admin dashboard loader — granted admin", () => {
 
     expect(result).toEqual({
       metrics: SAMPLE_METRICS,
+      trends: SAMPLE_TRENDS,
       isSiteAdmin: false,
       grantedAdmins: [],
     });
@@ -162,7 +171,7 @@ describe("admin dashboard loader — access denied", () => {
     }
   });
 
-  it("does not call getMetrics when access is denied", async () => {
+  it("does not call getMetrics or getMetricsTrends when access is denied", async () => {
     const { loader } = await import("./admin.dashboard");
     loginAs("user-5", "unrecognised");
     mockIsGrantedAdmin.mockResolvedValueOnce(false);
@@ -172,5 +181,6 @@ describe("admin dashboard loader — access denied", () => {
     } catch { /* expected 403 */ }
 
     expect(mockGetMetrics).not.toHaveBeenCalled();
+    expect(mockGetMetricsTrends).not.toHaveBeenCalled();
   });
 });

@@ -13,6 +13,7 @@ import {
   moveBoardsToTeamServer,
   bulkDeleteBoardsServer,
 } from "./board_model";
+import { logMetric } from "./logger";
 
 /** `handled: false` means the intent isn't a board mutation — the caller
  *  should fall through to its own intents. */
@@ -36,14 +37,18 @@ export async function handleBoardMutation(
 ): Promise<BoardMutationResult> {
   switch (intent) {
     case "duplicate": {
-      const newBoardId = await duplicateBoardServer(requireBoardId(formData), userId);
+      const boardId = requireBoardId(formData);
+      const newBoardId = await duplicateBoardServer(boardId, userId);
+      logMetric("Duplicate Board", { userId, boardId, newBoardId });
       return { handled: true, result: redirect(`/app/board/${newBoardId}`) };
     }
 
     case "delete": {
       // Return null (revalidate + stay) rather than redirecting, so this works
       // identically on the dashboard and the crew page.
-      await deleteBoardServer(requireBoardId(formData), userId);
+      const boardId = requireBoardId(formData);
+      await deleteBoardServer(boardId, userId);
+      logMetric("Delete Board", { userId, boardId });
       return { handled: true, result: null };
     }
 
