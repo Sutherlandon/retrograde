@@ -1,12 +1,35 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-// Captures what db_config hands the pg Pool, so SSL settings can be asserted.
+// Captures what db_config hands the pg Pool, so SSL settings can be asserted,
+// and what reaches the underlying pool, so schema gating can be.
 const poolConfigs = vi.hoisted(() => [] as unknown[]);
+const rawCalls = vi.hoisted(() => [] as string[]);
 vi.mock("pg", () => ({
   Pool: class {
     constructor(config: unknown) {
       poolConfigs.push(config);
     }
+    async query(sql: string) {
+      rawCalls.push(`query:${sql}`);
+      return { rows: [], rowCount: 0 };
+    }
+    async connect() {
+      rawCalls.push("connect");
+      return { release() {} };
+    }
+  },
+}));
+
+// The schema build is replaced by a promise each test settles itself.
+const schema = vi.hoisted(() => ({
+  calls: 0,
+  resolve: () => {},
+  ready: Promise.resolve(),
+}));
+vi.mock("./db_init", () => ({
+  initializeDatabase: () => {
+    schema.calls += 1;
+    return schema.ready;
   },
 }));
 
@@ -18,6 +41,9 @@ beforeEach(() => {
   // earlier test from satisfying a later test's assertion.
   vi.restoreAllMocks();
   poolConfigs.length = 0;
+  rawCalls.length = 0;
+  schema.calls = 0;
+  schema.ready = Promise.resolve();
   process.env = { ...originalEnv };
   process.env.NODE_ENV = "test";
   process.env.DATABASE_URL = "postgresql://user:pass@host/db";
@@ -609,5 +635,64 @@ describe("every setting fails fast", () => {
   it("accepts a valid PORT", async () => {
     process.env.PORT = "8080";
     await expect(import("./db_config")).resolves.toBeDefined();
+  });
+});
+
+// On Vercel a function is frozen once it responds, so a schema build started in
+// the background could sit uncommitted while requests query tables that do not
+// exist yet (ADR-0024). Every query waits for the build instead.
+describe("pool", () => {
+  beforeEach(() => {
+    process.env.OAUTH_REDIRECT_URI = "http://localhost:3000/auth/callback";
+  });
+
+  function holdSchema() {
+    schema.ready = new Promise<void>((resolve) => {
+      schema.resolve = resolve;
+    });
+  }
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("starts the schema build once, when the module loads", async () => {
+    await import("./db_config");
+    await tick();
+    expect(schema.calls).toBe(1);
+  });
+
+  it("holds a query until the schema build has finished", async () => {
+    holdSchema();
+    const { pool } = await import("./db_config");
+    const result = pool.query("SELECT 1");
+    await tick();
+    expect(rawCalls).toEqual([]);
+
+    schema.resolve();
+    await result;
+    expect(rawCalls).toEqual(["query:SELECT 1"]);
+  });
+
+  it("holds connect() until the schema build has finished", async () => {
+    holdSchema();
+    const { pool } = await import("./db_config");
+    const client = pool.connect();
+    await tick();
+    expect(rawCalls).toEqual([]);
+
+    schema.resolve();
+    await client;
+    expect(rawCalls).toEqual(["connect"]);
+  });
+
+  it("never starts a second schema build, however many queries arrive", async () => {
+    const { pool } = await import("./db_config");
+    await Promise.all([pool.query("SELECT 1"), pool.query("SELECT 2"), pool.connect()]);
+    expect(schema.calls).toBe(1);
+  });
+
+  it("gives the schema build a pool that is not gated on itself", async () => {
+    holdSchema();
+    const { schemaPool } = await import("./db_config");
+    await schemaPool.query("CREATE TABLE t (id int)");
+    expect(rawCalls).toEqual(["query:CREATE TABLE t (id int)"]);
   });
 });

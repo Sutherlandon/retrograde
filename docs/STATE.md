@@ -13,7 +13,7 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres); Auth0, Stripe, Porkbun — see [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,350 passing across 87 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 3,356 passing across 87 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
@@ -75,8 +75,8 @@ Recorded so they aren't rediscovered as gaps: annual billing (a second Price on 
 ## Operational reality
 
 - Solo developer with AI-assisted commits.
-- Vercel + Neon + Auth0 + Stripe, domains at Porkbun, source on GitHub. Four environments: local, throwaway previews, `staging.retrograde.sh` (a Vercel custom environment on the `staging` branch, with real Auth0 and a Stripe sandbox), and production. [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) holds the matrix; ADR-0023 says why.
-- `initializeDatabase()` runs on every startup — idempotent, but startup always touches the DB.
+- Vercel + Neon + Auth0 + Stripe, domains at Porkbun, source on GitHub. Four environments: local, throwaway previews, `staging.retrograde.sh` (the Vercel project `retrograde-staging`, production branch `staging`, with real Auth0, a Stripe sandbox and its own Neon database), and production. [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) holds the matrix; ADR-0023 and ADR-0025 say why.
+- `initializeDatabase()` runs on every startup — idempotent, but startup always touches the DB. `db_config.ts` starts it once and every `pool.query`/`pool.connect` waits for it to commit (ADR-0024); `db_init.ts` itself does nothing on import. The build uses its own `schemaPool`. Before this, Vercel froze the build mid-transaction and a new database was never created.
 - A dev seed board (`dev-test`) is created at the bottom of `db_init.ts` and runs in production too. Harmless, noisy.
 - The auto-archive cron (API-006) is invoked by Vercel with a **GET**; it previously implemented POST only, so it answered 405 and never ran. Boards created before 2026-10-01 are exempt (ADR-0019), so the first run archives nothing that exists at release; the earliest archive is 2026-10-31.
 - Honeypot on free-board creation is the only bot defense. Turnstile was removed deliberately (issue #87) — an agent must be able to create a board without solving a captcha. If bots become a problem, the answer is rate limiting, not a captcha.

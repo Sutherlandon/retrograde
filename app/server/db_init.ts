@@ -1,14 +1,16 @@
 import type { PoolClient } from "pg";
-import { pool } from "./db_config.js";
+import { schemaPool } from "./db_config.js";
 
 /**
  * Creates and upgrades the schema, idempotently, every time the server starts.
- * Any failure — including failing to connect — exits the process.
+ * Any failure — including failing to connect — exits the process. db_config.ts
+ * runs it once and holds every query until it has committed (ADR-0024); it has
+ * no import-time side effect of its own.
  */
 export async function initializeDatabase() {
   let client: PoolClient;
   try {
-    client = await pool.connect();
+    client = await schemaPool.connect();
   } catch (error) {
     // A bad host, bad credentials or a TLS failure: stop here rather than run a
     // server that fails on every request.
@@ -516,5 +518,3 @@ export async function initializeDatabase() {
     client.release();
   }
 }
-
-initializeDatabase();

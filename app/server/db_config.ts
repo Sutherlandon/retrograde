@@ -112,10 +112,38 @@ console.log(
   `connecting to database ${describeConnection(connectionString)}; NODE_ENV=${nodeEnv}; TLS ${databaseTlsRequired ? "required" : "not required (development)"}`
 );
 
-export const pool = new Pool({
+// The schema build's own connection. Only db_init.ts uses it: everything else
+// goes through `pool`, which waits for that build.
+export const schemaPool = new Pool({
   connectionString,
   ssl: databaseTlsRequired ? { rejectUnauthorized: true } : false,
 });
+
+// Every query waits for the schema to be built (ADR-0024). The build runs once,
+// starting when this module loads so a long-running server still exits at
+// startup when the database is unreachable (ADR-0018). Vercel freezes a
+// function once it responds, so a build left running in the background could
+// stay uncommitted while requests queried tables that did not exist yet.
+// db_init.ts is imported lazily because it imports this module.
+let schemaReady: Promise<void> | undefined;
+
+function ensureSchema(): Promise<void> {
+  schemaReady ??= import("./db_init.js").then(({ initializeDatabase }) => initializeDatabase());
+  return schemaReady;
+}
+
+void ensureSchema();
+
+export const pool: Pick<Pool, "query" | "connect"> = {
+  query: (async (...args: unknown[]) => {
+    await ensureSchema();
+    return (schemaPool.query as (...a: unknown[]) => unknown)(...args);
+  }) as Pool["query"],
+  connect: (async () => {
+    await ensureSchema();
+    return schemaPool.connect();
+  }) as Pool["connect"],
+};
 
 // Site admins: the OAuth `sub` values (users.external_id) that always have the
 // admin dashboard and can grant other admins. At least one is required.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-15) — supersedes the note in [ADR-0013](0013-stripe-subscriptions.md) §5 that `SITE_ADMIN_IDS` stays a warning. Extends [ADR-0017](0017-deployment-configured-by-environment.md). The Stripe rules in ADR-0013 and ADR-0016 are unchanged. `CRON_SECRET` now follows those Stripe rules — required on the hosted service, refused on a self-hosted instance ([ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md)).
+Accepted (2026-09-15) — supersedes the note in [ADR-0013](0013-stripe-subscriptions.md) §5 that `SITE_ADMIN_IDS` stays a warning. Extends [ADR-0017](0017-deployment-configured-by-environment.md). The Stripe rules in ADR-0013 and ADR-0016 are unchanged. `CRON_SECRET` now follows those Stripe rules — required on the hosted service, refused on a self-hosted instance ([ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md)). The schema build that makes the startup connection now also gates every query ([ADR-0024](0024-queries-wait-for-the-schema-build.md)).
 
 ## Context
 

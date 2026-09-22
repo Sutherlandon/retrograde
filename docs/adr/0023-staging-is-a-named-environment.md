@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-18) — mechanism detail in [`../DEPLOYMENT.md`](../DEPLOYMENT.md): the project's Vercel Authentication is set to `all_except_custom_domains`, so staging's custom domain is already exempt and §4 needed no setting changed and no bypass. Extends [ADR-0018](0018-every-setting-validated-and-database-tls.md) §1, which read the OAuth callback from `VERCEL_URL` on every Vercel deployment that is not production.
+Accepted (2026-09-18) — §1 and §4 superseded by [ADR-0025](0025-staging-is-its-own-vercel-project.md): `all_except_custom_domains` exempts production's custom domains only, so a custom environment's domain stayed behind Vercel's login and staging became its own project. §2 and §3 stand. Extends [ADR-0018](0018-every-setting-validated-and-database-tls.md) §1, which read the OAuth callback from `VERCEL_URL` on every Vercel deployment that is not production.
 
 ## Context
 

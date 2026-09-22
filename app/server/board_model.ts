@@ -3,7 +3,6 @@
 // ---------------------------------------------------------------------------
 
 import { pool } from "./db_config";
-import "./db_init";
 import type { BoardDTO, DashboardBoardRow } from "./board.types";
 import { getPersonalTeamForUser } from "./team_model";
 
