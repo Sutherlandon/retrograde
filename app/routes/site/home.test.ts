@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
 import React from "react";
 
 // Track session data across mock calls
@@ -47,6 +47,8 @@ vi.mock("react-router", async (importOriginal) => {
     useActionData: () => mockActionData,
   };
 });
+
+afterEach(() => cleanup());
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -150,9 +152,9 @@ describe("homepage [SITE-001]", () => {
     const { default: Home } = await import("./home");
     render(React.createElement(Home));
 
-    expect(
-      screen.getByText("Agile Retrospective & Idea Boards for Productive Teams")
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      /Retros your whole crew shows up for/
+    );
 
     expect(screen.getByRole("link", { name: /Try the tutorial/i })).toHaveAttribute(
       "href",
@@ -170,6 +172,58 @@ describe("homepage [SITE-001]", () => {
     render(React.createElement(Home));
 
     expect(screen.getByText("Title must be at least 3 characters.")).toBeInTheDocument();
+  });
+
+  it("presents the 2.0 features: crews, AI crewmates, facilitators, action items", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    for (const name of ["Crews", "AI crewmates", "Facilitators", "Action items"]) {
+      expect(screen.getByRole("heading", { name, level: 3 })).toBeInTheDocument();
+    }
+  });
+
+  it("lists the plans with the crew price and a self-hosting contact", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const pricing = screen.getByRole("region", { name: /Bring the crew/i });
+    expect(pricing).toHaveTextContent("$39.99");
+    expect(pricing).toHaveTextContent("Guest");
+    expect(pricing).toHaveTextContent("Registered");
+    expect(pricing).toHaveTextContent("Crew");
+    const contact = screen.getAllByRole("link", { name: /Contact us/i });
+    expect(contact[0]).toHaveAttribute("href", "/contact");
+  });
+
+  it("points every create-board CTA at the hero form", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const ctas = screen.getAllByRole("link", { name: /Create your first board/i });
+    expect(ctas.length).toBeGreaterThanOrEqual(2);
+    for (const cta of ctas) expect(cta).toHaveAttribute("href", "#create-form");
+    expect(document.getElementById("create-form")).toContainElement(
+      screen.getByLabelText("Title")
+    );
+  });
+
+  it("sends the free registered plan through sign-in", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByRole("link", { name: /Sign in free/i })).toHaveAttribute(
+      "href",
+      "/auth/login"
+    );
+  });
+
+  it("answers the common questions", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByText(/Does everyone need an account\?/)).toBeInTheDocument();
+    expect(screen.getByText(/How do AI agents join a board\?/)).toBeInTheDocument();
   });
 });
 

@@ -26,6 +26,7 @@ Where the project is right now. For *what* the product does, action by action, s
 Still open before merge:
 
 1. Eyeball in light + dark, desktop + mobile: Mission Objectives panel, Crew Access modal, crew pages, dashboard columns.
+   The homepage is now a sales funnel (hero board form → how it works → 2.0 features → pricing → FAQ → closing CTA), built from `app/components/landing/` on a night-sky palette defined as `night`/`airglow`/`stardust`/`nebula`/`starlight`/`antares` tokens in `app.css`. It is always dark, regardless of theme. Its crew price is hardcoded to match the Stripe Price, as `crews.tsx` already is.
 2. Run the facilitator grant flow end to end with two real registered accounts.
 3. Confirm the Crew Access modal copy is explicit that `open_facilitation` hands locks, column deletion, and facilitator-granting to anonymous participants.
 4. Decide whether facilitators managing other facilitators matches intent, or should tighten to owner-only.
