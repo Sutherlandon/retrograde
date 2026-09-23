@@ -178,6 +178,12 @@ export async function listVisibleBoards(
 // WRITE — each function is called by its own resource route action
 // ---------------------------------------------------------------------------
 
+// The columns a board starts with when the creator names none. Follow-ups are
+// not a column: they live in the board-level action_items list (the Action
+// Items panel). public/llms.txt and docs/AI_AGENT_API.md restate these titles;
+// app/routes/api/api-docs.test.ts holds them together.
+export const DEFAULT_COLUMN_TITLES: readonly string[] = ["What went well?", "What can we do better?"];
+
 export async function createBoard(
   title: string = "Untitled",
   userId: string | null = null,
@@ -205,11 +211,8 @@ export async function createBoard(
       );
     }
 
-    // Follow-ups live in the right-side Mission Objectives column (board-level
-    // action_items), so the default board no longer ships an "Action items" column.
-    const defaultColumns = ["What went well?", "What can we do better?"];
     await Promise.all(
-      defaultColumns.map((colTitle, i) =>
+      DEFAULT_COLUMN_TITLES.map((colTitle, i) =>
         client.query(
           `INSERT INTO columns (id, board_id, title, col_order) VALUES ($1, $2, $3, $4)`,
           [crypto.randomUUID(), id, colTitle, i]
@@ -237,12 +240,9 @@ export async function createBoardWithColumns(
   const id = crypto.randomUUID();
 
   // Empty array falls back to default retro columns
-  const cols = columns.length > 0
+  const cols: typeof columns = columns.length > 0
     ? columns
-    : [
-        { title: "What went well?" },
-        { title: "What can we do better?" },
-      ];
+    : DEFAULT_COLUMN_TITLES.map((title) => ({ title }));
 
   try {
     await client.query("BEGIN");

@@ -43,7 +43,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 **Self-hosted instances (ADR-0016).** `SELF_HOSTED=true` makes every account tier 3: the entitlement seam returns true without reading billing state, so every account can create named crews and lapse never applies. Billing and scheduled cleanup do not exist there — the Stripe variables and `CRON_SECRET` are refused at startup, the three billing routes and the cleanup endpoint return 404, the sidebar hides Billing, and crewless boards are never archived (ADR-0020). The personal crew's one-key cap still applies, as it does to a paying hosted account. The dashboard is also home: every marketing page redirects to it, the sitemap returns 404, and the header drops About and Contact. Vercel Analytics does not load there (ADR-0017). There are no guests either: every page and API call needs a signed-in account or an API key, enforced in the identity helpers rather than per route, with a coverage test over `routes.ts` (ADR-0021).
 
-**The model is enforced.** Facilitator-only controls, locks, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. On the hosted service the paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
+**The model is enforced.** Facilitator-only controls, locks on the UI write routes, board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. On the hosted service the paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
 
 ## Known rough edges
 
@@ -57,6 +57,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 8. **The README covers self-hosting only** (issue #10). Development setup lives in `CLAUDE.md`. The Docker instructions in it have not been run against a Docker build of this branch.
 9. **~30 stale local branches** from merged PRs.
 10. **Database TLS has been exercised against a local TLS-only Postgres, not against Neon.** Outside development the pool connects with `ssl: { rejectUnauthorized: true }`. Neon's certificates chain to public CAs, so the hosted connection should verify, but the first deploy of this branch is the first time it runs against Neon. `npm start` against a local Postgres without TLS does not connect; develop with `npm run dev`.
+11. **The JSON API has two open enforcement gaps.** Its write routes skip the lock checks the UI routes make, so an agent can write to a locked board (issue #108). And on the hosted service an unresolvable bearer token on `POST /api/v1/boards` (a revoked API key, a dead `agent_token`) falls through to the trial flow instead of returning 401 (issue #109).
 
 ## Behavioral notes that are easy to get wrong
 
