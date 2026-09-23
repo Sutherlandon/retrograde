@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup } from "@testing-library/react";
 import React from "react";
 
 // Track session data across mock calls
@@ -47,6 +47,8 @@ vi.mock("react-router", async (importOriginal) => {
     useActionData: () => mockActionData,
   };
 });
+
+afterEach(() => cleanup());
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -145,23 +147,96 @@ describe("home page action", () => {
   });
 });
 
+describe("homepage link preview", () => {
+  it("shares the night-sky card, with its size and alt text", async () => {
+    const { meta } = await import("./home");
+    const tags = meta();
+    expect(tags).toContainEqual({ property: "og:image", content: "https://retrograde.sh/og-image.png" });
+    expect(tags).toContainEqual({ property: "og:image:width", content: "1200" });
+    expect(tags).toContainEqual({ property: "og:image:height", content: "630" });
+    expect(tags).toContainEqual(expect.objectContaining({ property: "og:image:alt" }));
+  });
+
+  it("ships the preview image at the size the tags declare", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    const png = readFileSync(resolve(process.cwd(), "public/og-image.png"));
+    // PNG IHDR: width and height are big-endian uint32s at bytes 16 and 20.
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
+  });
+});
+
 describe("homepage [SITE-001]", () => {
-  it("renders the hero heading, tutorial link, and board-creation form", async () => {
+  it("renders the hero heading and board-creation form", async () => {
     const { default: Home } = await import("./home");
     render(React.createElement(Home));
 
-    expect(
-      screen.getByText("Agile Retrospective & Idea Boards for Productive Teams")
-    ).toBeInTheDocument();
-
-    expect(screen.getByRole("link", { name: /Try the tutorial/i })).toHaveAttribute(
-      "href",
-      "/app/board/example-board"
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Retros your whole crew shows up for. People and agents."
     );
 
-    expect(screen.getByText("Create a Free Board")).toBeInTheDocument();
-    expect(screen.getByLabelText("Title")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Create Your First Board" })).toBeInTheDocument();
+    expect(screen.getByText(/Free · No sign-up/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveAttribute("placeholder", "Your stellar board title here...");
     expect(screen.getByRole("button", { name: /Launch/i })).toBeInTheDocument();
+  });
+
+  it("opens on the headline with no release pill above it", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.queryByText(/Crews & AI crewmates/)).not.toBeInTheDocument();
+  });
+
+  it("sells the product as it is, with no version number in the copy", async () => {
+    const { default: Home } = await import("./home");
+    const { container } = render(React.createElement(Home));
+
+    expect(container).not.toHaveTextContent(/\b2\.0\b/);
+  });
+
+  it("brings agents in by the link they already understand, not by minting API keys", async () => {
+    const { default: Home } = await import("./home");
+    const { container } = render(React.createElement(Home));
+
+    expect(container).not.toHaveTextContent(/API key|[Mm]int/);
+    const aiCard = screen.getByRole("heading", { name: "AI crewmates", level: 3 }).closest("article");
+    expect(aiCard).toHaveTextContent(/link/);
+  });
+
+  it("fades the closing sky in from the dark ground instead of starting it abruptly", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const closing = screen.getByRole("heading", { name: /Your next retro starts here/ }).closest("section")!;
+    const fade = closing.querySelector('[data-testid="sky-fade"]');
+    expect(fade).toHaveAttribute("aria-hidden", "true");
+    expect(fade).toHaveClass("bg-gradient-to-b", "from-night-950", "to-transparent");
+  });
+
+  it("fades the hero sky out of the header band instead of meeting it at a hard edge", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const hero = screen.getByRole("heading", { level: 1 }).closest("section")!;
+    const fade = hero.querySelector('[data-testid="sky-fade"]');
+    expect(fade).toHaveAttribute("aria-hidden", "true");
+    expect(fade).toHaveClass("bg-gradient-to-b", "from-night-950", "to-transparent");
+  });
+
+  it("offers the board for shared brainstorming with AI agents", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByRole("region", { name: /idea board/i })).toBeInTheDocument();
+  });
+
+  it("keeps the hero to the pitch and the form — no tutorial link or sign-up aside", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.queryByRole("link", { name: /Try the tutorial/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No credit card\. No sign-up\./)).not.toBeInTheDocument();
   });
 
   it("renders a title validation error from action data", async () => {
@@ -170,6 +245,58 @@ describe("homepage [SITE-001]", () => {
     render(React.createElement(Home));
 
     expect(screen.getByText("Title must be at least 3 characters.")).toBeInTheDocument();
+  });
+
+  it("presents the crew features: crews, AI crewmates, facilitators, action items", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    for (const name of ["Crews", "AI crewmates", "Facilitators", "Action items"]) {
+      expect(screen.getByRole("heading", { name, level: 3 })).toBeInTheDocument();
+    }
+  });
+
+  it("lists the plans with the crew price and a self-hosting contact", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const pricing = screen.getByRole("region", { name: /Bring the crew/i });
+    expect(pricing).toHaveTextContent("$39.99");
+    expect(pricing).toHaveTextContent("Guest");
+    expect(pricing).toHaveTextContent("Registered");
+    expect(pricing).toHaveTextContent("Crew");
+    const contact = screen.getAllByRole("link", { name: /Contact us/i });
+    expect(contact[0]).toHaveAttribute("href", "/contact");
+  });
+
+  it("points every create-board CTA at the hero form", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const ctas = screen.getAllByRole("link", { name: /Create your first board/i });
+    expect(ctas.length).toBeGreaterThanOrEqual(2);
+    for (const cta of ctas) expect(cta).toHaveAttribute("href", "#create-form");
+    expect(document.getElementById("create-form")).toContainElement(
+      screen.getByLabelText("Title")
+    );
+  });
+
+  it("sends the free registered plan through sign-in", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByRole("link", { name: /Sign in free/i })).toHaveAttribute(
+      "href",
+      "/auth/login"
+    );
+  });
+
+  it("answers the common questions", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    expect(screen.getByText(/Does everyone need an account\?/)).toBeInTheDocument();
+    expect(screen.getByText(/How do AI agents join a board\?/)).toBeInTheDocument();
   });
 });
 

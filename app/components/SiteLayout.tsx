@@ -23,9 +23,11 @@ export default function SiteLayout() {
 
   return (
     <UserProvider user={user}>
-      <div className='min-h-screen flex flex-col'>
-        <Header user={user} hosting={hosting} />
-        <main className="flex-grow">
+      {/* Every site page is drawn on the night sky; the night ground runs from
+          header to footer so a short page leaves no gap. */}
+      <div className="min-h-screen flex flex-col bg-night-950">
+        <Header user={user} hosting={hosting} night />
+        <main className="flex-grow bg-night-950">
           <Outlet />
         </main>
         <Footer />

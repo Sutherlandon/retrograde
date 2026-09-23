@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from "react-router";
 import { Logo } from '~/images/icons';
 import AccountHub from './AccountHub';
 import Sidebar from './Sidebar';
@@ -18,16 +17,21 @@ interface HeaderProps {
   /** How this deployment is hosted (ADR-0017). Required, so no layout can
    *  forget it and silently show a self-hosted user dead marketing links. */
   hosting: HostingConfig;
+  /** Draws the header on the marketing site's night sky (SiteLayout sets it). */
+  night?: boolean;
 }
 
-export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed, hosting }: HeaderProps) {
+// The marketing pages' night sky: solid airglow green in place of the app's
+// brighter green.
+const NIGHT_ACCOUNT_BUTTON =
+  "bg-airglow-300 font-semibold text-night-950 hover:bg-airglow-300 hover:brightness-110 dark:bg-airglow-300 dark:hover:bg-airglow-300";
+
+export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed, hosting, night = false }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const siteLogo = hosting.siteLogo;
 
-  const location = useLocation();
-  const home = location.pathname === "/";
 
   // Close on outside click
   useEffect(() => {
@@ -70,8 +74,8 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
 
   return (
     <header
-      className={`relative flex items-center px-4 py-3 ${home
-        ? 'bg-black'
+      className={`relative flex items-center px-4 py-3 ${night
+        ? 'bg-night-950 text-slate-100'
         : 'bg-gradient-to-b from-sky-400 to-white dark:from-black dark:to-gray-900'
         }`}
     >
@@ -118,7 +122,11 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
             Dashboard
           </a>
         )}
-        <AccountHub user={user} hideLogout={hosting.hideLogout} />
+        <AccountHub
+          user={user}
+          hideLogout={hosting.hideLogout}
+          buttonClassName={night ? NIGHT_ACCOUNT_BUTTON : undefined}
+        />
       </nav>
 
       {/* Hamburger */}
@@ -160,7 +168,7 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
       <div
         id="mobile-menu"
         ref={menuRef}
-        className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 overflow-y-auto ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 right-0 h-full w-72 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 overflow-y-auto ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         role="menu"
       >
