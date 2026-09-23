@@ -42,7 +42,7 @@ export const meta = ({ data }: { data?: { origin: string } }) => {
     { property: "og:image:height", content: "630" },
     {
       property: "og:image:alt",
-      content: "Retrograde: Retros your whole crew shows up for. People and agents. Set over a starry night sky and mountain ridge.",
+      content: "Retrograde: Retros your whole crew shows up for. People and Agents. Set over a starry night sky and mountain ridge.",
     },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: "Retrograde – Mission Control for Retrospectives" },

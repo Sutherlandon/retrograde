@@ -32,7 +32,7 @@ export default function OgCard() {
           Retros your whole crew shows up for.{" "}
           <br />
           <span className="bg-gradient-to-r from-stardust-100 via-airglow-300 to-starlight-300 bg-clip-text text-transparent">
-            People and agents.
+            People and Agents.
           </span>
         </h1>
       </div>

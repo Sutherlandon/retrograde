@@ -15,7 +15,7 @@ describe("OgCard", () => {
     render(<OgCard />);
     expect(screen.getByText("Retrograde")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Retros your whole crew shows up for. People and agents."
+      "Retros your whole crew shows up for. People and Agents."
     );
   });
 

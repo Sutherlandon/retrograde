@@ -154,7 +154,7 @@ describe("homepage link preview", () => {
     expect(tags).toContainEqual({ property: "og:image", content: "https://retrograde.sh/og-image.png" });
     expect(tags).toContainEqual({ property: "og:image:width", content: "1200" });
     expect(tags).toContainEqual({ property: "og:image:height", content: "630" });
-    expect(tags).toContainEqual(expect.objectContaining({ property: "og:image:alt" }));
+    expect(tags).toContainEqual(expect.objectContaining({ property: "og:image:alt", content: expect.stringContaining("People and Agents.") }));
   });
 
   // Staging's previews asked production for og-image.png, which production
