@@ -18,10 +18,10 @@ import Header from "./Header";
 const hosted: HostingConfig = { selfHosted: false, hideLogout: false, siteLogo: null };
 const user = { id: "user-1", username: "testuser" };
 
-function renderHeader(hosting: HostingConfig, withUser = false) {
+function renderHeader(hosting: HostingConfig, withUser = false, night = false) {
   return render(
     <MemoryRouter initialEntries={["/app/dashboard"]}>
-      <Header user={withUser ? user : undefined} hosting={hosting} />
+      <Header user={withUser ? user : undefined} hosting={hosting} night={night} />
     </MemoryRouter>
   );
 }
@@ -69,5 +69,25 @@ describe("Header — hosting configuration", () => {
   it("offers a signed-in user no logout when the deployment hides it", () => {
     renderHeader({ ...hosted, hideLogout: true }, true);
     expect(screen.queryByText("Logout")).toBeNull();
+  });
+});
+
+describe("Header — night-sky marketing pages", () => {
+  afterEach(() => cleanup());
+
+  it("draws itself and its account button in the night-sky palette when asked", () => {
+    renderHeader(hosted, false, true);
+    expect(screen.getByRole("banner")).toHaveClass("bg-night-950");
+    const [desktop] = screen.getAllByRole("link", { name: /Log In/i });
+    expect(desktop.className).toMatch(/airglow/);
+    expect(desktop.className).not.toMatch(/bg-green/);
+  });
+
+  it("keeps the app's look and green account button otherwise", () => {
+    renderHeader(hosted);
+    expect(screen.getByRole("banner")).not.toHaveClass("bg-night-950");
+    const [desktop] = screen.getAllByRole("link", { name: /Log In/i });
+    expect(desktop.className).toMatch(/bg-green/);
+    expect(desktop.className).not.toMatch(/airglow/);
   });
 });

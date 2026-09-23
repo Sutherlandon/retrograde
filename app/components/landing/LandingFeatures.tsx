@@ -1,9 +1,10 @@
 // app/components/landing/LandingFeatures.tsx
-// The homepage's middle of the funnel: how a retro runs, and what 2.0 adds
-// for teams — crews, AI crewmates, facilitators and action items.
+// The homepage's middle of the funnel: how a retro runs, the board as an idea
+// board for brainstorming with agents, and what Retrograde gives teams —
+// crews, AI crewmates, facilitators and action items.
 import type { JSX } from "react";
 import type { IconProps } from "~/images/icons";
-import { RocketIcon, UserIcon, RobotIcon, TimerIcon, FlagIcon, CheckIcon } from "~/images/icons";
+import { UserIcon, RobotIcon, TimerIcon, CheckCircleFilledIcon, ColumnsIcon, ThumbsUpIcon } from "~/images/icons";
 
 type Icon = (props: IconProps) => JSX.Element;
 
@@ -22,6 +23,27 @@ const STEPS = [
   },
 ];
 
+const IDEA_USES: { Icon: Icon; name: string; text: string; accent: string }[] = [
+  {
+    Icon: ColumnsIcon,
+    name: "Brainstorm together",
+    text: "Name the columns for anything — roadmap themes, launch names, design options. Your team and your agents add ideas side by side.",
+    accent: "text-stardust-300",
+  },
+  {
+    Icon: RobotIcon,
+    name: "Let agents fill the board",
+    text: "Ask your agent for fifty ideas and it drops them on the board as notes, each one labeled with its name.",
+    accent: "text-airglow-300",
+  },
+  {
+    Icon: ThumbsUpIcon,
+    name: "Vote, then hand it back",
+    text: "Your team votes, moves and edits. Your agent reads the finished board and picks up where the room left off.",
+    accent: "text-starlight-300",
+  },
+];
+
 const FEATURES: { Icon: Icon; name: string; text: string; accent: string }[] = [
   {
     Icon: UserIcon,
@@ -32,7 +54,7 @@ const FEATURES: { Icon: Icon; name: string; text: string; accent: string }[] = [
   {
     Icon: RobotIcon,
     name: "AI crewmates",
-    text: "Mint an API key and your agent joins as a named crewmate. It can seed a board before the meeting and read the votes back after. Its notes are always labeled.",
+    text: "Share the link with your agent — it already knows how to use it. It can seed a board before the meeting and read the votes back after. Its notes are always labeled.",
     accent: "text-airglow-300",
   },
   {
@@ -42,7 +64,7 @@ const FEATURES: { Icon: Icon; name: string; text: string; accent: string }[] = [
     accent: "text-antares-400",
   },
   {
-    Icon: FlagIcon,
+    Icon: CheckCircleFilledIcon,
     name: "Action items",
     text: "Commitments don't die in the board. Open items sit on your dashboard and your crew page until someone checks them off.",
     accent: "text-nebula-400",
@@ -56,10 +78,12 @@ export function HowItWorks() {
       <ol className="grid gap-6 md:grid-cols-3">
         {STEPS.map((step, i) => (
           <li key={step.title} className="mb-0 rounded-2xl border border-white/5 bg-night-900 p-7 glow-starlight">
-            <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-airglow-500/50 font-mono text-sm text-airglow-300">
-              0{i + 1}
-            </span>
-            <h3 className="py-0 mb-2 text-xl text-white">{step.title}</h3>
+            <div className="mb-3 flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-airglow-500/50 font-mono text-sm text-airglow-300">
+                0{i + 1}
+              </span>
+              <h3 className="py-0 mb-0 text-xl text-white">{step.title}</h3>
+            </div>
             <p className="mb-0 text-slate-400">{step.text}</p>
           </li>
         ))}
@@ -68,78 +92,60 @@ export function HowItWorks() {
   );
 }
 
-export function WhatsNew() {
+export function IdeaBoards() {
   return (
-    <section aria-labelledby="new-heading" className="mx-auto max-w-6xl px-4 py-24">
+    <section aria-labelledby="ideas-heading" className="mx-auto max-w-6xl px-4 py-24">
       <SectionIntro
-        eyebrow="New in 2.0"
-        id="new-heading"
-        title="Built for the whole crew — people and agents"
-        text="Retrograde started as a quick board for a single retro. 2.0 makes it where your team keeps its retros, its commitments and its AI helpers."
+        eyebrow="Beyond the retro"
+        id="ideas-heading"
+        title="An idea board for people and agents"
+        text="A retro is just one shape. Name your own columns and use the same board to brainstorm, sort a backlog or make a call — with your AI agents at the table."
       />
-      <div className="grid gap-12 lg:grid-cols-[1fr_0.9fr] lg:items-center">
-        <div className="grid gap-6 sm:grid-cols-2">
-          {FEATURES.map(({ Icon, name, text, accent }) => (
-            <article key={name} className="rounded-2xl border border-white/5 bg-gradient-to-b from-night-800 to-night-900 p-6">
-              <Icon size="lg" className={`mb-4 ${accent}`} />
-              <h3 className="py-0 mb-2 text-lg text-white">{name}</h3>
-              <p className="mb-0 text-sm leading-relaxed text-slate-400">{text}</p>
-            </article>
-          ))}
-        </div>
-        <AgentBoardPreview />
+      <div className="grid gap-6 md:grid-cols-3">
+        {IDEA_USES.map(({ Icon, name, text, accent }) => (
+          <FeatureCard key={name} Icon={Icon} name={name} text={text} accent={accent} />
+        ))}
       </div>
     </section>
   );
 }
 
-// A stylized slice of a board: a human note and an agent note side by side,
-// showing that agent contributions always carry their attribution.
-function AgentBoardPreview() {
+export function WhatsNew() {
   return (
-    <figure aria-label="A board with notes from a teammate and an AI crewmate" className="relative mx-auto w-full max-w-md">
-      <div className="absolute -inset-8 rounded-full bg-airglow-500/15 blur-3xl" aria-hidden="true" />
-      <div className="relative rounded-2xl border border-white/10 bg-night-800/80 p-5 backdrop-blur glow-starlight">
-        <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-widest text-slate-400">
-          <span>What went well</span>
-          <RocketIcon size="sm" className="text-airglow-300" />
-        </div>
-        <PreviewNote author="Maya" votes={4} text="Pairing on the migration cut review time in half." />
-        <PreviewNote
-          agent
-          author="Claude (sprint notes)"
-          votes={3}
-          text="12 of 14 stories closed; the two carried over were both blocked on the same API."
-        />
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-airglow-500/30 bg-airglow-500/10 px-3 py-2 text-sm text-airglow-300">
-          <CheckIcon size="sm" /> Action item: unblock the payments API before Sprint 43
-        </div>
+    <section aria-labelledby="new-heading" className="mx-auto max-w-6xl px-4 py-24">
+      <SectionIntro
+        eyebrow="Crews & crewmates"
+        id="new-heading"
+        title="Built for the whole crew — people and agents"
+        text="More than a board for one meeting — Retrograde is where your team keeps its retros, its commitments and its AI helpers."
+      />
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {FEATURES.map(({ Icon, name, text, accent }) => (
+          <FeatureCard key={name} Icon={Icon} name={name} text={text} accent={accent} />
+        ))}
       </div>
-      <figcaption className="mt-4 text-center text-xs text-slate-500">Agent notes are always attributed.</figcaption>
-    </figure>
+    </section>
   );
 }
 
-function PreviewNote({ author, text, votes, agent }: { author: string; text: string; votes: number; agent?: boolean }) {
+function FeatureCard({ Icon, name, text, accent }: { Icon: Icon; name: string; text: string; accent: string }) {
   return (
-    <div className={`mb-3 rounded-lg p-4 shadow-lg shadow-black/40 ${agent ? "bg-stardust-100 text-night-900" : "bg-starlight-300 text-night-900"}`}>
-      <p className="mb-3 text-sm font-medium">{text}</p>
-      <div className="flex items-center justify-between text-xs">
-        <span className="flex items-center gap-1 font-semibold">
-          {agent && <RobotIcon size="xs" />} {author}
-        </span>
-        <span className="rounded-full bg-night-900/10 px-2 py-0.5">+{votes}</span>
+    <article className="rounded-2xl border border-white/5 bg-gradient-to-b from-night-800 to-night-900 p-6">
+      <div className="mb-3 flex items-center gap-3">
+        <Icon size="lg" className={`shrink-0 ${accent}`} />
+        <h3 className="py-0 mb-0 text-lg text-white">{name}</h3>
       </div>
-    </div>
+      <p className="mb-0 text-sm leading-relaxed text-slate-400">{text}</p>
+    </article>
   );
 }
 
 export function SectionIntro({ eyebrow, id, title, text }: { eyebrow: string; id: string; title: string; text?: string }) {
   return (
-    <header className="mx-auto mb-14 max-w-2xl text-center">
+    <header className="mx-auto mb-14 text-center">
       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-airglow-300">{eyebrow}</p>
-      <h2 id={id} className="py-0 text-3xl tracking-tight text-white md:text-4xl">{title}</h2>
-      {text && <p className="mt-4 mb-0 text-lg text-slate-400">{text}</p>}
+      <h2 id={id} className="py-0 text-3xl tracking-tight text-balance text-white md:text-4xl">{title}</h2>
+      {text && <p className="mx-auto mt-4 mb-0 max-w-2xl text-lg text-pretty text-slate-400">{text}</p>}
     </header>
   );
 }

@@ -39,3 +39,12 @@ describe("CreateBoardForm [SITE-003]", () => {
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy-policy");
   });
 });
+
+describe("CreateBoardForm palette", () => {
+  it("launches with the night-sky airglow, not the app's green-to-blue", () => {
+    render(<CreateBoardForm />);
+    const launch = screen.getByRole("button", { name: /Launch/i });
+    expect(launch.className).toMatch(/airglow/);
+    expect(launch.className).not.toMatch(/green-|blue-/);
+  });
+});

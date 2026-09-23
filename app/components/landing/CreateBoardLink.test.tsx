@@ -25,3 +25,12 @@ describe("CreateBoardLink", () => {
     await waitFor(() => expect(screen.getByLabelText("Title")).toHaveFocus());
   });
 });
+
+describe("CreateBoardLink palette", () => {
+  it("uses the night-sky airglow, not the app's green-to-blue", () => {
+    render(<CreateBoardLink />);
+    const cta = screen.getByRole("link", { name: /Create your first board/i });
+    expect(cta.className).toMatch(/airglow/);
+    expect(cta.className).not.toMatch(/green-|blue-/);
+  });
+});

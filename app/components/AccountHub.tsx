@@ -12,9 +12,11 @@ interface AccountHubProps {
   /** HIDE_LOGOUT (ADR-0017): an SSO deployment that signs users straight back
    *  in hides logout, since the button would only bounce them. */
   hideLogout: boolean;
+  /** Restyles the account button for a page with its own palette. */
+  buttonClassName?: string;
 }
 
-export default function AccountHub({ user, closeMenu, hideLogout }: AccountHubProps) {
+export default function AccountHub({ user, closeMenu, hideLogout, buttonClassName }: AccountHubProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -60,7 +62,7 @@ export default function AccountHub({ user, closeMenu, hideLogout }: AccountHubPr
           color='secondary'
           text={user?.username}
           icon={<UserIcon size="md" />}
-          className="px-4 py-2"
+          className={`px-4 py-2 ${buttonClassName ?? ""}`}
           aria-expanded={open}
           aria-haspopup="menu"
         />
@@ -72,7 +74,7 @@ export default function AccountHub({ user, closeMenu, hideLogout }: AccountHubPr
           color='secondary'
           text={"Log In"}
           icon={<UserIcon size="md" />}
-          className="px-4 py-2"
+          className={`px-4 py-2 ${buttonClassName ?? ""}`}
         />
       )}
 

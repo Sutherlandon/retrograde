@@ -71,7 +71,7 @@ function Plan({
     >
       {featured && (
         <span className="absolute -top-3 left-8 rounded-full bg-airglow-300 px-3 py-0.5 text-xs font-semibold text-night-950">
-          New in 2.0
+          Best for teams
         </span>
       )}
       <h3 className="py-0 mb-1 text-lg text-white">{name}</h3>
@@ -103,7 +103,7 @@ const FAQS = [
   },
   {
     q: "How do AI agents join a board?",
-    a: "Mint an API key on your crew page and give it to your agent. It works through the JSON API as its own named crewmate, and every note it writes carries its name.",
+    a: "Share the link — your agent already knows how to use it. It can read any board you give it, or start its own and hand you the link. To have it write on your crew's boards, add it as a crewmate from your crew page. Every note it writes carries its name.",
   },
   {
     q: "Can we host it ourselves?",

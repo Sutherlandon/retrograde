@@ -497,6 +497,25 @@ export function CheckIcon({ size = 'md', className = '' }: IconProps) {
   );
 }
 
+export function CheckCircleFilledIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg
+      data-icon="check-circle-filled"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={`${sizeMap[size]} ${className}`}
+    >
+      {/* A solid disc with the check cut out of it */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.7 7.7a1 1 0 0 0-1.4-1.4L10.5 13.1l-1.8-1.8a1 1 0 0 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4 0l5.5-5.5z"
+      />
+    </svg>
+  );
+}
+
 export function TableIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg

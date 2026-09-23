@@ -2,12 +2,12 @@ import { redirect, useActionData, type ActionFunctionArgs } from "react-router";
 import { createBoard } from "~/server/board_model";
 import { getOrCreateUser } from "~/hooks/useAuth";
 import { commitSession } from "~/session.server";
-import { BookIcon } from "~/images/icons";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Horizon from "~/components/landing/Horizon";
+import SkyFade from "~/components/landing/SkyFade";
 import CreateBoardForm, { type CreateBoardErrors } from "~/components/landing/CreateBoardForm";
 import CreateBoardLink from "~/components/landing/CreateBoardLink";
-import { HowItWorks, WhatsNew, SectionIntro } from "~/components/landing/LandingFeatures";
+import { HowItWorks, IdeaBoards, WhatsNew, SectionIntro } from "~/components/landing/LandingFeatures";
 import { Pricing, Faq } from "~/components/landing/LandingPricing";
 import { selfHosted } from "~/server/db_config";
 
@@ -17,9 +17,9 @@ export const meta = () => {
     {
       name: "description",
       content:
-        "Run retrospectives your whole crew shows up for. Free boards in seconds, crews for your team, action items that carry into the next sprint, and API keys so AI agents can join the board.",
+        "Run retrospectives your whole crew shows up for. Free boards in seconds for retros and brainstorming, crews for your team, action items that carry into the next sprint, and AI agents that join the board from a shared link.",
     },
-    { name: "keywords", content: "agile retrospective tool, scrum retrospectives, retro board, AI agent retrospective, team action items, sprint review" },
+    { name: "keywords", content: "agile retrospective tool, scrum retrospectives, retro board, idea board, brainstorming with AI agents, AI agent retrospective, team action items, sprint review" },
     { name: "robots", content: "index, follow" },
     { property: "og:title", content: "Retrograde – Mission Control for Retrospectives" },
     {
@@ -28,7 +28,14 @@ export const meta = () => {
     },
     { property: "og:type", content: "website" },
     { property: "og:url", content: "https://retrograde.sh/" },
-    { property: "og:image", content: "https://retrograde.sh/retrograde-snapshot.png" },
+    // Captured from /og-card, which renders this image's source at 1200×630.
+    { property: "og:image", content: "https://retrograde.sh/og-image.png" },
+    { property: "og:image:width", content: "1200" },
+    { property: "og:image:height", content: "630" },
+    {
+      property: "og:image:alt",
+      content: "Retrograde: Retros your whole crew shows up for. People and agents. Set over a starry night sky and mountain ridge.",
+    },
     { name: "twitter:card", content: "summary_large_image" },
     { name: "twitter:title", content: "Retrograde – Mission Control for Retrospectives" },
     {
@@ -94,6 +101,7 @@ export default function Home() {
       <Hero errors={actionData?.errors} />
       <HowItWorks />
       <Snapshot />
+      <IdeaBoards />
       <WhatsNew />
       <Pricing />
       <Faq />
@@ -111,6 +119,8 @@ const TWINKLES = [
 function Hero({ errors }: { errors?: CreateBoardErrors }) {
   return (
     <section className="night-sky relative overflow-hidden">
+      {/* The header is a solid band; the sky comes up out of it. */}
+      <SkyFade className="h-40" />
       {TWINKLES.map((pos, i) => (
         <span
           key={pos}
@@ -121,29 +131,16 @@ function Hero({ errors }: { errors?: CreateBoardErrors }) {
       ))}
       <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 px-4 pt-16 pb-40 md:grid-cols-[1.3fr_1fr] md:pt-24 md:pb-56">
         <div>
-          <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-airglow-300/30 bg-night-900/60 px-4 py-1.5 text-xs font-semibold tracking-wide text-airglow-300 backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-airglow-300" aria-hidden="true" />
-            Retrograde 2.0 — Crews & AI crewmates
-          </p>
           <h1 className="py-0 mb-6 text-4xl leading-[1.1] tracking-tight text-white md:text-5xl xl:text-6xl">
             Retros your whole crew shows up for.{" "}
             <span className="bg-gradient-to-r from-stardust-100 via-airglow-300 to-starlight-300 bg-clip-text text-transparent">
-              People and agents alike.
+              People and agents.
             </span>
           </h1>
-          <p className="mb-8 max-w-xl text-lg text-slate-300 md:text-xl">
+          <p className="mb-0 max-w-xl text-lg text-slate-300 md:text-xl">
             Collect every insight, vote on what matters, and carry action items into the next sprint.
             Bring your team into a crew, and let your AI agents prep the board and read the results back.
           </p>
-          <div className="flex flex-wrap items-center gap-6">
-            <a
-              href="/app/board/example-board"
-              className="inline-flex items-center gap-2 font-semibold text-starlight-300 transition hover:text-white"
-            >
-              <BookIcon size="sm" /> Try the tutorial
-            </a>
-            <span className="text-sm text-slate-500">No credit card. No sign-up.</span>
-          </div>
         </div>
         <CreateBoardForm errors={errors} />
       </div>
@@ -178,7 +175,9 @@ function Snapshot() {
 function FinalCta() {
   return (
     <section className="night-sky relative overflow-hidden">
-      <div className="relative z-10 mx-auto max-w-3xl px-4 pt-24 pb-44 text-center">
+      {/* The page above ends on dark ground; the sky comes up out of it. */}
+      <SkyFade className="h-72" />
+      <div className="relative z-10 mx-auto max-w-3xl px-4 pt-40 pb-44 text-center">
         <h2 className="py-0 mb-4 text-3xl tracking-tight text-white md:text-5xl">Your next retro starts here.</h2>
         <p className="mb-10 text-lg text-slate-300">One board, one link, ten seconds. Your crew will do the rest.</p>
         <CreateBoardLink />

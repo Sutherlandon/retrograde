@@ -16,7 +16,7 @@ export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors
       <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-airglow-300">
         Free · No sign-up
       </p>
-      <h2 className="py-0 mb-6 text-2xl font-bold text-white">Create a Free Board</h2>
+      <h2 className="py-0 mb-6 text-2xl font-bold text-white">Create Your First Board</h2>
       <Form method="post">
         <div aria-hidden="true" style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>
           <label htmlFor="website">Website</label>
@@ -30,14 +30,14 @@ export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors
             type="text"
             id="title"
             name="title"
-            placeholder="Sprint 42 Retro"
+            placeholder="Your stellar board title here..."
             aria-invalid={errors?.title ? true : undefined}
             className="w-full rounded-lg border border-night-600 bg-night-950/70 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-airglow-500 focus:ring-2 focus:ring-airglow-500/40"
           />
           {errors?.title && <p className="mt-2 mb-0 text-sm text-red-400">{errors.title}</p>}
         </div>
         <div className="mb-6 flex items-start gap-3 text-sm text-slate-300">
-          <input type="checkbox" id="no_jerks" name="no_jerks" className="mt-1 accent-green-500" />
+          <input type="checkbox" id="no_jerks" name="no_jerks" className="mt-1 accent-airglow-300" />
           <label htmlFor="no_jerks">
             I agree to the{" "}
             <Link to="/terms-of-service" target="_blank" className="text-starlight-300 underline">
@@ -53,7 +53,7 @@ export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors
         {errors?.no_jerks && <p className="-mt-3 mb-5 text-sm text-red-400">{errors.no_jerks}</p>}
         <button
           type="submit"
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-6 py-3 text-base font-semibold text-white transition hover:from-green-400 hover:to-blue-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-airglow-300"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-airglow-300 to-starlight-300 px-6 py-3 text-base font-semibold text-night-950 transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-airglow-300"
         >
           Launch <RocketIcon size="md" />
         </button>

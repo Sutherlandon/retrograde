@@ -17,7 +17,7 @@ export default function CreateBoardLink({ className = "" }: { className?: string
     <a
       href={`#${CREATE_FORM_ID}`}
       onClick={focusTitle}
-      className={`inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-green-500 to-blue-500 px-6 py-3 font-semibold text-white glow-airglow transition hover:from-green-400 hover:to-blue-400 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-airglow-300 ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-airglow-300 to-starlight-300 px-6 py-3 font-semibold text-night-950 glow-airglow transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-airglow-300 ${className}`}
     >
       Create your first board <StartIcon size="sm" />
     </a>
