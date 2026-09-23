@@ -724,6 +724,21 @@ describe("createBoard", () => {
     expect(boardInsert![0]).toContain("open_facilitation");
     expect(boardInsert![1]).toEqual(expect.arrayContaining([false]));
   });
+
+  it("seeds the default retro columns", async () => {
+    const { createBoard } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoard("Plain Retro", "user-1", null);
+
+    const inserted = mockQuery.mock.calls
+      .filter((c) => typeof c[0] === "string" && c[0].includes("INSERT INTO columns"))
+      .map((c) => c[1][2]);
+    expect(inserted).toEqual([
+      "What went well?",
+      "What can we do better?",
+    ]);
+  });
 });
 
 describe("createBoardWithColumns", () => {
