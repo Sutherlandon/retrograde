@@ -38,6 +38,13 @@ describe("CreateBoardForm [SITE-003]", () => {
     expect(screen.getByRole("link", { name: "Terms of Service" })).toHaveAttribute("href", "/terms-of-service");
     expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy-policy");
   });
+
+  it("puts the kindness pledge first in the agreement", () => {
+    render(<CreateBoardForm />);
+    expect(screen.getByRole("checkbox")).toHaveAccessibleName(
+      "I agree to treat others the way I want to be treated and to the Terms of Service and Privacy Policy"
+    );
+  });
 });
 
 describe("CreateBoardForm palette", () => {

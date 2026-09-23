@@ -150,11 +150,32 @@ describe("home page action", () => {
 describe("homepage link preview", () => {
   it("shares the night-sky card, with its size and alt text", async () => {
     const { meta } = await import("./home");
-    const tags = meta();
+    const tags = meta({ data: { origin: "https://retrograde.sh" } });
     expect(tags).toContainEqual({ property: "og:image", content: "https://retrograde.sh/og-image.png" });
     expect(tags).toContainEqual({ property: "og:image:width", content: "1200" });
     expect(tags).toContainEqual({ property: "og:image:height", content: "630" });
     expect(tags).toContainEqual(expect.objectContaining({ property: "og:image:alt" }));
+  });
+
+  // Staging's previews asked production for og-image.png, which production
+  // did not have yet: the image must come from the deployment serving the page.
+  it("points the preview at the deployment serving the page", async () => {
+    const { meta } = await import("./home");
+    const tags = meta({ data: { origin: "https://staging.retrograde.sh" } });
+    expect(tags).toContainEqual({ property: "og:image", content: "https://staging.retrograde.sh/og-image.png" });
+    expect(tags).toContainEqual({ property: "og:url", content: "https://staging.retrograde.sh/" });
+  });
+
+  it("keeps production as the canonical page for search engines", async () => {
+    const { meta } = await import("./home");
+    const tags = meta({ data: { origin: "https://staging.retrograde.sh" } });
+    expect(tags).toContainEqual({ tagName: "link", rel: "canonical", href: "https://retrograde.sh" });
+  });
+
+  it("hands meta the origin the request arrived on", async () => {
+    const { loader } = await import("./home");
+    const request = new Request("https://staging.retrograde.sh/?utm_source=slack");
+    expect(await loader({ request } as never)).toEqual({ origin: "https://staging.retrograde.sh" });
   });
 
   it("ships the preview image at the size the tags declare", async () => {
@@ -172,7 +193,7 @@ describe("homepage [SITE-001]", () => {
     render(React.createElement(Home));
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
-      "Retros your whole crew shows up for. People and agents."
+      "Retros your whole crew shows up for. People and Agents."
     );
 
     expect(screen.getByRole("heading", { level: 2, name: "Create Your First Board" })).toBeInTheDocument();

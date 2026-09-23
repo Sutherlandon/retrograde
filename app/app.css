@@ -13,7 +13,7 @@
   --color-night-700: #132036;
   --color-night-600: #1d2e4a;
   --color-airglow-500: #5d8a6e;
-  --color-airglow-300: #b9cf94;
+  --color-airglow-300: #8ad882;
   --color-stardust-100: #f1e8d8;
   --color-stardust-300: #d6c6a8;
   --color-nebula-400: #8b6c9c;
@@ -46,7 +46,7 @@
     radial-gradient(1px 1px at 300px 210px, #fff 90%, transparent),
     radial-gradient(1.5px 1.5px at 370px 120px, var(--color-antares-400) 90%, transparent),
     linear-gradient(115deg, transparent 30%, rgb(214 198 168 / 0.10) 42%, rgb(139 108 156 / 0.12) 50%, rgb(214 198 168 / 0.08) 58%, transparent 70%),
-    radial-gradient(120% 60% at 50% 110%, rgb(185 207 148 / 0.28), rgb(93 138 110 / 0.14) 40%, transparent 70%),
+    radial-gradient(120% 60% at 50% 110%, color-mix(in srgb, var(--color-airglow-300) 28%, transparent), color-mix(in srgb, var(--color-airglow-500) 14%, transparent) 40%, transparent 70%),
     linear-gradient(to bottom, var(--color-night-950), var(--color-night-800));
   background-size:
     240px 260px, 320px 280px, 280px 300px, 360px 320px, 220px 260px,
@@ -57,7 +57,10 @@
 /* Soft light halo — the site's shadows are glows, the way light pools
    around bright objects on a dark night rather than falling below them. */
 @utility glow-airglow {
-  box-shadow: 0 0 0 1px rgb(185 207 148 / 0.14), 0 20px 60px -20px rgb(93 138 110 / 0.55), 0 0 120px -40px rgb(185 207 148 / 0.35);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-airglow-300) 14%, transparent),
+    0 20px 60px -20px color-mix(in srgb, var(--color-airglow-500) 55%, transparent),
+    0 0 120px -40px color-mix(in srgb, var(--color-airglow-300) 35%, transparent);
 }
 
 @utility glow-starlight {

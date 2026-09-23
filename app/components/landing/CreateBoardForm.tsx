@@ -39,15 +39,14 @@ export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors
         <div className="mb-6 flex items-start gap-3 text-sm text-slate-300">
           <input type="checkbox" id="no_jerks" name="no_jerks" className="mt-1 accent-airglow-300" />
           <label htmlFor="no_jerks">
-            I agree to the{" "}
+            I agree to treat others the way I want to be treated and to the{" "}
             <Link to="/terms-of-service" target="_blank" className="text-starlight-300 underline">
               Terms of Service
             </Link>{" "}
-            &{" "}
+            and{" "}
             <Link to="/privacy-policy" target="_blank" className="text-starlight-300 underline">
               Privacy Policy
             </Link>
-            , and to treat others the way I want to be treated.
           </label>
         </div>
         {errors?.no_jerks && <p className="-mt-3 mb-5 text-sm text-red-400">{errors.no_jerks}</p>}

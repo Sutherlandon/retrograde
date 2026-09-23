@@ -1,4 +1,4 @@
-import { redirect, useActionData, type ActionFunctionArgs } from "react-router";
+import { redirect, useActionData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { createBoard } from "~/server/board_model";
 import { getOrCreateUser } from "~/hooks/useAuth";
 import { commitSession } from "~/session.server";
@@ -11,7 +11,15 @@ import { HowItWorks, IdeaBoards, WhatsNew, SectionIntro } from "~/components/lan
 import { Pricing, Faq } from "~/components/landing/LandingPricing";
 import { selfHosted } from "~/server/db_config";
 
-export const meta = () => {
+// Link previews fetch og:image from whichever deployment served the page, so
+// staging previews staging's card before it ships. Search engines still treat
+// production as the real page (canonical).
+export async function loader({ request }: LoaderFunctionArgs) {
+  return { origin: new URL(request.url).origin };
+}
+
+export const meta = ({ data }: { data?: { origin: string } }) => {
+  const origin = data?.origin ?? "https://retrograde.sh";
   return [
     { title: "Retrograde – Retrospective Boards for Teams and Their AI Agents" },
     {
@@ -27,9 +35,9 @@ export const meta = () => {
       content: "Retros for your whole crew — people and AI agents on one board. Start free in seconds.",
     },
     { property: "og:type", content: "website" },
-    { property: "og:url", content: "https://retrograde.sh/" },
+    { property: "og:url", content: `${origin}/` },
     // Captured from /og-card, which renders this image's source at 1200×630.
-    { property: "og:image", content: "https://retrograde.sh/og-image.png" },
+    { property: "og:image", content: `${origin}/og-image.png` },
     { property: "og:image:width", content: "1200" },
     { property: "og:image:height", content: "630" },
     {
@@ -134,7 +142,7 @@ function Hero({ errors }: { errors?: CreateBoardErrors }) {
           <h1 className="py-0 mb-6 text-4xl leading-[1.1] tracking-tight text-white md:text-5xl xl:text-6xl">
             Retros your whole crew shows up for.{" "}
             <span className="bg-gradient-to-r from-stardust-100 via-airglow-300 to-starlight-300 bg-clip-text text-transparent">
-              People and agents.
+              People and Agents.
             </span>
           </h1>
           <p className="mb-0 max-w-xl text-lg text-slate-300 md:text-xl">
