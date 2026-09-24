@@ -13,6 +13,7 @@ export default [
   /* Non-layout routes */
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/sitemap.xml", "routes/sitemap.ts"),
+  route("/robots.txt", "routes/robots.ts"),
   route("/og-card", "routes/og-card.tsx"),
 /* App Routes — require authentication */
   route("/app", "components/AppLayout.tsx", [

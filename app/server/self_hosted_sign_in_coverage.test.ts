@@ -29,6 +29,7 @@ const PUBLIC_ROUTES: Record<string, string> = {
   "routes/site/privacy-policy.tsx": "child of SiteLayout",
   "routes/site/terms-of-service.tsx": "child of SiteLayout",
   "routes/sitemap.ts": "returns 404 when SELF_HOSTED=true",
+  "routes/robots.ts": "serves only a static crawl policy",
   "routes/og-card.tsx": "redirects to the dashboard when SELF_HOSTED=true",
   "routes/app/board.legacy.tsx": "only redirects to /app/board/:id, which requires sign-in",
   "routes/api/cron.archive-stale.ts": "returns 404 when SELF_HOSTED=true (ADR-0020)",

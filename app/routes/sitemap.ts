@@ -1,57 +1,42 @@
+// app/routes/sitemap.ts
+// The sitemap search engines read for the hosted site (SITE-005).
 import type { LoaderFunctionArgs } from "react-router";
 import { selfHosted } from "~/server/db_config";
 
-// Ideally, import your database client here
-// import { db } from "~/utils/db.server"; 
+const baseUrl = "https://retrograde.sh";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+// lastmod is the date the page's content last changed meaningfully — copy,
+// links, what the page shows. Search engines use it to decide what to recrawl,
+// and stop trusting it if it moves without the page changing, so bump a date
+// when you change that page and never set them all to the deploy time.
+// (changefreq and priority are omitted: Google ignores both.)
+const pages = [
+  { path: "/", lastmod: "2026-09-23" },
+  { path: "/about", lastmod: "2026-09-23" },
+  { path: "/contact", lastmod: "2026-09-23" },
+  { path: "/terms-of-service", lastmod: "2026-01-01" },
+  { path: "/privacy-policy", lastmod: "2026-01-01" },
+  { path: "/app/board/example-board", lastmod: "2026-09-23" },
+];
+
+export async function loader(_args: LoaderFunctionArgs) {
   // A self-hosted instance has no public site to index (ADR-0017).
   if (selfHosted) return new Response("Not Found", { status: 404 });
 
-  const baseUrl = "https://retrograde.sh";
+  const urls = pages
+    .map((page) => `  <url>\n    <loc>${baseUrl}${page.path}</loc>\n    <lastmod>${page.lastmod}</lastmod>\n  </url>`)
+    .join("\n");
 
-  // 1. Define your static pages manually
-  // These are pages that always exist
-  const staticPages = [
-    { path: "/", priority: "1.0", changefreq: "daily" },
-    { path: "/about", priority: "0.8", changefreq: "monthly" },
-    { path: "/contact", priority: "0.8", changefreq: "monthly" },
-    { path: "/terms-of-service", priority: "0.6", changefreq: "monthly" },
-    { path: "/privacy-policy", priority: "0.6", changefreq: "monthly" },
-    { path: "/app/board/example-board", priority: "0.9", changefreq: "monthly" },
-  ];
-
-  // 2. Fetch dynamic content (Example: Publicly viewable boards)
-  // This is where the "Dynamic" magic happens. 
-  // If you add a new board to the DB, it automatically appears here.
-
-  // const boards = await db.board.findMany({ where: { isPublic: true } });
-
-  // 3. Generate the XML string
   const content = `<?xml version="1.0" encoding="UTF-8"?>
-    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      ${staticPages
-      .map((page) => {
-        return `
-            <url>
-              <loc>${baseUrl}${page.path}</loc>
-              <priority>${page.priority}</priority>
-              <changefreq>${page.changefreq}</changefreq>
-            </url>
-          `;
-      })
-      .join("")}
-    </urlset>
-  `;
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
 
-  // 4. Return the Response with correct headers
   return new Response(content, {
     status: 200,
     headers: {
       "Content-Type": "application/xml",
-      "xml-version": "1.0",
-      "encoding": "UTF-8",
-      // Optional: Cache this response for 1 hour to save server resources
       "Cache-Control": "public, max-age=3600",
     },
   });
