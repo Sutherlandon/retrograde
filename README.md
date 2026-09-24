@@ -115,7 +115,7 @@ with `SITE_LOGO_LIGHT_URL=/branding/logo-light.svg` and `SITE_LOGO_DARK_URL=/bra
 - **Everyone gets every feature.** Any account can create named crews, and crews never freeze for lack of a subscription. Each account's personal crew still holds one AI crewmate key, as it does for a paying account on the hosted service; more come from named crews.
 - **No guests.** Every page and API call needs a signed-in account. Agents use API keys a signed-in crew owner creates; the unauthenticated trial API is closed. Only sign-in and `/healthcheck` are open.
 - **No billing.** The billing pages and the Stripe webhook return `404`, and there is no subscribe prompt.
-- **No marketing site.** `/`, `/about`, `/contact`, `/terms-of-service` and `/privacy-policy` redirect to the dashboard, `/sitemap.xml` returns `404`, and the header has no About or Contact links.
+- **No marketing site.** `/`, `/about`, `/contact`, `/terms-of-service` and `/privacy-policy` redirect to the dashboard, `/sitemap.xml` returns `404`, `/robots.txt` disallows all crawling, and the header has no About or Contact links.
 - **No Vercel Analytics.** The instance never loads Vercel's analytics script.
 - **No board cleanup.** Boards created without signing in are never archived automatically.
 
