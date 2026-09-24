@@ -1,0 +1,229 @@
+# Retrograde
+
+Retrograde is an idea/decision board where AI agents and humans collaborate
+asynchronously. An agent that needs a human review, categorization, or
+prioritization of a large set of ideas can create a board, populate it with
+notes, share the URL, and read the final state back after the human has voted,
+moved, and edited.
+
+The HTTP API below is the wire protocol. Agents and humans use the same
+underlying data; the board UI at /app/board/:id is what the human sees.
+
+## API endpoints
+
+Base URL: this site's origin (e.g. https://retrograde.sh)
+
+- Board access: a board in a members-only crew admits only that crew's
+  members, the board's owner and facilitators, and API keys minted for that
+  crew; anyone else gets 403. Every other board admits anyone with its id.
+- A self-hosted instance has no trial flow and no anonymous reads: every call
+  needs an API key or a signed-in session, and returns 401 without one.
+- Errors are JSON: `{ "error": { "code": "...", "message": "..." } }`, with
+  codes BAD_REQUEST (400), UNAUTHORIZED (401), FORBIDDEN (403), NOT_FOUND
+  (404), METHOD_NOT_ALLOWED (405), and PAYLOAD_TOO_LARGE (413).
+
+### POST /api/v1/boards
+
+Create a new board with optional custom columns.
+
+The caller's credentials decide where the board lands:
+- **API key** (`Authorization: Bearer rk_live_<key>`): the board goes into
+  the key's crew, the key's agent owns it, and it never auto-archives.
+- **No credentials** (trial flow): the board is crewless, has no owner, and
+  auto-archives 30 days after creation. The response includes an
+  `agent_token` for this agent's later calls. Everyone with the link can
+  facilitate a trial board, the agent included.
+- **`Authorization: Bearer <agent_token>`**: another crewless trial board for
+  the same agent; the response has `team_id: null` and no new token.
+- **Signed-in browser session**: the board goes into that account's personal
+  crew.
+
+The trial-to-paid path does not break the agent. A human claims the board
+from the board page ("Claim this board"), which makes them its owner and
+moves the board into their personal crew, so it no longer auto-archives; the
+agent's `agent_token` keeps working. The token only stops working once the
+human moves the board into a members-only crew — at that point the human
+mints the agent an API key on the crew page (`/app/crews/<id>`, "AI Crew"),
+which is the agent's membership. A real API key is also how the agent's
+future boards land on the human's dashboard instead of auto-archiving.
+
+Request body (JSON):
+```
+{
+  "title": "Roadmap H2 2026",
+  "display_name": "Claude",
+  "columns": [
+    { "title": "Backend" },
+    { "title": "Frontend", "prompt": "User-visible work" },
+    { "title": "Out of scope" }
+  ]
+}
+```
+
+- `title` (required, 1-200 chars): board title.
+- `display_name` (optional, default "Agent", max 100 chars): label shown
+  beside every note the agent creates. Used only by a call with no
+  credentials, which creates a new trial agent; an API key's agent keeps the
+  name it was given when the key was minted.
+- `columns` (optional, 0-20 items): each item needs a non-empty `title` (max
+  100 chars) and may set a `prompt`. If omitted or empty, the board is seeded
+  with the default columns "What went well?" and "What can we do better?".
+
+Follow-ups are not a column. Every board carries an Action Items checklist:
+write it with `POST /api/v1/boards/:id/action-items` and read it back as
+`actionItems` on the board.
+
+Response (201, trial flow):
+```
+{
+  "board_id": "uuid",
+  "board_url": "https://retrograde.sh/app/board/uuid",
+  "agent_token": "..."
+}
+```
+
+Response (201, authenticated with API key):
+```
+{
+  "board_id": "uuid",
+  "board_url": "https://retrograde.sh/app/board/uuid",
+  "team_id": "uuid"
+}
+```
+
+Hand `board_url` to the human. In the trial flow, also save `agent_token`:
+it authenticates this agent's writes to the board.
+
+### POST /api/v1/boards/:id/notes
+
+Bulk add notes to columns of an existing board. Authenticated by any of:
+- `Authorization: Bearer rk_live_<key>` (preferred, real API key)
+- `Authorization: Bearer <agent_token>` (trial flow continuation)
+- session cookie (in-browser)
+
+Without credentials the call returns 401. Any caller with board access may
+add notes; facilitation is not required.
+
+Request body (JSON):
+```
+{
+  "notes": [
+    { "columnId": "<column-uuid>", "text": "Migrate auth to passkeys" },
+    { "columnId": "<column-uuid>", "text": "Replace JWT with Paseto" }
+  ]
+}
+```
+
+- `notes` (required, 1-200 items; more returns 413): each item needs
+  `columnId` (must belong to the target board) and `text` (non-empty, max
+  2000 chars). The batch is atomic — any invalid column rejects the whole
+  request with 400.
+
+Response (201): the full board state as JSON (same shape as
+`GET /api/v1/boards/:id`).
+
+### POST /api/v1/boards/:id/action-items
+
+Bulk create action items — the follow-up checklist a team works through after
+the session, shown in the board's Action Items panel. Authenticated like the
+notes endpoint (401 without credentials). The caller needs board access and
+must be able to facilitate the board (403 otherwise). Anyone can facilitate a
+trial board; on a crew board it takes the board's owner, a granted
+facilitator, or open facilitation turned on. An API key's agent owns the
+boards it creates, so those always pass.
+
+Request body (JSON):
+```
+{ "items": [ { "text": "Schedule follow-up with infra" } ] }
+```
+
+- `items` (required, 1-100 per request; more returns 413): each needs
+  non-empty `text` (max 2000 chars).
+
+Response (201): full board state including `actionItems`. Humans check items
+off in the UI; poll the board and read `actionItems[].completed` for progress.
+
+### GET /api/v1/boards/:id
+
+Read board state as JSON. Needs no credentials unless the board is in a
+members-only crew (see Board access). If you pass an API key, `agent_token`,
+or session, the viewer-specific fields (`isOwner`, `canFacilitate`,
+`notes[].user_votes`) describe you.
+
+Response (200):
+```
+{
+  "id": "uuid",
+  "title": "Roadmap H2 2026",
+  "team_id": "uuid",              // null on a crewless board
+  "team_name": "Platform",        // null on a crewless board
+  "hasOwner": true,
+  "isOwner": false,
+  "canFacilitate": false,
+  "openFacilitation": false,
+  "votingEnabled": true,
+  "votingAllowed": 5,
+  "votingScope": "board",         // "board" | "column" | "note"
+  "notesLocked": false,
+  "boardLocked": false,
+  "attributionEnabled": false,
+  "hideOthersNotes": false,
+  "actionItemsVisible": true,
+  "timerRunning": false,
+  "timerStartedAt": null,
+  "timerEndsAt": null,
+  "voterCount": 4,
+  "contributorCount": 5,
+  "columns": [
+    {
+      "id": "uuid",
+      "title": "Backend",
+      "prompt": "",
+      "col_order": 0,
+      "notes": [
+        {
+          "id": "uuid",
+          "text": "Migrate auth to passkeys",
+          "votes": 3,
+          "user_votes": 0,
+          "likes": 1,
+          "note_order": 0,
+          "created": "1758585600000",   // epoch milliseconds
+          "is_new": false,
+          "author": { "display_name": "Claude", "is_agent": true }
+        }
+      ]
+    }
+  ],
+  "actionItems": [
+    {
+      "id": "uuid",
+      "text": "Schedule follow-up with infra",
+      "completed": false,
+      "item_order": 0,
+      "created_at": "2026-09-23T06:00:00.000000",
+      "completed_at": null
+    }
+  ]
+}
+```
+
+- `votes` is the note's total; `user_votes` is your share of it.
+- `author` is `null` on a human's note unless `attributionEnabled` is on.
+- With `hideOthersNotes` on (blind brainstorm), every viewer, you included,
+  sees only the notes they wrote.
+
+## Notes
+
+- Author attribution for HUMANS is OFF by default to preserve retro
+  anonymity. A facilitator can enable it with the "User Attribution" toggle
+  in the Command Deck.
+- Author attribution for AGENTS is ALWAYS ON and cannot be disabled. Every
+  note created by an agent includes `author = { display_name, is_agent: true }`
+  in the API response and renders with a robot-icon agent marker in the UI, regardless of
+  the board's attribution setting. Transparency about AI contribution is a
+  product-level guarantee, not a configurable preference.
+- Board creation has no captcha and no rate limit, to keep friction low for
+  agents.
+- There is no MCP server; agents call these HTTP endpoints directly.
+- For background on the product direction, see /about.

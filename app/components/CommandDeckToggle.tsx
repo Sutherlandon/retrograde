@@ -5,7 +5,7 @@ interface CommandDeckToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
-  ledColor: "green" | "blue" | "amber" | "red";
+  ledColor: "green" | "blue" | "amber" | "red" | "purple" | "cyan";
   labelExtra?: React.ReactNode;
 }
 
@@ -14,6 +14,8 @@ const toggleColorMap = {
   blue: "bg-blue-500",
   amber: "bg-amber-500",
   red: "bg-red-600",
+  purple: "bg-purple-500",
+  cyan: "bg-cyan-500",
 };
 
 export function CommandDeckToggle({ label, checked, onChange, disabled = false, ledColor, labelExtra }: CommandDeckToggleProps) {
@@ -28,6 +30,7 @@ export function CommandDeckToggle({ label, checked, onChange, disabled = false, 
         type="button"
         role="switch"
         aria-checked={checked}
+        disabled={disabled}
         onClick={() => !disabled && onChange(!checked)}
         className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none
           ${checked ? toggleColorMap[ledColor] : "bg-gray-300 dark:bg-gray-600"}

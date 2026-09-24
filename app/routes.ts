@@ -13,12 +13,17 @@ export default [
   /* Non-layout routes */
   route("/healthcheck", "routes/healthcheck.tsx"),
   route("/sitemap.xml", "routes/sitemap.ts"),
+  route("/og-card", "routes/og-card.tsx"),
 /* App Routes — require authentication */
   route("/app", "components/AppLayout.tsx", [
     route("dashboard", "routes/app/dashboard.tsx"),
     route("board/claim", "routes/app/board.claim.ts"),
     route("admin/dashboard", "routes/app/admin.dashboard.tsx"),
     route("admin/admins",   "routes/app/admin.admins.ts"),
+    route("crews", "routes/app/crews.tsx"),
+    route("crews/:id", "routes/app/crews.$id.tsx"),
+    route("billing/checkout", "routes/app/billing.checkout.ts"),
+    route("billing/portal", "routes/app/billing.portal.ts"),
   ]),
 
   /* Board Routes — authentication optional (anonymous access) */
@@ -33,12 +38,22 @@ export default [
     route("poll", "routes/app/board.poll.ts"),
     route("settings", "routes/app/board.settings.ts"),
     route("attachments", "routes/app/board.attachments.ts"),
+    route("facilitators", "routes/app/board.facilitators.ts"),
+    route("action-items", "routes/app/board.action-items.ts"),
   ]),
 
   /* Api Routes */
   route("/auth/login", "routes/auth/login.ts"),
   route("/auth/callback", "routes/auth/callback.ts"),
   route("/auth/logout", "routes/auth/logout.ts"),
+
+  /* JSON API — agent-facing */
+  route("/api/v1/boards", "routes/api/boards.ts"),
+  route("/api/v1/boards/:id", "routes/api/board.ts"),
+  route("/api/v1/boards/:id/notes", "routes/api/board.notes.ts"),
+  route("/api/v1/boards/:id/action-items", "routes/api/board.action-items.ts"),
+  route("/api/v1/cron/archive-stale", "routes/api/cron.archive-stale.ts"),
+  route("/api/stripe/webhook", "routes/api/stripe.webhook.ts"),
 
   // legacy route for backward compatibility
   route("/board/:id", "routes/app/board.legacy.tsx"),

@@ -1,31 +1,16 @@
 // routes/app/board.settings.ts
 // Resource route — no UI. Handles board settings mutations.
-// PATCH → update voting_enabled and voting_allowed
+// PATCH → update voting/lock/attribution settings (facilitators — ADR-0006)
 // POST  → clear all votes and likes (called before enabling voting)
 
 import { type ActionFunctionArgs } from "react-router";
-import { getOptionalUser } from "~/hooks/useAuth";
 import {
   updateBoardSettingsServer,
   clearBoardVotesServer,
   getBoardServer,
 } from "~/server/board_model";
-import { pool } from "~/server/db_config";
+import { requireFacilitator } from "~/server/board_permissions";
 import { logMetric } from "~/server/logger";
-
-async function requireOwner(request: Request, boardId: string) {
-  const user = await getOptionalUser(request);
-  if (!user) throw new Response("Unauthorized", { status: 401 });
-
-  const res = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, user.id]
-  );
-  if (res.rowCount === 0 || res.rows[0].role !== "owner") {
-    throw new Response("Forbidden", { status: 403 });
-  }
-  return user;
-}
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
@@ -35,31 +20,32 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   switch (request.method.toUpperCase()) {
     case "PATCH": {
-      const user = await requireOwner(request, boardId);
+      // The facilitator's id scopes the returned board in blind-brainstorm mode.
+      const viewerId = (await requireFacilitator(request, boardId))?.id;
       const votingEnabled = data.get("votingEnabled") === "true";
       const votingAllowed = Number(data.get("votingAllowed"));
       const votingScope = (data.get("votingScope") as string) || "board";
       const notesLocked = data.get("notesLocked") === "true";
       const boardLocked = data.get("boardLocked") === "true";
+      const attributionEnabled = data.get("attributionEnabled") === "true";
+      // Absent → keep the column visible (its default); only an explicit "false" hides it.
+      const actionItemsVisible = data.has("actionItemsVisible")
+        ? data.get("actionItemsVisible") === "true"
+        : true;
+      const hideOthersNotes = data.get("hideOthersNotes") === "true";
       if (isNaN(votingAllowed) || votingAllowed < 1) {
         throw new Response("Invalid votingAllowed", { status: 422 });
       }
-      logMetric("Update Board Settings", {
-        userId: user.id,
-        boardId,
-        votingEnabled,
-        notesLocked,
-        boardLocked,
-      });
-      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked });
+      logMetric("Update Board Settings", { userId: viewerId, boardId, votingEnabled, notesLocked, boardLocked });
+      return updateBoardSettingsServer(boardId, { votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, hideOthersNotes }, viewerId);
     }
 
     case "POST": {
       // Clear all votes/likes — called when enabling voting to wipe existing likes
-      const user = await requireOwner(request, boardId);
+      const viewerId = (await requireFacilitator(request, boardId))?.id;
+      logMetric("Clear Board Votes", { userId: viewerId, boardId });
       await clearBoardVotesServer(boardId);
-      logMetric("Clear Board Votes", { userId: user.id, boardId });
-      return getBoardServer(boardId);
+      return getBoardServer(boardId, viewerId);
     }
 
     default:

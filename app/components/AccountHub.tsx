@@ -2,18 +2,21 @@ import { useState, useRef, useEffect } from 'react';
 import { MoonIcon, SunIcon, UserIcon, ComputerIcon } from '~/images/icons';
 import { useTheme } from '~/hooks/useTheme';
 import Button from './Button';
-import { siteConfig } from '~/config/siteConfig';
 
 interface AccountHubProps {
   user?: {
     id: string;
     username: string;
   };
-  isAdmin?: boolean;
   closeMenu?: () => void;
+  /** HIDE_LOGOUT (ADR-0017): an SSO deployment that signs users straight back
+   *  in hides logout, since the button would only bounce them. */
+  hideLogout: boolean;
+  /** Restyles the account button for a page with its own palette. */
+  buttonClassName?: string;
 }
 
-export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps) {
+export default function AccountHub({ user, closeMenu, hideLogout, buttonClassName }: AccountHubProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -59,7 +62,7 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
           color='secondary'
           text={user?.username}
           icon={<UserIcon size="md" />}
-          className="px-4 py-2"
+          className={`px-4 py-2 ${buttonClassName ?? ""}`}
           aria-expanded={open}
           aria-haspopup="menu"
         />
@@ -71,7 +74,7 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
           color='secondary'
           text={"Log In"}
           icon={<UserIcon size="md" />}
-          className="px-4 py-2"
+          className={`px-4 py-2 ${buttonClassName ?? ""}`}
         />
       )}
 
@@ -84,25 +87,6 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
         role="menu"
       >
         <div className="py-4 px-2 flex flex-col gap-2">
-          {/* Dashboard Link */}
-          <Button
-            as="a"
-            href="/app/dashboard"
-            variant="text"
-            text="Dashboard"
-            className="w-full justify-start"
-            onClick={() => setOpen(false)}
-          />
-          {isAdmin && (
-            <Button
-              as="a"
-              href="/app/admin/dashboard"
-              variant="text"
-              text="Admin Dashboard"
-              className="w-full justify-start"
-              onClick={() => setOpen(false)}
-            />
-          )}
           <div className="inline-flex justify-between items-center w-full px-4 py-2">
             <div className="text-sm font-semibold mr-1">
               Theme
@@ -128,7 +112,7 @@ export default function AccountHub({ user, isAdmin, closeMenu }: AccountHubProps
           </div>
 
           {/* Log Out */}
-          {!siteConfig.dashboardHome &&
+          {!hideLogout &&
             <>
               <div className="border-t border-gray-200 dark:border-gray-700" />
               <Button

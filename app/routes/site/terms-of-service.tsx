@@ -1,4 +1,5 @@
 import type { MetaFunction } from "react-router";
+import LegalPage from "~/components/landing/LegalPage";
 export const meta: MetaFunction = () => {
   return [
     { title: "Terms of Service | Retrograde" },
@@ -20,12 +21,7 @@ export const meta: MetaFunction = () => {
 
 export default function TermsOfService() {
   return (
-    <main className="prose prose-neutral max-w-3xl mx-auto px-4 py-12">
-        <h1>Terms of Service</h1>
-        <p className="text-sm text-muted-foreground">
-          Last updated: 01/01/2026
-        </p>
-
+    <LegalPage title="Terms of Service" updated="01/01/2026">
         <p>
           Welcome to <strong>Retrograde</strong>. By accessing or using this website
           or application, you agree to the following terms. If you do not agree,
@@ -101,6 +97,6 @@ export default function TermsOfService() {
           Questions? Email{" "}
           <a href="mailto:support@retrograde.sh">support@retrograde.sh</a>.
         </p>
-    </main>
+    </LegalPage>
   );
 }

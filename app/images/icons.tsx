@@ -497,6 +497,25 @@ export function CheckIcon({ size = 'md', className = '' }: IconProps) {
   );
 }
 
+export function CheckCircleFilledIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg
+      data-icon="check-circle-filled"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={`${sizeMap[size]} ${className}`}
+    >
+      {/* A solid disc with the check cut out of it */}
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.7 7.7a1 1 0 0 0-1.4-1.4L10.5 13.1l-1.8-1.8a1 1 0 0 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4 0l5.5-5.5z"
+      />
+    </svg>
+  );
+}
+
 export function TableIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg
@@ -514,6 +533,14 @@ export function TableIcon({ size = 'md', className = '' }: IconProps) {
       <line x1="3" y1="15" x2="21" y2="15" />
       <line x1="9" y1="3" x2="9" y2="21" />
       <line x1="15" y1="3" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+export function ColumnsIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125Z" />
     </svg>
   );
 }
@@ -756,6 +783,66 @@ export function SearchIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
       <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+    </svg>
+  );
+}
+
+export function LockIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </svg>
+  );
+}
+
+// ADR-0013: billing nav row — a bare $ glyph, deliberately no coin/circle
+// outline, reads as "money" at a glance without adding a second shape to
+// parse at nav-row size.
+export function DollarIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    // Cropped to the glyph's own bounding box (4.5,4.5 to 19.5,19.5), not the
+    // full 0-24 canvas: without the coin circle, the bare $ only fills about
+    // a quarter of the default viewBox width, rendering visibly smaller and
+    // thinner-stroked than every other nav icon at the same w-5 h-5 box.
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="4.5 4.5 15 15" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33" />
+    </svg>
+  );
+}
+
+// BRD-020: planted-flag glyph (pole + pennant) used on the claim controls.
+export function FlagIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5" />
+    </svg>
+  );
+}
+
+export function RobotIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`${sizeMap[size]} ${className}`}
+    >
+      {/* Antenna */}
+      <path d="M12 3v2" />
+      <circle cx="12" cy="2.5" r="0.75" fill="currentColor" stroke="none" />
+      {/* Head */}
+      <rect x="4.5" y="6" width="15" height="12" rx="2.5" />
+      {/* Eyes */}
+      <circle cx="9" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="12" r="1.25" fill="currentColor" stroke="none" />
+      {/* Mouth */}
+      <path d="M9.5 15.5h5" />
+      {/* Side bolts */}
+      <path d="M2.5 11v2M21.5 11v2" />
     </svg>
   );
 }

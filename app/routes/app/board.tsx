@@ -8,8 +8,10 @@ import Board from "~/components/Board";
 import { getBoardServer, stopTimerServer } from "~/server/board_model";
 import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
+import { requireBoardAccess } from "~/server/board_permissions";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
+import { isExampleBoardId } from "~/example-data/example_board_ids";
 
 export const meta = ({ data }: MetaArgs) => {
   const board = data as { title?: string } | undefined;
@@ -23,11 +25,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Board ID Missing", { status: 400 });
   }
 
-  // Example / read-only boards — no DB needed
-  if (board_id === "example-board") return exampleBoardTutorial;
-  if (board_id === "example-board-real-world") return exampleBoardRealWorld;
-
+  // Resolve the caller before anything else. On a self-hosted instance this is
+  // what refuses a guest (ADR-0021) — and the example boards just below return
+  // before any access check, so it has to come first.
   const user = await getOptionalUser(request);
+
+  // Example / read-only boards — no board query needed (BRD-017)
+  if (isExampleBoardId(board_id)) {
+    return board_id === exampleBoardTutorial.id ? exampleBoardTutorial : exampleBoardRealWorld;
+  }
+
+  // Members-only crews restrict who can open their boards. Anonymous callers who
+  // might be members are sent to log in; registered non-members get a 403.
+  await requireBoardAccess(request, board_id, { loginRedirect: true });
   const board = await getBoardServer(board_id, user?.id);
 
   if (!board) {

@@ -5,7 +5,7 @@ import debounce from "lodash.debounce";
 import { useBoard } from "../context/BoardContext";
 import { useOptionalUser } from "~/context/userContext";
 import type { Note } from "~/server/board.types";
-import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon } from "~/images/icons";
+import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, RobotIcon } from "~/images/icons";
 import Button from "./Button";
 
 export default function Note({
@@ -17,7 +17,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked } = useBoard();
+  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -120,19 +120,42 @@ export default function Note({
       className={`${noteColor} text-slate-900 rounded-md p-2 mb-2 shadow-md/20 text-xs w-[47%] max-w-[15rem] min-h-[6rem] ${notesLocked || boardLocked ? "cursor-default" : "cursor-grab touch-none"}`}
     >
       {isEditing ? (
-        <textarea
-          className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={saveNote}
-          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
-          autoFocus
-        />
+        <div className="flex flex-col gap-1">
+          {/* While composing a new note with attribution on, preview the name
+              that will be attached so the author knows it won't be anonymous. */}
+          {attributionEnabled && note.is_new && user && (
+            <div
+              data-testid="note-author-preview"
+              className="text-[10px] text-slate-600 flex items-center gap-1"
+              title="This note will be attributed to you"
+            >
+              <span>{user.username}</span>
+            </div>
+          )}
+          <textarea
+            className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={saveNote}
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
+            autoFocus
+          />
+        </div>
       ) : (
         <div
           className="flex flex-col gap-2 justify-between h-full"
           onDoubleClick={() => { if (!notesLocked && !boardLocked) setIsEditing(true); }}
         >
+          {note.author && (
+            <div
+              data-testid="note-author"
+              className={`text-[10px] flex items-center gap-1 ${note.author.is_agent ? "text-blue-700" : "text-slate-600"}`}
+              title={note.author.is_agent ? `Suggested by ${note.author.display_name} (AI agent)` : `by ${note.author.display_name}`}
+            >
+              {note.author.is_agent && <span aria-hidden="true" className="inline-flex"><RobotIcon size="xs" /></span>}
+              <span>{note.author.display_name}</span>
+            </div>
+          )}
           <div className="flex-1 whitespace-pre-wrap">
             {note.text}
           </div>

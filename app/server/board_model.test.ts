@@ -46,9 +46,15 @@ describe("updateColumnPromptServer", () => {
 });
 
 describe("duplicateBoardServer", () => {
-  it("creates a new board with '(copy)' suffix and copies columns", async () => {
+  it("creates a new board with '(copy)' suffix and copies columns [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
+    // SELECT role (ownership check, via pool.query — before the transaction)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] });
+    // SELECT team_id (original board's crew)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "team-orig" }] });
+    // SELECT 1 FROM team_members (caller is a member of the original's crew)
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] });
     // BEGIN
     mockQuery.mockResolvedValueOnce({});
     // SELECT title + voting settings
@@ -85,10 +91,14 @@ describe("duplicateBoardServer", () => {
     expect(insertBoardCall[0]).toContain("INSERT INTO boards");
     expect(insertBoardCall[1][1]).toBe("Sprint 1 (copy)");
 
+    // Verify it landed on the original's crew, closed to open facilitation
+    expect(insertBoardCall[1][3]).toBe("team-orig"); // team_id
+    expect(insertBoardCall[1][4]).toBe(false);       // open_facilitation
+
     // Verify voting settings were copied
-    expect(insertBoardCall[1][3]).toBe(true);     // voting_enabled
-    expect(insertBoardCall[1][4]).toBe(3);        // voting_allowed
-    expect(insertBoardCall[1][5]).toBe("column"); // voting_scope
+    expect(insertBoardCall[1][5]).toBe(true);     // voting_enabled
+    expect(insertBoardCall[1][6]).toBe(3);        // voting_allowed
+    expect(insertBoardCall[1][7]).toBe("column"); // voting_scope
 
     // Verify owner membership
     const insertMemberCall = mockQuery.mock.calls[3];
@@ -112,9 +122,12 @@ describe("duplicateBoardServer", () => {
     expect(mockRelease).toHaveBeenCalled();
   });
 
-  it("throws and rolls back when board is not found", async () => {
+  it("throws and rolls back when board is not found [DASH-006]", async () => {
     const { duplicateBoardServer } = await import("./board_model");
 
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "team-orig" }] }); // original team_id
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // caller is a member of it
     mockQuery.mockResolvedValueOnce({}); // BEGIN
     mockQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // SELECT title - not found
     mockQuery.mockResolvedValueOnce({}); // ROLLBACK
@@ -122,16 +135,128 @@ describe("duplicateBoardServer", () => {
     await expect(duplicateBoardServer("bad-id", "user-1")).rejects.toThrow("Board not found");
     expect(mockRelease).toHaveBeenCalled();
   });
+
+  it("throws and never opens a transaction when the caller is not the owner [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "facilitator" }] });
+
+    await expect(duplicateBoardServer("board-1", "user-2")).rejects.toThrow(
+      "Only the board owner can duplicate a board"
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it("throws when the caller is not a board member at all [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(duplicateBoardServer("board-1", "stranger")).rejects.toThrow(
+      "Only the board owner can duplicate a board"
+    );
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("copies into the original's crew when the caller is a member of it [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "crew-A" }] }); // original's crew
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{}] }); // caller is a member of crew-A
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Sprint 1", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("crew-A"); // team_id — the original's crew, not the caller's personal crew
+    expect(insertBoardCall[1][4]).toBe(false);    // open_facilitation
+  });
+
+  it("falls back to the personal crew when the caller is not a member of the original's crew [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: "crew-A" }] }); // original's crew
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // caller is NOT a member of crew-A
+    mockPoolQuery.mockResolvedValueOnce({ // getPersonalTeamForUser
+      rowCount: 1,
+      rows: [{ id: "personal-team-1", name: "Personal", is_personal: true, created_at: "2026-01-01" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Sprint 1", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("personal-team-1"); // fell back to caller's personal crew
+    expect(insertBoardCall[1][4]).toBe(false);             // open_facilitation
+  });
+
+  it("falls back to the personal crew when the original board is crewless [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: null }] }); // original is crewless
+    mockPoolQuery.mockResolvedValueOnce({ // getPersonalTeamForUser (no team_members lookup — origTeamId is null)
+      rowCount: 1,
+      rows: [{ id: "personal-team-2", name: "Personal", is_personal: true, created_at: "2026-01-01" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ title: "Anon board", voting_enabled: false, voting_allowed: 1, voting_scope: "board" }],
+    });
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member
+    mockQuery.mockResolvedValueOnce({ rows: [] }); // SELECT columns
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    await duplicateBoardServer("board-1", "user-1");
+
+    const insertBoardCall = mockQuery.mock.calls[2];
+    expect(insertBoardCall[1][3]).toBe("personal-team-2");
+  });
+
+  it("never produces team_id IS NULL — throws when no crew resolves [DASH-006]", async () => {
+    const { duplicateBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ team_id: null }] }); // original is crewless
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] }); // getPersonalTeamForUser finds none
+
+    await expect(duplicateBoardServer("board-1", "user-1")).rejects.toThrow(
+      "Could not resolve a crew for the duplicated board"
+    );
+    // Never opened a transaction, so it can never write a crewless board with an owner row.
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
 });
 
 describe("updateBoardSettingsServer", () => {
-  it("enables voting with a specified allowed vote count", async () => {
+  it("enables voting with a specified allowed vote count (DECK-008, DECK-009)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] }); // getBoardServer
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 3, votingScope: "board", notesLocked: false, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 3, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false });
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE boards");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_enabled");
@@ -139,7 +264,7 @@ describe("updateBoardSettingsServer", () => {
     expect(mockPoolQuery.mock.calls[0][0]).toContain("voting_scope");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("notes_locked");
     expect(mockPoolQuery.mock.calls[0][0]).toContain("board_locked");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 3, "board", false, false, false, true, false, "board-1"]);
   });
 
   it("disables voting", async () => {
@@ -148,31 +273,203 @@ describe("updateBoardSettingsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, false, "board-1"]);
   });
 
-  it("enables notes lock to prevent note editing during voting", async () => {
+  it("enables notes lock to prevent note editing during voting (DECK-015)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, votingScope: "board", notesLocked: true, boardLocked: false });
+    await updateBoardSettingsServer("board-1", { votingEnabled: true, votingAllowed: 5, votingScope: "board", notesLocked: true, boardLocked: false, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, 5, "board", true, false, false, true, false, "board-1"]);
   });
 
-  it("enables full board lock to prevent all modifications", async () => {
+  it("enables full board lock to prevent all modifications (DECK-016)", async () => {
     const { updateBoardSettingsServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({});
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
 
-    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: true });
+    await updateBoardSettingsServer("board-1", { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: true, attributionEnabled: false });
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, "board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, true, false, true, false, "board-1"]);
+  });
+
+  it("persists hide_others_notes and scopes the returned board to the viewer (DECK-013)", async () => {
+    const { updateBoardSettingsServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({}); // UPDATE boards
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] }); // getBoardServer
+
+    await updateBoardSettingsServer(
+      "board-1",
+      { votingEnabled: false, votingAllowed: 5, votingScope: "board", notesLocked: false, boardLocked: false, attributionEnabled: false, actionItemsVisible: true, hideOthersNotes: true },
+      "viewer-1"
+    );
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("hide_others_notes");
+    // hideOthersNotes true lands in the $8 slot, before the board id.
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([false, 5, "board", false, false, false, true, true, "board-1"]);
+    // The returned board is fetched scoped to the acting viewer (blind mode).
+    expect(mockPoolQuery.mock.calls[1][1]).toEqual(["board-1", "viewer-1"]);
+  });
+});
+
+describe("getBoardServer — blind brainstorm filtering", () => {
+  it("emits a per-viewer notes filter gated on hide_others_notes", async () => {
+    const { getBoardServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] });
+
+    await getBoardServer("board-1", "viewer-1");
+
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    // Notes are excluded unless blind mode is off OR the viewer authored them.
+    expect(sql).toContain("NOT b.hide_others_notes OR n.created_by = $2::uuid");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["board-1", "viewer-1"]);
+  });
+});
+
+describe("moveBoardsToTeamServer", () => {
+  it("moves owned boards to a team the user belongs to and returns moved ids (DASH-010, DASH-011)", async () => {
+    const { moveBoardsToTeamServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [{ id: "board-1" }, { id: "board-2" }],
+      rowCount: 2,
+    });
+
+    const moved = await moveBoardsToTeamServer(["board-1", "board-2"], "team-9", "user-1");
+
+    expect(moved).toEqual(["board-1", "board-2"]);
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("UPDATE boards");
+    expect(sql).toContain("board_members");
+    expect(sql).toContain("team_members");
+    expect(params).toEqual([["board-1", "board-2"], "team-9", "user-1"]);
+  });
+
+  // ADR-0022: only an owner can move a board, so every moved board is owned,
+  // and on an owned board open facilitation is the facilitator's choice. A
+  // move, onto a crew or off one, never changes it.
+  it("leaves open_facilitation alone when a board moves onto or off a crew", async () => {
+    const { moveBoardsToTeamServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValue({ rows: [{ id: "board-1" }], rowCount: 1 });
+
+    await moveBoardsToTeamServer(["board-1"], null, "user-1");
+    await moveBoardsToTeamServer(["board-1"], "team-9", "user-1");
+
+    for (const [sql] of mockPoolQuery.mock.calls) {
+      expect(sql).toContain("SET team_id = $2");
+      expect(sql).not.toContain("open_facilitation");
+    }
+  });
+
+  it("moves a board to no team (unassigned) with a null teamId", async () => {
+    const { moveBoardsToTeamServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
+
+    const moved = await moveBoardsToTeamServer(["board-1"], null, "user-1");
+
+    expect(moved).toEqual(["board-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([["board-1"], null, "user-1"]);
+  });
+
+  it("returns only the boards that were actually moved (ownership enforced in SQL)", async () => {
+    const { moveBoardsToTeamServer } = await import("./board_model");
+
+    // Only board-1 passes the ownership/membership guards
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
+
+    const moved = await moveBoardsToTeamServer(["board-1", "board-x"], "team-9", "user-1");
+    expect(moved).toEqual(["board-1"]);
+  });
+
+  it("returns an empty array without querying when given no ids", async () => {
+    const { moveBoardsToTeamServer } = await import("./board_model");
+    const moved = await moveBoardsToTeamServer([], "team-9", "user-1");
+    expect(moved).toEqual([]);
+    expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("countUnassignedBoardsForUser", () => {
+  it("counts active teamless boards the user owns", async () => {
+    const { countUnassignedBoardsForUser } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ count: 3 }], rowCount: 1 });
+
+    const count = await countUnassignedBoardsForUser("user-1");
+
+    expect(count).toBe(3);
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("team_id IS NULL");
+    expect(sql).toContain("archived_at IS NULL");
+    expect(sql).toContain("board_members");
+    expect(params).toEqual(["user-1"]);
+  });
+});
+
+describe("bulkDeleteBoardsServer", () => {
+  it("deletes only owned boards (notes, columns, members, board) in one transaction (DASH-012)", async () => {
+    const { bulkDeleteBoardsServer } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }, { id: "board-2" }], rowCount: 2 }); // owned ids
+    mockQuery.mockResolvedValueOnce({}); // DELETE notes
+    mockQuery.mockResolvedValueOnce({}); // DELETE columns
+    mockQuery.mockResolvedValueOnce({}); // DELETE board_members
+    mockQuery.mockResolvedValueOnce({}); // DELETE boards
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    const deleted = await bulkDeleteBoardsServer(["board-1", "board-2", "board-x"], "user-1");
+
+    expect(deleted).toEqual(["board-1", "board-2"]);
+    expect(mockQuery.mock.calls[0][0]).toBe("BEGIN");
+    expect(mockQuery.mock.calls[1][0]).toContain("board_members");
+    expect(mockQuery.mock.calls[1][1]).toEqual([["board-1", "board-2", "board-x"], "user-1"]);
+    expect(mockQuery.mock.calls[6][0]).toBe("COMMIT");
+    expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("commits without deleting when the user owns none of the boards", async () => {
+    const { bulkDeleteBoardsServer } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // owned ids — none
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    const deleted = await bulkDeleteBoardsServer(["board-x"], "user-1");
+
+    expect(deleted).toEqual([]);
+    // No delete statements between the ownership check and COMMIT
+    expect(mockQuery.mock.calls[2][0]).toBe("COMMIT");
+  });
+
+  it("rolls back on failure", async () => {
+    const { bulkDeleteBoardsServer } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "board-1" }], rowCount: 1 });
+    mockQuery.mockRejectedValueOnce(new Error("db down")); // DELETE notes fails
+    mockQuery.mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(bulkDeleteBoardsServer(["board-1"], "user-1")).rejects.toThrow("db down");
+    expect(mockQuery.mock.calls.at(-1)?.[0]).toBe("ROLLBACK");
+    expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("returns an empty array without touching the db when given no ids", async () => {
+    const { bulkDeleteBoardsServer } = await import("./board_model");
+    const deleted = await bulkDeleteBoardsServer([], "user-1");
+    expect(deleted).toEqual([]);
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 
@@ -227,7 +524,7 @@ describe("voteNoteServer", () => {
 });
 
 describe("archiveBoardServer", () => {
-  it("sets archived_at when the user is the board owner", async () => {
+  it("sets archived_at when the user is the board owner (DASH-008)", async () => {
     const { archiveBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
@@ -262,7 +559,7 @@ describe("archiveBoardServer", () => {
 });
 
 describe("unarchiveBoardServer", () => {
-  it("clears archived_at when the user is the board owner", async () => {
+  it("clears archived_at when the user is the board owner (DASH-009)", async () => {
     const { unarchiveBoardServer } = await import("./board_model");
 
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ role: "owner" }] }); // ownership check
@@ -286,8 +583,413 @@ describe("unarchiveBoardServer", () => {
   });
 });
 
+describe("facilitators", () => {
+  it("addFacilitatorServer upserts without demoting an owner", async () => {
+    const { addFacilitatorServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({});
+    await addFacilitatorServer("board-1", "user-2");
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("INSERT INTO board_members");
+    expect(call[0]).toContain("'facilitator'");
+    expect(call[0]).toContain("WHEN board_members.role = 'owner' THEN 'owner'");
+    expect(call[1]).toEqual(["board-1", "user-2"]);
+  });
+
+  it("removeFacilitatorServer only deletes facilitator rows", async () => {
+    const { removeFacilitatorServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({});
+    await removeFacilitatorServer("board-1", "user-2");
+    const call = mockPoolQuery.mock.calls[0];
+    expect(call[0]).toContain("role = 'facilitator'");
+    expect(call[1]).toEqual(["board-1", "user-2"]);
+  });
+
+  it("setOpenFacilitationServer updates the board flag and reports success", async () => {
+    const { setOpenFacilitationServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    const applied = await setOpenFacilitationServer("board-1", true);
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("SET open_facilitation");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual([true, "board-1"]);
+    expect(applied).toBe(true);
+  });
+
+  // ADR-0022: an ownerless (anonymous) board can never have facilitation
+  // closed, since no role would be left to reach the Command Deck. The guard
+  // lives in the WHERE clause so no caller can bypass it from the UI.
+  it("setOpenFacilitationServer refuses to close facilitation on an ownerless board, in SQL", async () => {
+    const { setOpenFacilitationServer } = await import("./board_model");
+    // Simulates the DB-side guard rejecting the write: 0 rows matched because
+    // the board has no owner row and the caller asked for open=false.
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 });
+    const applied = await setOpenFacilitationServer("ownerless-board", false);
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("role = 'owner'");
+    expect(applied).toBe(false);
+  });
+
+  it("setOpenFacilitationServer keys the guard on ownership, not on the board's crew", async () => {
+    const { setOpenFacilitationServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    const applied = await setOpenFacilitationServer("owned-crewless-board", false);
+    expect(mockPoolQuery.mock.calls[0][0]).not.toContain("team_id");
+    expect(applied).toBe(true);
+  });
+
+  it("listFacilitatorsServer returns owner first with usernames", async () => {
+    const { listFacilitatorsServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rows: [
+        { user_id: "u1", role: "owner", username: "landon" },
+        { user_id: "u2", role: "facilitator", username: "sam" },
+      ],
+    });
+    const rows = await listFacilitatorsServer("board-1");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("role IN ('owner', 'facilitator')");
+    expect(rows[0].role).toBe("owner");
+  });
+});
+
+describe("getBoardServer facilitation + action item fields", () => {
+  it("selects canFacilitate, openFacilitation, and actionItems in the board JSON", async () => {
+    const { getBoardServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [], actionItems: [] } }],
+    });
+    await getBoardServer("board-1", "user-1");
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("'canFacilitate'");
+    expect(sql).toContain("'openFacilitation', b.open_facilitation");
+    expect(sql).toContain("'actionItems'");
+    expect(sql).toContain("FROM action_items ai");
+    expect(sql).toContain("bm2.role IN ('owner', 'facilitator')");
+    // Crew name for the board title tag
+    expect(sql).toContain("'team_name'");
+    expect(sql).toContain("MAX(t.name)");
+    expect(sql).toContain("LEFT JOIN teams t ON t.id = b.team_id");
+  });
+
+  // BRD-020: the claim button on the board needs to know whether an owner
+  // row exists at all — independent of the viewer's own relationship to it.
+  it("selects hasOwner as whether any owner row exists on the board", async () => {
+    const { getBoardServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [], actionItems: [] } }],
+    });
+    await getBoardServer("board-1", null);
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("'hasOwner'");
+    expect(sql).toContain("bm.role = 'owner'");
+  });
+});
+
+describe("createBoard", () => {
+  // GAP-002: the model is "owner row iff the board is on a crew." Anonymous
+  // (crewless) boards must have no owner and open_facilitation TRUE, or
+  // tier 1 loses the Command Deck entirely — see the paragraph after the
+  // Gaps table in docs/spec/0001-action-registry.md.
+  it("writes no owner row and open_facilitation TRUE for a crewless board", async () => {
+    const { createBoard } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoard("Trial Board", "user-1", null);
+
+    const memberInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO board_members")
+    );
+    expect(memberInserts).toHaveLength(0);
+
+    const boardInsert = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO boards")
+    );
+    expect(boardInsert![0]).toContain("open_facilitation");
+    expect(boardInsert![1]).toEqual(expect.arrayContaining([true]));
+  });
+
+  it("writes an owner row and open_facilitation FALSE for a crew board", async () => {
+    const { createBoard } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoard("Crew Board", "user-1", "team-x");
+
+    const memberInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO board_members")
+    );
+    expect(memberInserts).toHaveLength(1);
+
+    const boardInsert = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO boards")
+    );
+    expect(boardInsert![0]).toContain("open_facilitation");
+    expect(boardInsert![1]).toEqual(expect.arrayContaining([false]));
+  });
+
+  it("seeds the default retro columns", async () => {
+    const { createBoard } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoard("Plain Retro", "user-1", null);
+
+    const inserted = mockQuery.mock.calls
+      .filter((c) => typeof c[0] === "string" && c[0].includes("INSERT INTO columns"))
+      .map((c) => c[1][2]);
+    expect(inserted).toEqual([
+      "What went well?",
+      "What can we do better?",
+    ]);
+  });
+});
+
+describe("createBoardWithColumns", () => {
+  it("creates a board with caller-supplied custom columns in order", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({}); // INSERT board
+    mockQuery.mockResolvedValueOnce({}); // INSERT board_member (owner)
+    mockQuery.mockResolvedValueOnce({}); // INSERT column 0
+    mockQuery.mockResolvedValueOnce({}); // INSERT column 1
+    mockQuery.mockResolvedValueOnce({}); // INSERT column 2
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+
+    // On a crew ("team-x") so the owner row is expected — see the
+    // GAP-002 tests below for the crewless (ownerless) case.
+    const id = await createBoardWithColumns(
+      "Roadmap H2",
+      [
+        { title: "Backend" },
+        { title: "Frontend", prompt: "User-visible work" },
+        { title: "Out of scope" },
+      ],
+      "agent-user-1",
+      "team-x"
+    );
+
+    expect(typeof id).toBe("string");
+    expect(id).toHaveLength(36);
+
+    // Board insert: title is the second positional arg
+    expect(mockQuery.mock.calls[1][0]).toContain("INSERT INTO boards");
+    expect(mockQuery.mock.calls[1][1][1]).toBe("Roadmap H2");
+
+    // Member insert: agent is owner
+    expect(mockQuery.mock.calls[2][0]).toContain("INSERT INTO board_members");
+    expect(mockQuery.mock.calls[2][0]).toContain("owner");
+
+    // Column inserts: titles in order, with prompts respected
+    expect(mockQuery.mock.calls[3][1][2]).toBe("Backend");
+    expect(mockQuery.mock.calls[3][1][3]).toBe(0);
+    expect(mockQuery.mock.calls[3][1][4]).toBe("");
+    expect(mockQuery.mock.calls[4][1][2]).toBe("Frontend");
+    expect(mockQuery.mock.calls[4][1][4]).toBe("User-visible work");
+    expect(mockQuery.mock.calls[5][1][2]).toBe("Out of scope");
+
+    // Final COMMIT
+    expect(mockQuery.mock.calls[6][0]).toBe("COMMIT");
+    expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("falls back to default retro columns when called with an empty array", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValue({}); // any number of calls return empty
+
+    await createBoardWithColumns("Plain Retro", [], "user-1");
+
+    const inserted = mockQuery.mock.calls
+      .filter((c) => typeof c[0] === "string" && c[0].includes("INSERT INTO columns"))
+      .map((c) => c[1][2]);
+    expect(inserted).toEqual([
+      "What went well?",
+      "What can we do better?",
+    ]);
+  });
+
+  it("skips the board_members row when userId is null", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Ownerless", [{ title: "A" }], null);
+
+    const memberInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO board_members")
+    );
+    expect(memberInserts).toHaveLength(0);
+  });
+
+  // GAP-002: owner row iff teamId IS NOT NULL — a crewless board is ownerless
+  // even when a userId is given, because it must stay claimable (BRD-020).
+  it("skips the board_members row when teamId is null, even with a userId (crewless boards are ownerless)", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Trial Board", [{ title: "A" }], "user-1", null);
+
+    const memberInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO board_members")
+    );
+    expect(memberInserts).toHaveLength(0);
+  });
+
+  it("inserts the board_members owner row when teamId is given", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Crew Board", [{ title: "A" }], "user-1", "team-x");
+
+    const memberInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO board_members")
+    );
+    expect(memberInserts).toHaveLength(1);
+    expect(memberInserts[0][1]).toEqual([expect.any(String), "user-1"]);
+    expect(memberInserts[0][0]).toContain("'owner'");
+  });
+
+  it("sets open_facilitation TRUE at insert time for a crewless board", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Trial Board", [{ title: "A" }], "user-1", null);
+
+    const boardInsert = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO boards")
+    );
+    expect(boardInsert![0]).toContain("open_facilitation");
+    expect(boardInsert![1]).toEqual(expect.arrayContaining([true]));
+  });
+
+  it("sets open_facilitation FALSE at insert time for a crew board", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Crew Board", [{ title: "A" }], "user-1", "team-x");
+
+    const boardInsert = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO boards")
+    );
+    expect(boardInsert![0]).toContain("open_facilitation");
+    expect(boardInsert![1]).toEqual(expect.arrayContaining([false]));
+  });
+
+  it("threads teamId into the boards INSERT (null = trial pool, uuid = team-owned)", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValue({});
+
+    await createBoardWithColumns("Team Board", [{ title: "X" }], "user-1", "team-acme");
+
+    const boardInsert = mockQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO boards")
+    );
+    expect(boardInsert).toBeDefined();
+    expect(boardInsert![1]).toEqual(["team-acme", "Team Board", "user-1", "team-acme"].slice(0).length
+      ? expect.arrayContaining(["Team Board", "user-1", "team-acme"]) : []);
+  });
+
+  it("rolls back when an insert fails", async () => {
+    const { createBoardWithColumns } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockRejectedValueOnce(new Error("constraint violation"));
+    mockQuery.mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(
+      createBoardWithColumns("X", [{ title: "A" }], "u")
+    ).rejects.toThrow("constraint violation");
+    expect(mockQuery.mock.calls.some((c) => c[0] === "ROLLBACK")).toBe(true);
+    expect(mockRelease).toHaveBeenCalled();
+  });
+});
+
+describe("bulkInsertNotesServer", () => {
+  it("inserts notes into validated columns and continues note_order from existing max", async () => {
+    const { bulkInsertNotesServer } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "col-a" }, { id: "col-b" }] }); // SELECT id FROM columns
+    mockQuery.mockResolvedValueOnce({ rows: [{ next: 3 }] }); // max+1 for col-a (existing 2 -> next 3)
+    mockQuery.mockResolvedValueOnce({ rows: [{ next: 0 }] }); // max+1 for col-b (empty)
+    mockQuery.mockResolvedValueOnce({}); // INSERT note 1
+    mockQuery.mockResolvedValueOnce({}); // INSERT note 2
+    mockQuery.mockResolvedValueOnce({}); // INSERT note 3
+    mockQuery.mockResolvedValueOnce({}); // COMMIT
+    // getBoardServer at the end
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [] } }],
+    });
+
+    const result = await bulkInsertNotesServer(
+      "board-1",
+      [
+        { columnId: "col-a", text: "first" },
+        { columnId: "col-a", text: "second" },
+        { columnId: "col-b", text: "third" },
+      ],
+      "agent-1"
+    );
+
+    // Note inserts: col-a starts at 3, col-b at 0
+    const noteInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO notes")
+    );
+    expect(noteInserts).toHaveLength(3);
+    expect(noteInserts[0][1][1]).toBe("col-a");
+    expect(noteInserts[0][1][2]).toBe("first");
+    expect(noteInserts[0][1][4]).toBe(3); // note_order
+    expect(noteInserts[1][1][4]).toBe(4); // next in col-a
+    expect(noteInserts[2][1][1]).toBe("col-b");
+    expect(noteInserts[2][1][4]).toBe(0); // first in col-b
+
+    expect(result).toBeTruthy();
+    expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("rejects the whole batch when a columnId does not belong to the board", async () => {
+    const { bulkInsertNotesServer } = await import("./board_model");
+
+    mockQuery.mockResolvedValueOnce({}); // BEGIN
+    mockQuery.mockResolvedValueOnce({ rows: [{ id: "col-a" }] }); // SELECT only finds col-a
+    mockQuery.mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(
+      bulkInsertNotesServer(
+        "board-1",
+        [
+          { columnId: "col-a", text: "ok" },
+          { columnId: "col-bad", text: "no" },
+        ],
+        "user-1"
+      )
+    ).rejects.toThrow(/COLUMN_NOT_ON_BOARD/);
+
+    const noteInserts = mockQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && c[0].includes("INSERT INTO notes")
+    );
+    expect(noteInserts).toHaveLength(0);
+    expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it("returns the current board state without inserting when given an empty array", async () => {
+    const { bulkInsertNotesServer } = await import("./board_model");
+
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [] } }],
+    });
+
+    const result = await bulkInsertNotesServer("board-1", [], "user-1");
+    expect(result).toBeTruthy();
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+});
+
 describe("deleteBoardServer", () => {
-  it("deletes board and all related data when user is owner", async () => {
+  it("deletes board and all related data when user is owner (DASH-007)", async () => {
     const { deleteBoardServer } = await import("./board_model");
 
     mockQuery.mockResolvedValueOnce({}); // BEGIN
@@ -339,5 +1041,44 @@ describe("deleteBoardServer", () => {
       "Only the board owner can delete a board"
     );
     expect(mockRelease).toHaveBeenCalled();
+  });
+});
+
+describe("listVisibleBoards", () => {
+  it("lists active, user-visible boards ordered by the given expression", async () => {
+    const { listVisibleBoards } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "b1", title: "Retro", role: "owner" }] });
+
+    const rows = await listVisibleBoards("user-1", { order: "updated_at DESC" });
+
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("archived_at IS NULL");
+    expect(sql).toContain("team_members");                 // dashboard-wide visibility clause
+    expect(sql).toContain("ORDER BY updated_at DESC");
+    expect(sql).toContain("COALESCE(bm.role, 'team')");
+    expect(params).toEqual(["user-1"]);
+    expect(rows).toEqual([{ id: "b1", title: "Retro", role: "owner" }]);
+  });
+
+  it("scopes to a single crew's boards when teamId is given (no visibility clause)", async () => {
+    const { listVisibleBoards } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+    await listVisibleBoards("user-1", { teamId: "t9", order: "created_at DESC" });
+
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("AND b.team_id = $2");
+    expect(sql).not.toContain("team_members");
+    expect(params).toEqual(["user-1", "t9"]);
+  });
+
+  it("lists archived boards when archived is true", async () => {
+    const { listVisibleBoards } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [] });
+
+    await listVisibleBoards("user-1", { archived: true, order: "title ASC" });
+
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("archived_at IS NOT NULL");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("ORDER BY title ASC");
   });
 });

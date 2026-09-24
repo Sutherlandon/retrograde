@@ -135,12 +135,12 @@ function ImagePreviewModal({
 
 function ImageCard({
   attachment,
-  isOwner,
+  canFacilitate,
   onDelete,
   onImageClick,
 }: {
   attachment: Attachment;
-  isOwner: boolean;
+  canFacilitate: boolean;
   onDelete: () => void;
   onImageClick: () => void;
 }) {
@@ -161,7 +161,7 @@ function ImageCard({
       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
         {attachment.filename}
       </p>
-      {isOwner && (
+      {canFacilitate && (
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -181,11 +181,11 @@ function ImageCard({
 
 function LinkItem({
   attachment,
-  isOwner,
+  canFacilitate,
   onDelete,
 }: {
   attachment: Attachment;
-  isOwner: boolean;
+  canFacilitate: boolean;
   onDelete: () => void;
 }) {
   return (
@@ -197,7 +197,7 @@ function LinkItem({
     >
       <FileTypeBadge filename={attachment.filename} />
       <span className="text-sm truncate flex-1">{attachment.filename}</span>
-      {isOwner && (
+      {canFacilitate && (
         <button
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); }}
@@ -216,7 +216,7 @@ function LinkItem({
 // ---------------------------------------------------------------------------
 
 export function AttachmentsList() {
-  const { attachments, isOwner, deleteAttachment } = useBoard();
+  const { attachments, canFacilitate, deleteAttachment } = useBoard();
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
   const [previewImage, setPreviewImage] = useState<Attachment | null>(null);
 
@@ -242,7 +242,7 @@ export function AttachmentsList() {
             <ImageCard
               key={attachment.id}
               attachment={attachment}
-              isOwner={isOwner}
+              canFacilitate={canFacilitate}
               onDelete={() => setDeleteTarget(attachment)}
               onImageClick={() => setPreviewImage(attachment)}
             />
@@ -256,7 +256,7 @@ export function AttachmentsList() {
             <LinkItem
               key={attachment.id}
               attachment={attachment}
-              isOwner={isOwner}
+              canFacilitate={canFacilitate}
               onDelete={() => setDeleteTarget(attachment)}
             />
           ))}

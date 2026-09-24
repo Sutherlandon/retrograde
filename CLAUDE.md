@@ -38,15 +38,24 @@ Wire domains together with minimal integration points at the top level. Avoid cr
 
 ### 5. Centralized Configuration
 
-All environment variables must be **defined, validated, and loaded in one place at startup** (`app/server/db_config.ts`, `app/config/siteConfig.ts`). If a required variable is missing, the app must fail loudly at startup with a clear error — not silently at runtime.
+All environment variables must be **defined, validated, and loaded in one place at startup** (`app/server/db_config.ts`). If a required variable is missing, the app must fail loudly at startup with a clear error — not silently at runtime.
+
+Anything that varies by deployment — hosted or self-hosted, logout visibility, the OIDC username claim, branding — is an environment variable, never a source edit a customer has to carry through upgrades (ADR-0017). Values the browser needs reach it as props from the layout loaders; `process.env` does not exist on the client.
 
 Never scatter `process.env` references throughout the codebase. Import config values from the config modules.
 
 ### 6. Decision Logs
 
-Maintain a record of key decisions, current project state, and progress in `plan/`. Before starting a significant feature or refactor, note the approach and rationale. This allows new sessions to resume context without re-explaining the problem.
+`docs/` records **where the project is** and **why it is that way**. It does not record how it got there — git has the history, and a narrative archive quietly contradicts the docs that are current.
 
-When completing a meaningful change, update or create a brief note in `plan/` describing what was done and why.
+Before starting a significant feature or refactor, write a plan. When it lands, fold anything durable into the records below and delete the plan.
+
+**Four kinds of record:**
+
+- **`docs/STATE.md`** — the "what's where right now" snapshot: current pulse, known gaps, gotchas. Edit freely.
+- **`docs/spec/0001-action-registry.md`** — every action in the product, who may take it, what enforces that, and whether a test proves it. Update it whenever you add, remove, or re-gate an action.
+- **`docs/plans/`** — one unfinished feature or refactor. Disposable: deleted when the work merges. See `docs/plans/README.md`.
+- **`docs/adr/`** — Architecture Decision Records. Long-memory documents capturing decisions that shape the architecture or product direction. Use ADRs when a decision is hard to reverse, shapes future work, has non-obvious rejected alternatives, or might otherwise be challenged without context. Read `docs/adr/README.md` for the convention. **Never edit an accepted ADR's substance** — supersede it with a new ADR that references the old one.
 
 ### 7. Keep Secrets Secret
 
@@ -76,7 +85,7 @@ app/
 ├── hooks/            # Custom React hooks (useAuth, useTheme)
 ├── server/           # Backend server code & PostgreSQL models
 ├── utils/            # Helper functions (exportBoard CSV/Markdown)
-├── config/           # App config (siteConfig, db_config)
+├── config/           # Product constants (grandfather.ts); deployment config is env, read in server/db_config.ts
 ├── images/           # SVG icon components
 ├── example-data/     # Sample boards for onboarding/tutorials
 ├── root.tsx          # Root layout & error boundary
@@ -84,7 +93,7 @@ app/
 ├── session.server.ts # Session cookie management
 └── features.ts       # Feature flags
 public/               # Static assets (icons, PDFs)
-plan/                 # Feature planning documents
+docs/                 # Decision log, project state, feature planning
 ```
 
 ---
@@ -116,19 +125,68 @@ OAUTH_TOKEN_URL=
 OAUTH_USERINFO_URL=
 OAUTH_REDIRECT_URI=http://localhost:3000/auth/callback
 OAUTH_SCOPES=openid profile email
+# Optional — where logout sends the browser: an http(s) URL (e.g. the IdP's
+# end-session endpoint) or a path. Default "/".
+OAUTH_LOGOUT_REDIRECT_URL=
 
 # Session (required)
 SESSION_SECRET=
 
-# Database — use DATABASE_URL OR the individual PG_* vars
+# Database (required) — DATABASE_URL, OR all four PG_* vars (not both). The
+# connection uses TLS with the server certificate verified whenever NODE_ENV is
+# not development; sslmode=disable / ssl=false in the URL are refused there
+# (ADR-0018). A private CA goes in the URL as sslrootcert=/path/to/ca.pem.
 DATABASE_URL=
 PG_HOST=
 PG_USER=
 PG_PASSWORD=
 PG_SCHEMA=
+
+# Cron (required on the hosted service; refused when SELF_HOSTED=true) — bearer
+# secret for /api/v1/cron/archive-stale. Vercel's scheduler sends it
+# automatically as an Authorization header, and invokes the path with GET. A
+# self-hosted instance runs no scheduled cleanup (ADR-0020).
+CRON_SECRET=
+
+# Deployment mode (optional) — ADR-0016, ADR-0017. Unset or "false" is the
+# hosted service. "true" is a self-hosted instance: every account is tier 3,
+# there are no guests (everyone signs in; ADR-0021), billing does not exist,
+# the dashboard is home with no marketing site, and the Stripe variables below
+# must NOT be set. Any other value refuses to boot.
+SELF_HOSTED=
+
+# Hosting presentation (optional) — ADR-0017. Configured here so a deployment
+# never edits code. HIDE_LOGOUT=true hides logout, for SSO that signs users
+# straight back in. OAUTH_USERNAME_FIELD is the stored profile field shown as
+# the username: preferred_username (default), email, name, given_name or
+# family_name. A site logo needs all three SITE_LOGO_* values or none; the
+# URLs must be reachable from users' browsers.
+HIDE_LOGOUT=
+OAUTH_USERNAME_FIELD=
+SITE_LOGO_LIGHT_URL=
+SITE_LOGO_DARK_URL=
+SITE_LOGO_ALT=
+
+# Stripe (required on the hosted service; refused when SELF_HOSTED=true) —
+# ADR-0013. A RESTRICTED key (rk_…), never the account secret key; the webhook
+# signing secret; the id of the single monthly Price.
+STRIPE_RESTRICTED_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_ID=
+
+# Admin (required) — comma-separated OAuth sub values (users.external_id) of
+# the site admins. At least one.
+SITE_ADMIN_IDS=
+
+# Server (optional) — PORT is read by react-router-serve; validated as 1–65535.
+PORT=
 ```
 
-`NODE_ENV=production` auto-enables SSL on the database connection.
+Every variable marked required is read through `requireEnv()` in `app/server/db_config.ts`, which exits the process with a clear message if it is missing — in every environment, including local dev. `npm run dev` will not boot without all of them. The Stripe variables and `CRON_SECRET` are the mode-dependent set: required unless `SELF_HOSTED=true`, and refused when it is (ADR-0016, ADR-0020). Optional variables are validated the same way: a malformed value exits at startup. Nothing warns and carries on (ADR-0018).
+
+`NODE_ENV` must be `development`, `production` or `test`. Anything but `development` requires TLS to the database with the certificate verified, so `npm start` against a local Postgres without TLS will not connect — use `npm run dev` locally. `production`, the default under `npm start`, also marks the session cookie `Secure`, so production needs HTTPS.
+
+Self-hosting is documented for operators in [`README.md`](README.md). Where the hosted service runs — providers, its four environments, and which secret comes from which dashboard — is [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
 
 ---
 
@@ -289,9 +347,8 @@ docker run -p 3000:3000 --env-file .env retrograde
 | `app/context/BoardContext.tsx` | Board state management (central hub) |
 | `app/server/board_model.ts` | All board-related SQL queries |
 | `app/server/db_init.ts` | Schema initialization (run on startup) |
-| `app/server/db_config.ts` | Database connection pool |
+| `app/server/db_config.ts` | Database pool and every environment variable, validated at startup |
 | `app/server/board.types.ts` | Shared type definitions (4-layer system) |
-| `app/config/siteConfig.ts` | OAuth field mapping, logo, branding |
 | `app/components/CommandDeck.tsx` | Facilitator control panel UI |
 | `vite.config.ts` | Vite + React Router + Tailwind plugin config |
 | `react-router.config.ts` | SSR enabled |
@@ -308,7 +365,8 @@ docker run -p 3000:3000 --env-file .env retrograde
 - Do not commit `.env` files or hardcode any secret in source code.
 - Do not collapse the 4-layer type system in `board.types.ts`.
 - Do not add migration files — schema changes go in `db_init.ts` as idempotent DDL.
-- Do not scatter `process.env` references — read config from `app/server/db_config.ts` or `app/config/siteConfig.ts`.
+- Do not scatter `process.env` references — read config from `app/server/db_config.ts`.
+- Do not make a deployment edit source to configure itself — add an environment variable (ADR-0017).
 - Do not write functions longer than 150 lines — break them up.
 - Do not ship a feature without a corresponding test.
 - Do not introduce a new language without strong justification — default to TypeScript.

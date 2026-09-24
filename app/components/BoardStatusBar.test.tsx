@@ -10,7 +10,7 @@ vi.mock("~/context/BoardContext", () => ({
 import { BoardStatusBar } from "./BoardStatusBar";
 
 const defaultBoard = {
-  showPrompts: true,
+  attributionEnabled: false,
   votingEnabled: false,
   votingAllowed: 5,
   votingScope: "board",
@@ -43,32 +43,34 @@ describe("BoardStatusBar", () => {
     expect(screen.queryByText("Votes")).not.toBeInTheDocument();
   });
 
-  it("expands legend when LEDs are clicked", () => {
+  it("expands legend with the four status LEDs", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
-    expect(screen.getByText("Voting")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
+    expect(screen.getByText("Hide Others' Notes")).toBeInTheDocument();
     expect(screen.getByText("Notes Locked")).toBeInTheDocument();
-    expect(screen.getByText("Board Locked")).toBeInTheDocument();
+    expect(screen.getByText("Voting")).toBeInTheDocument();
+    // Board Lock has its own on-board indicator — no LED here.
+    expect(screen.queryByText("Board Locked")).not.toBeInTheDocument();
   });
 
   it("collapses legend when clicked again", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.queryByText("Prompts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
   });
 
   it("closes legend when clicking outside", () => {
     render(<BoardStatusBar />);
     fireEvent.click(screen.getByTitle("Board status"));
-    expect(screen.getByText("Prompts")).toBeInTheDocument();
+    expect(screen.getByText("Attribution")).toBeInTheDocument();
     fireEvent.mouseDown(document.body);
-    expect(screen.queryByText("Prompts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Attribution")).not.toBeInTheDocument();
   });
 
-  it("shows correct vote count", () => {
+  it("shows correct vote count (BRD-016)", () => {
     mockUseBoard.mockReturnValue({ ...defaultBoard, votingEnabled: true, votingAllowed: 5 });
     render(<BoardStatusBar />);
     // 1 vote used (n2 has user_votes: 1), so 4 remaining
@@ -80,6 +82,19 @@ describe("BoardStatusBar", () => {
     const { container } = render(<BoardStatusBar />);
     const amberLed = container.querySelector(".bg-amber-400");
     expect(amberLed).toBeInTheDocument();
+  });
+
+  it("lights a purple LED (not green) for attribution when enabled", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, attributionEnabled: true });
+    const { container } = render(<BoardStatusBar />);
+    expect(container.querySelector(".bg-purple-400")).toBeInTheDocument();
+    expect(container.querySelector(".bg-green-400")).not.toBeInTheDocument();
+  });
+
+  it("lights the cyan LED when Hide Others' Notes is on", () => {
+    mockUseBoard.mockReturnValue({ ...defaultBoard, hideOthersNotes: true });
+    const { container } = render(<BoardStatusBar />);
+    expect(container.querySelector(".bg-cyan-400")).toBeInTheDocument();
   });
 
   it("shows voting info icon in legend next to Voting label", () => {

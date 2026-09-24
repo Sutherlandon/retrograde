@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { useLocation } from "react-router";
 import { Logo } from '~/images/icons';
-import { siteConfig } from '~/config/siteConfig';
 import AccountHub from './AccountHub';
+import Sidebar from './Sidebar';
+import type { TeamSummary } from '~/server/team_model';
+import type { HostingConfig } from '~/server/db_config';
 
 interface HeaderProps {
   user?: {
@@ -10,16 +11,27 @@ interface HeaderProps {
     username: string;
   };
   isAdmin?: boolean;
+  teams?: TeamSummary[];
+  unassignedCount?: number;
+  isSubscribed?: boolean;
+  /** How this deployment is hosted (ADR-0017). Required, so no layout can
+   *  forget it and silently show a self-hosted user dead marketing links. */
+  hosting: HostingConfig;
+  /** Draws the header on the marketing site's night sky (SiteLayout sets it). */
+  night?: boolean;
 }
 
-export default function Header({ user, isAdmin }: HeaderProps) {
+// The marketing pages' night sky: solid airglow green in place of the app's
+// brighter green.
+const NIGHT_ACCOUNT_BUTTON =
+  "bg-airglow-300 font-semibold text-night-950 hover:bg-airglow-300 hover:brightness-110 dark:bg-airglow-300 dark:hover:bg-airglow-300";
+
+export default function Header({ user, isAdmin, teams, unassignedCount, isSubscribed, hosting, night = false }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const siteLogo = siteConfig.logoLight && siteConfig.logoDark;
+  const siteLogo = hosting.siteLogo;
 
-  const location = useLocation();
-  const home = location.pathname === "/";
 
   // Close on outside click
   useEffect(() => {
@@ -62,8 +74,8 @@ export default function Header({ user, isAdmin }: HeaderProps) {
 
   return (
     <header
-      className={`relative flex items-center px-4 py-3 ${home
-        ? 'bg-black'
+      className={`relative flex items-center px-4 py-3 ${night
+        ? 'bg-night-950 text-slate-100'
         : 'bg-gradient-to-b from-sky-400 to-white dark:from-black dark:to-gray-900'
         }`}
     >
@@ -77,13 +89,13 @@ export default function Header({ user, isAdmin }: HeaderProps) {
         {siteLogo && (
           <div className="ml-4 border-l-2 border-gray-900 dark:border-gray-100 px-4 py-1">
             <img
-              src={siteConfig.logoLight}
-              alt={siteConfig.logoAlt}
+              src={siteLogo.light}
+              alt={siteLogo.alt}
               className="h-8 dark:hidden"
             />
             <img
-              src={siteConfig.logoDark}
-              alt={siteConfig.logoAlt}
+              src={siteLogo.dark}
+              alt={siteLogo.alt}
               className="h-8 hidden dark:block"
             />
           </div>
@@ -94,13 +106,27 @@ export default function Header({ user, isAdmin }: HeaderProps) {
 
       {/* Desktop Nav */}
       <nav className="hidden sm:flex items-center gap-6 mr-4">
-        <a href="/about" className="hover:underline">
-          About
-        </a>
-        <a href="/contact" className="hover:underline">
-          Contact
-        </a>
-        <AccountHub user={user} isAdmin={isAdmin} />
+        {/* A self-hosted instance has no marketing site to link to. */}
+        {!hosting.selfHosted && (
+          <>
+            <a href="/about" className="hover:underline">
+              About
+            </a>
+            <a href="/contact" className="hover:underline">
+              Contact
+            </a>
+          </>
+        )}
+        {user && (
+          <a href="/app/dashboard" className="hover:underline">
+            Dashboard
+          </a>
+        )}
+        <AccountHub
+          user={user}
+          hideLogout={hosting.hideLogout}
+          buttonClassName={night ? NIGHT_ACCOUNT_BUTTON : undefined}
+        />
       </nav>
 
       {/* Hamburger */}
@@ -142,17 +168,27 @@ export default function Header({ user, isAdmin }: HeaderProps) {
       <div
         id="mobile-menu"
         ref={menuRef}
-        className={`fixed top-0 right-0 h-full w-72 bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 right-0 h-full w-72 bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-xl transform transition-transform duration-300 ease-in-out sm:hidden z-50 flex flex-col gap-6 p-6 overflow-y-auto ${mobileOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         role="menu"
       >
-        <AccountHub user={user} closeMenu={closeMenu} />
-        <a href="/about" className="hover:underline" onClick={closeMenu}>
-          About
-        </a>
-        <a href="/contact" className="hover:underline" onClick={closeMenu}>
-          Contact
-        </a>
+        <AccountHub user={user} hideLogout={hosting.hideLogout} closeMenu={closeMenu} />
+        {user && (
+          <>
+            <Sidebar isAdmin={isAdmin} teams={teams} unassignedCount={unassignedCount} isSubscribed={isSubscribed} onNavigate={closeMenu} />
+            <div className="border-t border-gray-200 dark:border-gray-700" />
+          </>
+        )}
+        {!hosting.selfHosted && (
+          <>
+            <a href="/about" className="hover:underline" onClick={closeMenu}>
+              About
+            </a>
+            <a href="/contact" className="hover:underline" onClick={closeMenu}>
+              Contact
+            </a>
+          </>
+        )}
       </div>
     </header>
   );

@@ -116,14 +116,14 @@ function ManageAdmins({ grantedAdmins }: { grantedAdmins: GrantedAdmin[] }) {
             name="username"
             placeholder="Username"
             required
-            className="border rounded px-3 py-1.5 border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
+            className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950"
           />
           {addFetcher.data?.error   && <p className="text-sm text-red-500">{addFetcher.data.error}</p>}
           {addFetcher.data?.success && <p className="text-sm text-green-600">Access granted to {addFetcher.data.addedUsername}.</p>}
         </div>
         <button
           type="submit"
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer"
+          className="px-3 py-1.5 border border-transparent bg-blue-600 hover:bg-blue-700 text-white rounded text-sm cursor-pointer"
         >
           Grant Access
         </button>

@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { nanoid } from "nanoid";
-import type { Attachment, Board, BoardDTO, Column, Note } from "~/server/board.types";
+import type { ActionItem, Attachment, Board, BoardDTO, Column, Note } from "~/server/board.types";
 
 // ---------------------------------------------------------------------------
 // Context setup
@@ -84,6 +84,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const isReadOnly = loaderData.readonly;
 
   const [title, setTitle] = useState(loaderData.title);
+  const teamName = (loaderData.team_name as string | null | undefined) ?? null;
 
   // Separate fetchers per concern — each gets its own pending/error state
   const columnFetcher = useFetcher();
@@ -101,6 +102,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [votingScope, setVotingScope] = useState<"board" | "column" | "note">(loaderData.votingScope ?? "board");
   const [notesLocked, setNotesLocked] = useState(loaderData.notesLocked ?? false);
   const [boardLocked, setBoardLocked] = useState(loaderData.boardLocked ?? false);
+  const [attributionEnabled, setAttributionEnabled] = useState(loaderData.attributionEnabled ?? false);
+  const [actionItemsVisible, setActionItemsVisible] = useState(loaderData.actionItemsVisible ?? true);
+  const [hideOthersNotes, setHideOthersNotes] = useState(loaderData.hideOthersNotes ?? false);
+  const [canFacilitate, setCanFacilitate] = useState(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
+  const [openFacilitation, setOpenFacilitation] = useState(loaderData.openFacilitation ?? false);
+  const [actionItems, setActionItems] = useState<ActionItem[]>((loaderData.actionItems as ActionItem[]) ?? []);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
     loaderData.boardLocked ? new Date() : null
   );
@@ -115,8 +122,11 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [contributorCount, setContributorCount] = useState(loaderData.contributorCount ?? 0);
   const [attachments, setAttachments] = useState<Attachment[]>(loaderData.attachments ?? []);
   const attachmentFetcher = useFetcher();
+  const actionItemFetcher = useFetcher();
   const isOwner = loaderData.isOwner ?? false;
-  const [showPrompts, setShowPrompts] = useState(true);
+  // BRD-020: default TRUE (not false) — an older/incomplete loader response
+  // should never spuriously offer to claim a board that already has an owner.
+  const hasOwner = loaderData.hasOwner ?? true;
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -136,7 +146,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     setVotingScope(loaderData.votingScope ?? "board");
     setNotesLocked(loaderData.notesLocked ?? false);
     setLocked(loaderData.boardLocked ?? false);
-  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked]);
+    setAttributionEnabled(loaderData.attributionEnabled ?? false);
+    setActionItemsVisible(loaderData.actionItemsVisible ?? true);
+    setHideOthersNotes(loaderData.hideOthersNotes ?? false);
+  }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled, loaderData.actionItemsVisible, loaderData.hideOthersNotes]);
+
+  useEffect(() => {
+    setActionItems((loaderData.actionItems as ActionItem[]) ?? []);
+    setCanFacilitate(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
+    setOpenFacilitation(loaderData.openFacilitation ?? false);
+  }, [loaderData.actionItems, loaderData.canFacilitate, loaderData.openFacilitation, loaderData.isOwner]);
 
   // Sync timer from server (other users may have started/stopped it).
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
@@ -169,6 +188,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [attachmentFetcher.data]);
 
   useEffect(() => {
+    if (actionItemFetcher.data) {
+      const data = actionItemFetcher.data as BoardDTO;
+      if (data.actionItems) setActionItems(data.actionItems as ActionItem[]);
+    }
+  }, [actionItemFetcher.data]);
+
+  useEffect(() => {
     if (settingsFetcher.data) {
       const data = settingsFetcher.data as BoardDTO;
       setColumns(data.columns as Column[]);
@@ -176,6 +202,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       setVotingAllowed(data.votingAllowed ?? 5);
       setNotesLocked(data.notesLocked ?? false);
       setLocked(data.boardLocked ?? false);
+      setAttributionEnabled(data.attributionEnabled ?? false);
+      setActionItemsVisible(data.actionItemsVisible ?? true);
+      setHideOthersNotes(data.hideOthersNotes ?? false);
     }
   }, [settingsFetcher.data]);
 
@@ -208,9 +237,14 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         setVotingAllowed(data.votingAllowed ?? 5);
         setNotesLocked(data.notesLocked ?? false);
         setLocked(data.boardLocked ?? false);
+        setActionItemsVisible(data.actionItemsVisible ?? true);
+        setHideOthersNotes(data.hideOthersNotes ?? false);
         if (data.voterCount !== undefined) setVoterCount(data.voterCount);
         if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
         if (data.attachments) setAttachments(data.attachments);
+        setActionItems((data.actionItems as ActionItem[]) ?? []);
+        setCanFacilitate(data.canFacilitate ?? false);
+        setOpenFacilitation(data.openFacilitation ?? false);
 
         syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
       } catch (err) {
@@ -530,13 +564,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }) => {
+  const updateBoardSettings = (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }) => {
     if (isReadOnly) return;
     setVotingEnabled(settings.votingEnabled);
     setVotingAllowed(settings.votingAllowed);
     setVotingScope(settings.votingScope);
     setNotesLocked(settings.notesLocked);
     setLocked(settings.boardLocked);
+    setAttributionEnabled(settings.attributionEnabled);
+    setActionItemsVisible(settings.actionItemsVisible);
+    setHideOthersNotes(settings.hideOthersNotes);
     settingsFetcher.submit(
       {
         votingEnabled: String(settings.votingEnabled),
@@ -544,8 +581,50 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
         votingScope: settings.votingScope,
         notesLocked: String(settings.notesLocked),
         boardLocked: String(settings.boardLocked),
+        attributionEnabled: String(settings.attributionEnabled),
+        actionItemsVisible: String(settings.actionItemsVisible),
+        hideOthersNotes: String(settings.hideOthersNotes),
       },
       { method: "PATCH", action: `/app/board/${boardId}/settings` }
+    );
+  };
+
+  // ---------------------------------------------------------------------------
+  // Action item actions (issue #88)
+  // ---------------------------------------------------------------------------
+
+  const addActionItem = (text: string) => {
+    if (isReadOnly || boardLocked) return;
+    actionItemFetcher.submit(
+      { text },
+      { method: "POST", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const updateActionItem = (itemId: string, text: string) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, text } : i)));
+    actionItemFetcher.submit(
+      { intent: "text", itemId, text },
+      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const toggleActionItem = (itemId: string, completed: boolean) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, completed } : i)));
+    actionItemFetcher.submit(
+      { intent: "complete", itemId, completed: String(completed) },
+      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
+    );
+  };
+
+  const deleteActionItem = (itemId: string) => {
+    if (isReadOnly || boardLocked) return;
+    setActionItems((prev) => prev.filter((i) => i.id !== itemId));
+    actionItemFetcher.submit(
+      { itemId },
+      { method: "DELETE", action: `/app/board/${boardId}/action-items` }
     );
   };
 
@@ -614,8 +693,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const value: Board = {
     id: boardId,
     title,
+    teamName,
     updateTitle,
     readonly: isReadOnly,
+    hasOwner,
     isOwner,
     columns,
     nextColOrder: deriveNextColOrder(columns),
@@ -652,8 +733,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     deleteAttachment,
     startTimer,
     stopTimer,
-    showPrompts,
-    setShowPrompts,
+    attributionEnabled,
+    actionItemsVisible,
+    hideOthersNotes,
+    canFacilitate,
+    openFacilitation,
+    actionItems,
+    addActionItem,
+    updateActionItem,
+    toggleActionItem,
+    deleteActionItem,
   };
 
   return <BoardContext.Provider value={value}>{children}</BoardContext.Provider>;

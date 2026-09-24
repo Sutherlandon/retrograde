@@ -17,10 +17,8 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
+  oauthUsernameField: "preferred_username",
+  selfHosted: false,
 }));
 
 const mockUpdateSettings = vi.fn();
@@ -54,24 +52,20 @@ function makePatchRequest(boardId: string, fields: Record<string, string>) {
   });
 }
 
-function setupUserAndOwnership(userId: string, isAnonymous: boolean, isOwner: boolean) {
+function setupUserAndOwnership(userId: string, isAnonymous: boolean, canFacilitate: boolean) {
   sessionData["userId"] = userId;
   // getOptionalUser SELECT
   mockPoolQuery.mockResolvedValueOnce({
     rows: [{ id: userId, preferred_username: isAnonymous ? "Guest" : "realuser", is_anonymous: isAnonymous }],
     rowCount: 1,
   });
-  // requireOwner board_members SELECT
-  if (isOwner) {
-    mockPoolQuery.mockResolvedValueOnce({ rows: [{ role: "owner" }], rowCount: 1 });
-  } else {
-    mockPoolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
-  }
+  // requireFacilitator → userCanFacilitate SELECT (ADR-0006)
+  mockPoolQuery.mockResolvedValueOnce({ rows: [{ can: canFacilitate }], rowCount: 1 });
 }
 
 describe("board.settings action", () => {
   describe("PATCH (update settings)", () => {
-    it("allows anonymous board owner to update settings", async () => {
+    it("allows anonymous board owner to update settings (DECK-008, DECK-009, DECK-015, DECK-016)", async () => {
       const { action } = await import("./board.settings");
       setupUserAndOwnership("anon-user-1", true, true);
 
@@ -82,14 +76,17 @@ describe("board.settings action", () => {
         boardLocked: "false",
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockUpdateSettings).toHaveBeenCalledWith("board-1", {
         votingEnabled: true,
         votingAllowed: 3,
         votingScope: "board",
         notesLocked: false,
         boardLocked: false,
-      });
+        attributionEnabled: false,
+        actionItemsVisible: true,
+        hideOthersNotes: false,
+      }, "anon-user-1");
     });
 
     it("allows registered board owner to update settings", async () => {
@@ -103,8 +100,28 @@ describe("board.settings action", () => {
         boardLocked: "false",
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockUpdateSettings).toHaveBeenCalled();
+    });
+
+    it("parses the hideOthersNotes flag (blind brainstorm) (DECK-013)", async () => {
+      const { action } = await import("./board.settings");
+      setupUserAndOwnership("user-1", false, true);
+
+      const request = makePatchRequest("board-1", {
+        votingEnabled: "false",
+        votingAllowed: "5",
+        notesLocked: "false",
+        boardLocked: "false",
+        hideOthersNotes: "true",
+      });
+
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        "board-1",
+        expect.objectContaining({ hideOthersNotes: true }),
+        "user-1"
+      );
     });
 
     it("returns 403 for anonymous non-owner", async () => {
@@ -119,7 +136,7 @@ describe("board.settings action", () => {
       });
 
       try {
-        await action({ request, params: { id: "board-1" }, context: {} });
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
         expect.unreachable("should have thrown");
       } catch (response: unknown) {
         const res = response as Response;
@@ -138,7 +155,7 @@ describe("board.settings action", () => {
       });
 
       try {
-        await action({ request, params: { id: "board-1" }, context: {} });
+        await action({ request, params: { id: "board-1" }, context: {} } as never);
         expect.unreachable("should have thrown");
       } catch (response: unknown) {
         const res = response as Response;
@@ -148,7 +165,7 @@ describe("board.settings action", () => {
   });
 
   describe("POST (clear votes)", () => {
-    it("allows anonymous owner to clear votes", async () => {
+    it("allows anonymous owner to clear votes (DECK-011)", async () => {
       const { action } = await import("./board.settings");
       setupUserAndOwnership("anon-user-1", true, true);
 
@@ -158,9 +175,9 @@ describe("board.settings action", () => {
         body: form,
       });
 
-      await action({ request, params: { id: "board-1" }, context: {} });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockClearVotes).toHaveBeenCalledWith("board-1");
-      expect(mockGetBoard).toHaveBeenCalledWith("board-1");
+      expect(mockGetBoard).toHaveBeenCalledWith("board-1", "anon-user-1");
     });
   });
 });

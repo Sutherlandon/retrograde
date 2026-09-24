@@ -17,10 +17,10 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
-}));
-
-vi.mock("~/config/siteConfig", () => ({
-  siteConfig: { usernameField: "preferred_username" },
+  oauthUsernameField: "preferred_username",
+  selfHosted: false,
+  // Non-default values, so the test below proves pass-through, not a default.
+  hostingConfig: { selfHosted: true, hideLogout: true, siteLogo: null },
 }));
 
 vi.mock("~/server/db_init", () => ({}));
@@ -32,7 +32,7 @@ beforeEach(() => {
 });
 
 describe("BoardLayout loader", () => {
-  it("creates anonymous user and sets session cookie when no session exists", async () => {
+  it("creates anonymous user and sets session cookie when no session exists [AUTH-004]", async () => {
     const { loader } = await import("./BoardLayout");
 
     const anonId = "anon-uuid-new";
@@ -44,7 +44,7 @@ describe("BoardLayout loader", () => {
 
     expect(response).toBeInstanceOf(Response);
     const body = await response.json();
-    expect(body.user).toEqual({ id: anonId, username: "Guest" });
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
 
     // Verify anonymous user was created with the board's ID
@@ -59,7 +59,7 @@ describe("BoardLayout loader", () => {
 
     sessionData["userId"] = "user-1";
     mockPoolQuery.mockResolvedValueOnce({
-      rows: [{ id: "user-1", preferred_username: "realuser" }],
+      rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
       rowCount: 1,
     });
 
@@ -67,7 +67,7 @@ describe("BoardLayout loader", () => {
     const response = await loader({ request, params: { id: "board-42" } });
 
     const body = await response.json();
-    expect(body.user).toEqual({ id: "user-1", username: "realuser" });
+    expect(body.user).toEqual({ id: "user-1", username: "realuser", is_anonymous: false });
     // No Set-Cookie for existing user
     expect(response.headers.get("Set-Cookie")).toBeNull();
     // Only SELECT, no INSERT
@@ -88,7 +88,7 @@ describe("BoardLayout loader", () => {
     const response = await loader({ request, params: { id: "board-99" } });
 
     const body = await response.json();
-    expect(body.user).toEqual({ id: anonId, username: "Guest" });
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
   });
 
@@ -107,5 +107,39 @@ describe("BoardLayout loader", () => {
     );
     expect(insertCall).toBeDefined();
     expect(insertCall![1]).toContain("specific-board-id");
+  });
+
+  it("creates an anonymous user with a null board_id for an example board [BRD-017]", async () => {
+    const { loader } = await import("./BoardLayout");
+
+    const anonId = "anon-uuid-example";
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: anonId }] });
+
+    const request = new Request("http://localhost:3000/app/board/example-board");
+    const response = await loader({ request, params: { id: "example-board" } });
+
+    const body = await response.json();
+    expect(body.user).toEqual({ id: anonId, username: "Guest", is_anonymous: true });
+
+    // The INSERT must NOT link the anonymous user to the nonexistent
+    // "example-board" row — board_id must be null, not the example id.
+    const insertCall = mockPoolQuery.mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT")
+    );
+    expect(insertCall).toBeDefined();
+    expect(insertCall![1]).toEqual([expect.stringMatching(/^anon-/), null]);
+  });
+});
+
+describe("BoardLayout loader — hosting config", () => {
+  it("hands the header the deployment's hosting config (ADR-0017)", async () => {
+    const { loader } = await import("./BoardLayout");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "anon-uuid-new" }] });
+
+    const request = new Request("http://localhost:3000/app/board/board-42");
+    const response = await loader({ request, params: { id: "board-42" } });
+    const body = await response.json();
+
+    expect(body.hosting).toEqual({ selfHosted: true, hideLogout: true, siteLogo: null });
   });
 });

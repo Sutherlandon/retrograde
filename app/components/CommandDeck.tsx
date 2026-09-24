@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { useBoard } from "~/context/BoardContext";
-import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon, InfoIcon } from "~/images/icons";
+import { RocketIcon, CloseIcon, PaperclipIcon, ChevronDownIcon, TableIcon, DocumentIcon, InfoIcon, UserIcon } from "~/images/icons";
 import { exportToCSV, exportToMarkdown, downloadFile } from "~/utils/exportBoard";
 import { StatusLED } from "./StatusLED";
 import { CommandDeckToggle } from "./CommandDeckToggle";
 import { AttachmentModal } from "./AttachmentModal";
 import { VotingInfoModal } from "./VotingInfoModal";
+import { FacilitatorModal } from "./FacilitatorModal";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -16,13 +17,14 @@ export function CommandDeck() {
     id: boardId, title, timerRunning, timeLeft, startTimer, stopTimer,
     addColumn, columns, votingEnabled, votingAllowed, votingScope,
     notesLocked, boardLocked, attachments, updateBoardSettings,
-    showPrompts, setShowPrompts, sortNotesByScore,
+    attributionEnabled, actionItemsVisible, hideOthersNotes, sortNotesByScore,
     voterCount, contributorCount, clearParticipantCounts,
   } = useBoard();
 
   const [expanded, setExpanded] = useState(true);
   const [showAttachments, setShowAttachments] = useState(false);
   const [showVotingInfo, setShowVotingInfo] = useState(false);
+  const [showCrewAccess, setShowCrewAccess] = useState(false);
   const [minutes, setMinutes] = useState(3);
   const [seconds, setSeconds] = useState(0);
 
@@ -32,8 +34,12 @@ export function CommandDeck() {
   const [localVotingScope, setLocalVotingScope] = useState(votingScope);
   const [localNotesLocked, setLocalNotesLocked] = useState(notesLocked);
   const [localBoardLocked, setLocalBoardLocked] = useState(boardLocked);
+  const [localAttributionEnabled, setLocalAttributionEnabled] = useState(attributionEnabled);
+  const [localActionItemsVisible, setLocalActionItemsVisible] = useState(actionItemsVisible ?? true);
+  const [localHideOthersNotes, setLocalHideOthersNotes] = useState(hideOthersNotes ?? false);
   const [showVotingWarning, setShowVotingWarning] = useState(false);
   const [pendingVotingEnabled, setPendingVotingEnabled] = useState<boolean | null>(null);
+  const [showAttributionWarning, setShowAttributionWarning] = useState(false);
 
   const clearFetcher = useFetcher();
   const deckRef = useRef<HTMLDivElement>(null);
@@ -45,7 +51,10 @@ export function CommandDeck() {
     setLocalVotingScope(votingScope);
     setLocalNotesLocked(notesLocked);
     setLocalBoardLocked(boardLocked);
-  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked]);
+    setLocalAttributionEnabled(attributionEnabled);
+    setLocalActionItemsVisible(actionItemsVisible ?? true);
+    setLocalHideOthersNotes(hideOthersNotes ?? false);
+  }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, hideOthersNotes]);
 
   // Close on Escape
   useEffect(() => {
@@ -65,6 +74,9 @@ export function CommandDeck() {
         votingScope: localVotingScope,
         notesLocked: localNotesLocked,
         boardLocked: localBoardLocked,
+        attributionEnabled: localAttributionEnabled,
+        actionItemsVisible: localActionItemsVisible,
+        hideOthersNotes: localHideOthersNotes,
       });
       setShowVotingWarning(false);
       setPendingVotingEnabled(null);
@@ -84,13 +96,16 @@ export function CommandDeck() {
     startTimer(totalSeconds);
   };
 
-  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean }> = {}) => {
+  const saveSettings = (overrides: Partial<{ votingEnabled: boolean; votingAllowed: number; votingScope: "board" | "column" | "note"; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }> = {}) => {
     updateBoardSettings({
       votingEnabled: overrides.votingEnabled ?? localVotingEnabled,
       votingAllowed: overrides.votingAllowed ?? localVotingAllowed,
       votingScope: overrides.votingScope ?? localVotingScope,
       notesLocked: overrides.notesLocked ?? localNotesLocked,
       boardLocked: overrides.boardLocked ?? localBoardLocked,
+      attributionEnabled: overrides.attributionEnabled ?? localAttributionEnabled,
+      actionItemsVisible: overrides.actionItemsVisible ?? localActionItemsVisible,
+      hideOthersNotes: overrides.hideOthersNotes ?? localHideOthersNotes,
     });
   };
 
@@ -132,6 +147,42 @@ export function CommandDeck() {
     saveSettings({ votingScope: scope });
   };
 
+  const handleAttributionToggle = (enabled: boolean) => {
+    if (enabled) {
+      // Enabling reveals who wrote each note — confirm before de-anonymizing.
+      setLocalAttributionEnabled(true);
+      setShowAttributionWarning(true);
+    } else {
+      // Re-hiding authorship is always safe; apply immediately.
+      setLocalAttributionEnabled(false);
+      saveSettings({ attributionEnabled: false });
+    }
+  };
+
+  const confirmAttributionToggle = () => {
+    saveSettings({ attributionEnabled: true });
+    setShowAttributionWarning(false);
+  };
+
+  const cancelAttributionToggle = () => {
+    setLocalAttributionEnabled(false);
+    setShowAttributionWarning(false);
+  };
+
+  const handleActionItemsVisibleToggle = (visible: boolean) => {
+    setLocalActionItemsVisible(visible);
+    saveSettings({ actionItemsVisible: visible });
+  };
+
+  const handleHideOthersNotesToggle = (hidden: boolean) => {
+    setLocalHideOthersNotes(hidden);
+    saveSettings({ hideOthersNotes: hidden });
+  };
+
+  // While any confirm prompt is open, freeze the other toggles so nothing is
+  // changed out from under the pending decision.
+  const anyWarning = showVotingWarning || showAttributionWarning;
+
   const totalNotes = columns.reduce((sum, c) => sum + c.notes.length, 0);
 
   // ----- MINIMIZED PILL -----
@@ -150,10 +201,10 @@ export function CommandDeck() {
         <RocketIcon size="lg" />
         <span className="hidden sm:inline text-sm font-semibold tracking-wide">Command Deck</span>
         <div className="flex items-center gap-1.5 ml-1">
-          <StatusLED color="green" active={showPrompts} size="sm" />
-          <StatusLED color="blue" active={votingEnabled} size="sm" />
+          <StatusLED color="purple" active={localAttributionEnabled} size="sm" />
+          <StatusLED color="cyan" active={localHideOthersNotes} size="sm" />
           <StatusLED color="amber" active={notesLocked || boardLocked} size="sm" />
-          <StatusLED color="red" active={boardLocked} size="sm" />
+          <StatusLED color="blue" active={votingEnabled} size="sm" />
         </div>
       </button>
     );
@@ -185,10 +236,10 @@ export function CommandDeck() {
             Command Deck
           </h3>
           <div className="flex items-center gap-1.5">
-            <StatusLED color="green" active={showPrompts} size="sm" />
-            <StatusLED color="blue" active={localVotingEnabled} size="sm" />
+            <StatusLED color="purple" active={localAttributionEnabled} size="sm" />
+            <StatusLED color="cyan" active={localHideOthersNotes} size="sm" />
             <StatusLED color="amber" active={localNotesLocked || localBoardLocked} size="sm" />
-            <StatusLED color="red" active={localBoardLocked} size="sm" />
+            <StatusLED color="blue" active={localVotingEnabled} size="sm" />
             <button
               onClick={() => setExpanded(false)}
               title="Minimize"
@@ -269,6 +320,12 @@ export function CommandDeck() {
             >
               <PaperclipIcon size="sm" /> Attach File
             </button>
+            <button
+              onClick={() => setShowCrewAccess(true)}
+              className="w-full py-1.5 rounded-lg border border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-400 text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white text-sm transition-colors cursor-pointer flex items-center justify-center gap-1"
+            >
+              <UserIcon size="sm" /> Crew Access
+            </button>
           </div>
         </div>
 
@@ -276,13 +333,44 @@ export function CommandDeck() {
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700/50">
           <p className="text-[10px] font-bold tracking-[0.15em] uppercase text-gray-400 dark:text-gray-500 mb-2">System Toggles</p>
           <div className="space-y-2">
-            <CommandDeckToggle label="Show Prompts" checked={showPrompts} onChange={setShowPrompts} ledColor="green" disabled={localBoardLocked || showVotingWarning} />
+            <CommandDeckToggle
+              label="User Attribution"
+              checked={localAttributionEnabled}
+              onChange={handleAttributionToggle}
+              ledColor="purple"
+              disabled={localBoardLocked || anyWarning}
+            />
+            {showAttributionWarning && (
+              <div className="p-2 rounded bg-amber-50 dark:bg-amber-900/50 border border-amber-300 dark:border-amber-600/50 text-xs text-amber-800 dark:text-amber-200">
+                <p className="font-medium">
+                  Attribution reveals who wrote each note. In an anonymous retro this can't be un-seen once shown.
+                </p>
+                <div className="flex justify-between mt-1">
+                  <button onClick={confirmAttributionToggle} className="w-[30%] py-0.5 rounded bg-amber-600 text-white text-xs cursor-pointer">Reveal</button>
+                  <button onClick={cancelAttributionToggle} className="w-[30%] py-0.5 rounded border border-current text-amber-800 dark:text-amber-200 text-xs cursor-pointer">Cancel</button>
+                </div>
+              </div>
+            )}
+            <CommandDeckToggle
+              label="Action Items"
+              checked={localActionItemsVisible}
+              onChange={handleActionItemsVisibleToggle}
+              ledColor="green"
+              disabled={localBoardLocked || anyWarning}
+            />
+            <CommandDeckToggle
+              label="Hide Others' Notes"
+              checked={localHideOthersNotes}
+              onChange={handleHideOthersNotesToggle}
+              ledColor="cyan"
+              disabled={localBoardLocked || anyWarning}
+            />
             <CommandDeckToggle
               label="Enable Voting"
               checked={localVotingEnabled}
               onChange={handleVotingToggle}
               ledColor="blue"
-              disabled={localBoardLocked || showVotingWarning}
+              disabled={localBoardLocked || anyWarning}
               labelExtra={
                 <button
                   type="button"
@@ -334,9 +422,9 @@ export function CommandDeck() {
               checked={localNotesLocked || localBoardLocked}
               onChange={handleNotesLockToggle}
               ledColor="amber"
-              disabled={localBoardLocked || showVotingWarning}
+              disabled={localBoardLocked || anyWarning}
             />
-            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" disabled={showVotingWarning} />
+            <CommandDeckToggle label="Lock Board" checked={localBoardLocked} onChange={handleBoardLockToggle} ledColor="red" disabled={anyWarning} />
           </div>
         </div>
 
@@ -374,6 +462,9 @@ export function CommandDeck() {
 
       {/* Voting Info Modal */}
       <VotingInfoModal isOpen={showVotingInfo} onClose={() => setShowVotingInfo(false)} />
+
+      {/* Crew Access (facilitators) Modal */}
+      <FacilitatorModal boardId={boardId} isOpen={showCrewAccess} onClose={() => setShowCrewAccess(false)} />
     </>
   );
 }

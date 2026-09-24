@@ -5,14 +5,25 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 import { Analytics } from "@vercel/analytics/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
 import ThemeInitializer from "./components/ThemeInitializer";
+import { selfHosted } from "~/server/db_config";
+
+// Vercel Analytics belongs to the hosted service, which runs on Vercel. A
+// self-hosted instance must never load its script (ADR-0017).
+export function loader() {
+  return { vercelAnalytics: !selfHosted };
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  // Undefined only if the root loader never ran; analytics stays off then.
+  const rootData = useRouteLoaderData<typeof loader>("root");
+
   return (
     <html lang="en">
       <head>
@@ -43,6 +54,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-status-bar-style" content="black-translucent" />
 
+        {/* AI-agent discoverability */}
+        <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM-readable site documentation" />
+
         <Meta />
         <Links />
         {/* Inline theme bootstrap to prevent wrong theme flash */}
@@ -62,14 +76,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             `,
           }}
         />
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
       </head>
       <body>
         <ThemeInitializer />
         {children}
         <ScrollRestoration />
         <Scripts />
-        <Analytics />
+        {rootData?.vercelAnalytics && <Analytics />}
       </body>
     </html>
   );

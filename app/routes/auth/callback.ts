@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { getSession, commitSession } from "~/session.server";
-import { pool, oauthRedirectUri } from "~/server/db_config";
+import { pool, oauthClientId, oauthClientSecret, oauthRedirectUri, oauthTokenUrl, oauthUserinfoUrl } from "~/server/db_config";
+import { ensurePersonalTeam } from "~/server/team_model";
 import { logMetric } from "~/server/logger";
 
 export async function loader({ request }: { request: Request }) {
@@ -32,22 +33,22 @@ export async function loader({ request }: { request: Request }) {
   session.unset("oauth_state");
 
   // 1. Exchange code for token
-  const tokenRes = await fetch(process.env.OAUTH_TOKEN_URL!, {
+  const tokenRes = await fetch(oauthTokenUrl, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
       redirect_uri: oauthRedirectUri,
-      client_id: process.env.OAUTH_CLIENT_ID!,
-      client_secret: process.env.OAUTH_CLIENT_SECRET!,
+      client_id: oauthClientId,
+      client_secret: oauthClientSecret,
     }),
   });
 
   const token = await tokenRes.json();
 
   // 2. Fetch user profile
-  const profileRes = await fetch(process.env.OAUTH_USERINFO_URL!, {
+  const profileRes = await fetch(oauthUserinfoUrl, {
     headers: {
       Authorization: `Bearer ${token.access_token}`,
     },
@@ -87,6 +88,10 @@ export async function loader({ request }: { request: Request }) {
     const userId = result.rows[0].id;
     session.set("userId", userId);
     logMetric("Login", { userId });
+
+    // Ensure the user has a personal team (ADR-0003). Idempotent on returning
+    // logins; only does work for brand-new users not covered by the backfill.
+    await ensurePersonalTeam(userId);
   } finally {
     client.release();
   }
