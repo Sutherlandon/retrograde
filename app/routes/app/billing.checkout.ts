@@ -62,6 +62,9 @@ export async function action({ request }: ActionFunctionArgs) {
     line_items: [{ price: stripePriceId, quantity: 1 }],
     success_url: `${origin}/app/crews?checkout=success`,
     cancel_url: `${origin}/app/crews`,
+    // Promotion codes (e.g. EARLYCREW) are created in the Stripe Dashboard;
+    // Checkout shows a field to enter one.
+    allow_promotion_codes: true,
     // No payment_method_types — Stripe decides eligible methods dynamically
     // from Dashboard settings; hardcoding this is the first mistake Stripe's
     // own guidance flags.
