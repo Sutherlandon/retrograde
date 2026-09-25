@@ -39,7 +39,10 @@ async function handleEvent(event: Stripe.Event): Promise<void> {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded": {
       const s = event.data.object as Stripe.Checkout.Session;
-      if (s.mode === "subscription" && s.payment_status === "paid") {
+      // no_payment_required is a session a 100%-off promotion code fully
+      // covered. Our Checkout creates no trials, so that subscription is active.
+      const settled = s.payment_status === "paid" || s.payment_status === "no_payment_required";
+      if (s.mode === "subscription" && settled) {
         await applyAndWarn(event.type, idOf(s.customer), idOf(s.subscription), "active");
       }
       return;
