@@ -111,6 +111,25 @@ describe("CREW-002 POST /api/stripe/webhook [API-007]", () => {
     expect(await response.json()).toEqual({ received: true });
   });
 
+  it("checkout.session.completed: a fully discounted session (no_payment_required) applies active state", async () => {
+    // A 100%-off promotion code (e.g. an early-adopter coupon) completes
+    // Checkout with nothing to charge. The subscription is still active.
+    mockConstructEvent.mockReturnValue(
+      event("checkout.session.completed", {
+        mode: "subscription",
+        payment_status: "no_payment_required",
+        customer: "cus_1",
+        subscription: "sub_1",
+      }),
+    );
+    const response = (await action({
+      request: req("{}", { "stripe-signature": "sig_ok" }),
+      params: {}, context: {},
+    } as never)) as Response;
+    expect(mockApplySubscriptionState).toHaveBeenCalledWith("cus_1", "sub_1", "active");
+    expect(response.status).toBe(200);
+  });
+
   it("checkout.session.completed: unpaid session applies nothing but still returns 200", async () => {
     mockConstructEvent.mockReturnValue(
       event("checkout.session.completed", {

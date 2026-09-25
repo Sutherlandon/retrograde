@@ -214,7 +214,7 @@ Everyone gets a personal crew at signup (tier 2). **Creating a named crew is the
 | CREW-008 | **Toggle members-only board access**      | 3    | Crew owner  | `crews.$id.tsx` `setRestrictAccess` | owner + `!is_personal` · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-009 | Mint the **first** API key (one AI crewmate) | 2 | Crew owner  | `crews.$id.tsx` `mintKey`           | owner (personal crews allowed) · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
 | CREW-019 | Mint **additional** API keys | 3 | Crew owner | `crews.$id.tsx` `mintKey` | `mintApiKey` refuses a second active key on a personal crew · **402 when the crew's owner lapses** (ADR-0015) | Verified |
-| CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | **404 on a self-hosted instance** (ADR-0016); `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use | Verified |
+| CREW-020 | Start a subscription (Stripe Checkout) | 2 | Registered | `billing.checkout.ts` | **404 on a self-hosted instance** (ADR-0016); `requireRegisteredUser`; redirects to `/app/crews` if already active; creates the Stripe customer on first use; accepts promotion codes created in the Stripe Dashboard | Verified |
 | CREW-021 | Manage billing (Stripe Billing Portal) | 3 | Subscriber | `billing.portal.ts` | **404 on a self-hosted instance** (ADR-0016); `requireRegisteredUser`; redirects to `/app/crews` if no Stripe customer | Verified |
 | CREW-010 | List API keys                             | 2    | Crew member | `crews.$id.tsx` loader              | membership                           | Verified    |
 | CREW-011 | Revoke an API key                         | 2    | Crew owner  | `crews.$id.tsx` `revokeKey`         | owner · **402 when the crew's owner lapses** (ADR-0015) | Verified    |
@@ -260,7 +260,7 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` | Verified |
 | API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts` GET (Vercel cron) or POST | **404 on a self-hosted instance** (ADR-0020); `CRON_SECRET` bearer, which Vercel sends automatically | Verified |
-| API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | **404 on a self-hosted instance** (ADR-0016); signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event | Verified |
+| API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | **404 on a self-hosted instance** (ADR-0016); signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event. A completed Checkout activates when `payment_status` is `paid` or `no_payment_required` (a 100%-off promotion code) | Verified |
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
 

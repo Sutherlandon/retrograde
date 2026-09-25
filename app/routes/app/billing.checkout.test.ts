@@ -151,6 +151,14 @@ describe("billing.checkout action (CREW-002) [CREW-020]", () => {
     expect(params.managed_payments).toEqual({ enabled: true });
   });
 
+  it("lets the customer enter a promotion code at Checkout", async () => {
+    const { action } = await import("./billing.checkout");
+    await action({ request: postRequest(), params: {}, context: {} } as never);
+
+    const params = mockCheckoutSessionsCreate.mock.calls[0][0];
+    expect(params.allow_promotion_codes).toBe(true);
+  });
+
   it("never sets a param forbidden alongside Managed Payments (would silently disable Stripe as merchant of record)", async () => {
     const { action } = await import("./billing.checkout");
     await action({ request: postRequest(), params: {}, context: {} } as never);
