@@ -119,6 +119,15 @@ export const schemaPool = new Pool({
   ssl: databaseTlsRequired ? { rejectUnauthorized: true } : false,
 });
 
+// pg emits "error" on the pool when a connection sitting idle in it dies: Neon
+// closes connections when a suspended compute sleeps, and a frozen Vercel
+// function only notices on thaw. Unhandled, that event throws and kills the
+// instance. The pool has already discarded the client and the next query opens
+// a new connection, so log it and carry on.
+schemaPool.on("error", (error) => {
+  console.warn(`[db] idle connection dropped: ${error.message}`);
+});
+
 // Every query waits for the schema to be built (ADR-0024). The build runs once,
 // starting when this module loads so a long-running server still exits at
 // startup when the database is unreachable (ADR-0018). Vercel freezes a

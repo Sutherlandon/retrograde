@@ -4,21 +4,26 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // and what reaches the underlying pool, so schema gating can be.
 const poolConfigs = vi.hoisted(() => [] as unknown[]);
 const rawCalls = vi.hoisted(() => [] as string[]);
-vi.mock("pg", () => ({
-  Pool: class {
-    constructor(config: unknown) {
-      poolConfigs.push(config);
-    }
-    async query(sql: string) {
-      rawCalls.push(`query:${sql}`);
-      return { rows: [], rowCount: 0 };
-    }
-    async connect() {
-      rawCalls.push("connect");
-      return { release() {} };
-    }
-  },
-}));
+vi.mock("pg", async () => {
+  // A real EventEmitter, like pg's Pool, so an "error" with no listener throws.
+  const { EventEmitter } = await vi.importActual<typeof import("node:events")>("node:events");
+  return {
+    Pool: class extends EventEmitter {
+      constructor(config: unknown) {
+        super();
+        poolConfigs.push(config);
+      }
+      async query(sql: string) {
+        rawCalls.push(`query:${sql}`);
+        return { rows: [], rowCount: 0 };
+      }
+      async connect() {
+        rawCalls.push("connect");
+        return { release() {} };
+      }
+    },
+  };
+});
 
 // The schema build is replaced by a promise each test settles itself.
 const schema = vi.hoisted(() => ({
@@ -687,6 +692,18 @@ describe("pool", () => {
     const { pool } = await import("./db_config");
     await Promise.all([pool.query("SELECT 1"), pool.query("SELECT 2"), pool.connect()]);
     expect(schema.calls).toBe(1);
+  });
+
+  // pg emits "error" on the pool when a connection idle in it dies: Neon closes
+  // connections when a suspended compute sleeps, and a frozen Vercel function
+  // only notices on thaw. With no listener, Node throws and the instance dies.
+  it("survives a pooled idle connection dropping, and logs it instead of crashing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { schemaPool } = await import("./db_config");
+    const dropped = new Error("Connection terminated unexpectedly");
+
+    expect(() => (schemaPool as unknown as import("node:events").EventEmitter).emit("error", dropped)).not.toThrow();
+    expect(warn).toHaveBeenCalledWith("[db] idle connection dropped: Connection terminated unexpectedly");
   });
 
   it("gives the schema build a pool that is not gated on itself", async () => {
