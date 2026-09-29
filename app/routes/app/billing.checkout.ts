@@ -7,6 +7,7 @@
 
 import { randomInt } from "node:crypto";
 import { redirect, type ActionFunctionArgs } from "react-router";
+import type Stripe from "stripe";
 import { requireRegisteredUser } from "~/hooks/useAuth";
 import { getBillingForUser, setStripeCustomerId } from "~/server/billing_model";
 import { stripe } from "~/server/stripe_client";
@@ -23,6 +24,20 @@ function randomLetters(n: number): string {
     out += letters[randomInt(letters.length)];
   }
   return out;
+}
+
+// A stored customer id can stop working: the customer was deleted in the
+// Stripe Dashboard, or was created under other keys (sandbox vs live). Checkout
+// rejects such an id, so the caller starts over with a new customer instead.
+async function liveCustomerId(stripeClient: Stripe, storedId: string | null): Promise<string | null> {
+  if (!storedId) return null;
+  try {
+    const customer = await stripeClient.customers.retrieve(storedId);
+    return customer.deleted ? null : storedId;
+  } catch (e) {
+    if ((e as { code?: string }).code === "resource_missing") return null;
+    throw e;
+  }
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -45,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect("/app/crews");
   }
 
-  let customerId = billing?.stripeCustomerId ?? null;
+  let customerId = await liveCustomerId(stripe, billing?.stripeCustomerId ?? null);
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: billing?.email ?? undefined,
@@ -62,6 +77,9 @@ export async function action({ request }: ActionFunctionArgs) {
     line_items: [{ price: stripePriceId, quantity: 1 }],
     success_url: `${origin}/app/crews?checkout=success`,
     cancel_url: `${origin}/app/crews`,
+    // Promotion codes (e.g. EARLYCREW) are created in the Stripe Dashboard;
+    // Checkout shows a field to enter one.
+    allow_promotion_codes: true,
     // No payment_method_types — Stripe decides eligible methods dynamically
     // from Dashboard settings; hardcoding this is the first mistake Stripe's
     // own guidance flags.

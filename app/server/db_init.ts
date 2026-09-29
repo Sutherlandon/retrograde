@@ -1,19 +1,46 @@
 import type { PoolClient } from "pg";
 import { schemaPool } from "./db_config.js";
 
+// A connection dropped in transit — typically Neon waking a suspended compute
+// while a cold serverless instance opens its first connection — succeeds on a
+// retry. A bad host, bad credentials or a certificate failure never does, so
+// those are not retried and still exit at once (ADR-0018).
+const TRANSIENT_CONNECT_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "EPIPE", "EAI_AGAIN"]);
+const CONNECT_RETRY_DELAYS_MS = [250, 1000, 2500];
+
+function isTransientConnectError(error: unknown): boolean {
+  const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+  if (typeof code === "string" && TRANSIENT_CONNECT_CODES.has(code)) return true;
+  return typeof message === "string" && message.startsWith("Connection terminated");
+}
+
+async function connectWithRetry(): Promise<PoolClient> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await schemaPool.connect();
+    } catch (error) {
+      const delay = CONNECT_RETRY_DELAYS_MS[attempt - 1];
+      if (delay === undefined || !isTransientConnectError(error)) throw error;
+      const reason = (error as { code?: string }).code ?? (error as Error).message;
+      console.warn(`[db] connect attempt ${attempt} failed (${reason}), retrying in ${delay}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
 /**
  * Creates and upgrades the schema, idempotently, every time the server starts.
- * Any failure — including failing to connect — exits the process. db_config.ts
- * runs it once and holds every query until it has committed (ADR-0024); it has
- * no import-time side effect of its own.
+ * Any failure — including failing to connect after the transient retries —
+ * exits the process. db_config.ts runs it once and holds every query until it
+ * has committed (ADR-0024); it has no import-time side effect of its own.
  */
 export async function initializeDatabase() {
   let client: PoolClient;
   try {
-    client = await schemaPool.connect();
+    client = await connectWithRetry();
   } catch (error) {
-    // A bad host, bad credentials or a TLS failure: stop here rather than run a
-    // server that fails on every request.
+    // A bad host, bad credentials, a TLS failure, or a connection that kept
+    // dropping: stop here rather than run a server that fails on every request.
     console.error("FATAL: could not connect to the database:", error);
     process.exit(1);
     return;
