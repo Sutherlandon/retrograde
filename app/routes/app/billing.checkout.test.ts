@@ -19,6 +19,7 @@ vi.mock("~/server/billing_model", () => ({
 }));
 
 const mockCustomersCreate = vi.fn();
+const mockCustomersRetrieve = vi.fn();
 const mockCheckoutSessionsCreate = vi.fn();
 // A self-hosted instance has no Stripe client and no Price (ADR-0016).
 const billing = vi.hoisted(() => ({ configured: true }));
@@ -26,7 +27,10 @@ vi.mock("~/server/stripe_client", () => ({
   get stripe() {
     return billing.configured
       ? {
-          customers: { create: (...args: unknown[]) => mockCustomersCreate(...args) },
+          customers: {
+            create: (...args: unknown[]) => mockCustomersCreate(...args),
+            retrieve: (...args: unknown[]) => mockCustomersRetrieve(...args),
+          },
           checkout: { sessions: { create: (...args: unknown[]) => mockCheckoutSessionsCreate(...args) } },
         }
       : null;
@@ -51,6 +55,7 @@ beforeEach(() => {
     subscriptionStatus: null,
   });
   mockCustomersCreate.mockResolvedValue({ id: "cus_new_1" });
+  mockCustomersRetrieve.mockImplementation(async (id: string) => ({ id, object: "customer" }));
   mockCheckoutSessionsCreate.mockResolvedValue({ url: "https://checkout.stripe.com/session_1" });
 });
 
@@ -124,6 +129,54 @@ describe("billing.checkout action (CREW-002) [CREW-020]", () => {
     expect(mockCheckoutSessionsCreate).toHaveBeenCalledWith(
       expect.objectContaining({ customer: "cus_existing" })
     );
+  });
+
+  describe("when the stored customer no longer exists in Stripe", () => {
+    beforeEach(() => {
+      mockGetBillingForUser.mockResolvedValueOnce({
+        userId: "user-1",
+        email: "landon@example.com",
+        stripeCustomerId: "cus_gone",
+        stripeSubscriptionId: "sub_old",
+        subscriptionStatus: "canceled",
+      });
+    });
+
+    it("replaces a customer deleted in the Stripe Dashboard with a new one", async () => {
+      mockCustomersRetrieve.mockResolvedValueOnce({ id: "cus_gone", object: "customer", deleted: true });
+      const { action } = await import("./billing.checkout");
+      await action({ request: postRequest(), params: {}, context: {} } as never);
+
+      expect(mockCustomersRetrieve).toHaveBeenCalledWith("cus_gone");
+      expect(mockSetStripeCustomerId).toHaveBeenCalledWith("user-1", "cus_new_1");
+      expect(mockCheckoutSessionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: "cus_new_1" })
+      );
+    });
+
+    it("replaces a customer Stripe has no record of (resource_missing), e.g. one made under other keys", async () => {
+      mockCustomersRetrieve.mockRejectedValueOnce(
+        Object.assign(new Error("No such customer: 'cus_gone'"), { type: "StripeInvalidRequestError", code: "resource_missing" })
+      );
+      const { action } = await import("./billing.checkout");
+      await action({ request: postRequest(), params: {}, context: {} } as never);
+
+      expect(mockSetStripeCustomerId).toHaveBeenCalledWith("user-1", "cus_new_1");
+      expect(mockCheckoutSessionsCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ customer: "cus_new_1" })
+      );
+    });
+
+    it("does not swallow other Stripe errors", async () => {
+      mockCustomersRetrieve.mockRejectedValueOnce(
+        Object.assign(new Error("Rate limited"), { type: "StripeRateLimitError", code: "rate_limit" })
+      );
+      const { action } = await import("./billing.checkout");
+
+      await expect(action({ request: postRequest(), params: {}, context: {} } as never)).rejects.toThrow("Rate limited");
+      expect(mockCustomersCreate).not.toHaveBeenCalled();
+      expect(mockCheckoutSessionsCreate).not.toHaveBeenCalled();
+    });
   });
 
   it("creates the session with the expected shape and no payment_method_types, then redirects to its url", async () => {
