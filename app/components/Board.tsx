@@ -20,6 +20,7 @@ import { AttachmentsList } from "./AttachmentsList";
 import { CommandDeck } from "./CommandDeck";
 import { ActionItemsPanel } from "./ActionItemsPanel";
 import { useOptionalUser } from "~/context/userContext";
+import { ArchiveNotice, ClaimReminder, StartYourOwnBoard, guestFooterFor } from "./GuestNotices";
 
 const noteColors = [
   'bg-yellow-200',
@@ -31,8 +32,11 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, canFacilitate, readonly: isReadOnly } = useBoard();
+  const { id: boardId, columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, canFacilitate, readonly: isReadOnly, hasOwner, isOwner, isCreator, archivesAt } = useBoard();
   const user = useOptionalUser();
+  // A visitor with no session yet is a guest too: they arrive from a shared link.
+  const isGuest = !user || user.is_anonymous;
+  const guestFooter = guestFooterFor({ isGuest, isReadOnly, isCreator, hasArchiveNotice: Boolean(archivesAt) });
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -164,6 +168,9 @@ export default function Board() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex flex-wrap gap-4">
+          {archivesAt && (
+            <ArchiveNotice archivesAt={archivesAt} boardId={boardId} isGuest={isGuest} hasOwner={hasOwner} isOwner={isOwner} />
+          )}
           {boardLocked && (
             <div className="w-full py-1 text-center text-sm text-gray-400 dark:text-gray-500">
               This board has been locked by the owner
@@ -191,11 +198,8 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {!isReadOnly && user?.username === "Guest" && (
-        <p className="w-full mt-6 text-center text-sm text-gray-400 dark:text-gray-500">
-          You are using this board anonymously. <a href="/auth/login" className="underline hover:text-gray-600 dark:hover:text-gray-300">Log in</a> to claim this board and manage your boards from your dashboard.
-        </p>
-      )}
+      {guestFooter === "claim" && <ClaimReminder boardId={boardId} />}
+      {guestFooter === "invite" && <StartYourOwnBoard />}
       <AttachmentsList />
       {canFacilitate && <CommandDeck />}
       <TimerEndModal

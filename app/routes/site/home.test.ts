@@ -28,8 +28,10 @@ vi.mock("~/server/db_config", () => ({
 }));
 
 const mockCreateBoard = vi.fn();
+const mockSetBoardCreator = vi.fn();
 vi.mock("~/server/board_model", () => ({
   createBoard: (...args: unknown[]) => mockCreateBoard(...args),
+  setBoardCreator: (...args: unknown[]) => mockSetBoardCreator(...args),
 }));
 
 // Home renders <Form>/<Link> which need a data-router context we don't set
@@ -87,6 +89,9 @@ describe("home page action", () => {
     expect(response.headers.get("Location")).toBe("/app/board/new-board-id");
     expect(response.headers.get("Set-Cookie")).toBe("session-cookie-value");
     expect(mockCreateBoard).toHaveBeenCalledWith("My Retro");
+    // Recorded as creator, not owner: the board stays ownerless (ADR-0022),
+    // and created_by is what lets us see a guest come back to make another.
+    expect(mockSetBoardCreator).toHaveBeenCalledWith("new-board-id", anonId);
   });
 
   it("creates board with existing registered user session", async () => {
@@ -114,6 +119,7 @@ describe("home page action", () => {
     // GAP-002: even a registered visitor hitting the trial form gets a
     // crewless, ownerless board — it's claimable, not pre-owned.
     expect(mockCreateBoard).toHaveBeenCalledWith("Team Retro");
+    expect(mockSetBoardCreator).toHaveBeenCalledWith("new-board-id", "registered-user-1");
   });
 
   it("returns validation error when title is too short", async () => {

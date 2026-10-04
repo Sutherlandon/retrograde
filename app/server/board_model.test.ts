@@ -684,6 +684,24 @@ describe("getBoardServer facilitation + action item fields", () => {
   });
 });
 
+describe("getBoardServer guest-board fields", () => {
+  // The archive notice needs the board's age and archive state; the invite to
+  // start your own board needs to know whether the viewer created this one.
+  it("selects createdAt, archivedAt and whether the viewer is the recorded creator", async () => {
+    const { getBoardServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ board: { id: "board-1", columns: [], actionItems: [] } }],
+    });
+    await getBoardServer("board-1", "user-1");
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("'createdAt'");
+    expect(sql).toContain("'archivedAt'");
+    expect(sql).toContain("'isCreator'");
+    expect(sql).toContain("b.created_by = $2::uuid");
+  });
+});
+
 describe("createBoard", () => {
   // GAP-002: the model is "owner row iff the board is on a crew." Anonymous
   // (crewless) boards must have no owner and open_facilitation TRUE, or
@@ -738,6 +756,22 @@ describe("createBoard", () => {
       "What went well?",
       "What can we do better?",
     ]);
+  });
+});
+
+describe("setBoardCreator", () => {
+  // Attribution, not ownership: ownership is the owner row (ADR-0022), and
+  // created_by grants nothing. It is how a returning guest can be counted.
+  it("records the creator on a board that has none, without an owner row", async () => {
+    const { setBoardCreator } = await import("./board_model");
+
+    await setBoardCreator("board-1", "guest-1");
+
+    expect(mockPoolQuery).toHaveBeenCalledTimes(1);
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toMatch(/UPDATE boards SET created_by = \$1 WHERE id = \$2 AND created_by IS NULL/);
+    expect(params).toEqual(["guest-1", "board-1"]);
+    expect(sql).not.toContain("board_members");
   });
 });
 

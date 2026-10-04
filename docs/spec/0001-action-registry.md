@@ -87,14 +87,14 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
 | SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
-| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only · on a self-hosted instance the action redirects to `/app/dashboard` and creates nothing (ADR-0021) | Verified   |
+| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only · records the visitor as `created_by` without an owner row, so the board stays ownerless · on a self-hosted instance the action redirects to `/app/dashboard` and creates nothing (ADR-0021) | Verified   |
 | SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Verified |
 | SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed; 404 when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
 | SITE-007 | View the link-preview card (`/og-card`) | Anyone | `routes/og-card.tsx`    | none needed; read-only, `noindex`, not in the sitemap; its loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-008 | robots.txt                             | Anyone | `routes/robots.ts`       | none needed; read-only. On `retrograde.sh` it closes `/app/` (except the example board), `/board/`, `/api/` and `/auth/` and names the sitemap; on any other host — staging, previews, a self-hosted instance — it disallows everything | Verified |
 
-Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 30-day TTL (ADR-0005).
+Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 30-day TTL (ADR-0005). The board itself tells every viewer the date it will be archived, and tells a guest to log in and claim it (BRD-020) to keep it.
 
 ## AUTH — identity
 

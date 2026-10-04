@@ -1,5 +1,5 @@
 import { redirect, useActionData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
-import { createBoard } from "~/server/board_model";
+import { createBoard, setBoardCreator } from "~/server/board_model";
 import { getOrCreateUser } from "~/hooks/useAuth";
 import { commitSession } from "~/session.server";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
@@ -90,8 +90,11 @@ export async function action({ request }: ActionFunctionArgs) {
   // ADR-0011). It stays ownerless and open to everyone until claimed.
   const board_id = await createBoard(title!);
 
-  // ensure the visitor has an identity (creates an anonymous user if needed)
-  const { session, isNew } = await getOrCreateUser(request, board_id);
+  // ensure the visitor has an identity (creates an anonymous user if needed),
+  // then record them as the creator. The board was made first because a new
+  // guest's users.board_id points at it; created_by grants no ownership.
+  const { user, session, isNew } = await getOrCreateUser(request, board_id);
+  await setBoardCreator(board_id, user.id);
 
   // redirect with session cookie if a new anonymous user was created
   const headers: HeadersInit = {};

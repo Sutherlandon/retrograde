@@ -75,6 +75,10 @@ export interface BoardDTO {
   readonly: boolean;       // true for example boards — server sets this
   hasOwner?: boolean;      // true when ANY owner row exists — drives the claim button (BRD-020)
   isOwner?: boolean;       // true when the current user is the board owner
+  isCreator?: boolean;     // true when the current user is boards.created_by (attribution, not ownership)
+  createdAt?: string;      // ISO, UTC; absent on the static example boards
+  archivedAt?: string | null;
+  archivesAt?: string | null; // ISO date the archive job will take this board, or null — set by the loader (auto_archive.ts)
   canFacilitate?: boolean; // owner OR facilitator role OR open_facilitation — see ADR-0006
   openFacilitation?: boolean;
   team_id?: string | null; // null = teamless (trial / grandfathered); see ADR-0003
@@ -153,6 +157,8 @@ export interface BoardClientState {
   readonly: boolean;
   hasOwner: boolean; // true when ANY owner row exists — drives the claim button (BRD-020)
   isOwner: boolean;
+  isCreator: boolean;        // viewer is the board's recorded creator — tells the starter apart from participants
+  archivesAt: string | null; // when the archive job may take this guest board; null when it never will
   // Facilitation — owner, granted facilitator, or open_facilitation. Gates the
   // Command Deck and board-level action item management. See ADR-0006.
   canFacilitate: boolean;

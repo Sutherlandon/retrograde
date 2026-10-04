@@ -22,6 +22,17 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       -- BRD-020: whether the board has an owner at all, independent of the
       -- viewer — drives the "Claim this board" control (GAP-002).
       'hasOwner',       EXISTS(SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.role = 'owner'),
+      -- Guest-board notices: the board's age and archive state give its archive
+      -- date (auto_archive.ts), and isCreator tells the person who started it
+      -- apart from participants. created_at is a UTC timestamp without a zone;
+      -- archived_at carries one.
+      'createdAt',      to_char(b.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'archivedAt',     to_char(b.archived_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+      'isCreator',      CASE
+                          WHEN $2::uuid IS NOT NULL
+                          THEN COALESCE(b.created_by = $2::uuid, FALSE)
+                          ELSE FALSE
+                        END,
       'isOwner',        CASE
                           WHEN $2::uuid IS NOT NULL
                           THEN EXISTS(SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.user_id = $2::uuid AND bm.role = 'owner')
@@ -228,6 +239,13 @@ export async function createBoard(
   } finally {
     client.release();
   }
+}
+
+// Records who created a board. Attribution only: ownership is the owner row
+// (ADR-0022) and created_by grants nothing, so a guest's board stays ownerless.
+// It is what lets metrics count active boards and a returning guest creator.
+export async function setBoardCreator(boardId: string, userId: string): Promise<void> {
+  await pool.query(`UPDATE boards SET created_by = $1 WHERE id = $2 AND created_by IS NULL`, [userId, boardId]);
 }
 
 export async function createBoardWithColumns(
