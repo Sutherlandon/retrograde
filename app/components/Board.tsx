@@ -20,7 +20,7 @@ import { AttachmentsList } from "./AttachmentsList";
 import { CommandDeck } from "./CommandDeck";
 import { ActionItemsPanel } from "./ActionItemsPanel";
 import { useOptionalUser } from "~/context/userContext";
-import { ArchiveNotice, ClaimReminder, StartYourOwnBoard, guestFooterFor } from "./GuestNotices";
+import { GuestFooter } from "./GuestNotices";
 
 const noteColors = [
   'bg-yellow-200',
@@ -36,7 +36,6 @@ export default function Board() {
   const user = useOptionalUser();
   // A visitor with no session yet is a guest too: they arrive from a shared link.
   const isGuest = !user || user.is_anonymous;
-  const guestFooter = guestFooterFor({ isGuest, isReadOnly, isCreator, hasArchiveNotice: Boolean(archivesAt) });
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -168,9 +167,6 @@ export default function Board() {
         onDragEnd={handleDragEnd}
       >
         <div className="flex flex-wrap gap-4">
-          {archivesAt && (
-            <ArchiveNotice archivesAt={archivesAt} boardId={boardId} isGuest={isGuest} hasOwner={hasOwner} isOwner={isOwner} />
-          )}
           {boardLocked && (
             <div className="w-full py-1 text-center text-sm text-gray-400 dark:text-gray-500">
               This board has been locked by the owner
@@ -198,8 +194,15 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {guestFooter === "claim" && <ClaimReminder boardId={boardId} />}
-      {guestFooter === "invite" && <StartYourOwnBoard />}
+      <GuestFooter
+        boardId={boardId}
+        archivesAt={archivesAt}
+        isGuest={isGuest}
+        isReadOnly={isReadOnly}
+        isCreator={isCreator}
+        hasOwner={hasOwner}
+        isOwner={isOwner}
+      />
       <AttachmentsList />
       {canFacilitate && <CommandDeck />}
       <TimerEndModal

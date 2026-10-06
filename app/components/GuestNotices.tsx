@@ -1,27 +1,37 @@
 // app/components/GuestNotices.tsx
-// What a guest is told on a board: when a crewless board will be archived,
-// and, for anyone who did not start it, how to run their own team's retro.
+// The one line under a board for each viewer. Whoever can keep a crewless
+// board is told how long it is kept and how to keep it; a guest who joined
+// someone else's board, or a signed-out visitor on an example board, is
+// invited to start their own. Nobody is shown both.
 import { CREATE_FORM_ID } from "~/components/landing/CreateBoardLink";
 
-type GuestFooter = "invite" | "claim" | null;
+type GuestFooterKind = "keep" | "claim" | "invite" | null;
 
-// Which line closes the board for this viewer. Signed-in users get neither:
-// they have a dashboard. The guest who started the board is reminded to claim
-// it unless the archive notice already says so; everyone else is invited.
 export function guestFooterFor({
   isGuest,
   isReadOnly,
   isCreator,
-  hasArchiveNotice,
+  hasArchiveDate,
+  hasOwner,
+  isOwner,
 }: {
   isGuest: boolean;
   isReadOnly: boolean;
   isCreator: boolean;
-  hasArchiveNotice: boolean;
-}): GuestFooter {
-  if (!isGuest) return null;
-  if (isReadOnly || !isCreator) return "invite";
-  return hasArchiveNotice ? null : "claim";
+  hasArchiveDate: boolean;
+  hasOwner: boolean;
+  isOwner: boolean;
+}): GuestFooterKind {
+  if (isReadOnly) return isGuest ? "invite" : null;
+  if (isGuest) {
+    // Keeping the board is the creator's business, not a participant's.
+    if (!isCreator) return "invite";
+    return hasArchiveDate ? "keep" : "claim";
+  }
+  // A signed-in user may be the guest creator after logging in (a new user
+  // id), so anyone who can claim an unclaimed board is told, as is its owner.
+  if (hasArchiveDate && (!hasOwner || isOwner)) return "keep";
+  return null;
 }
 
 function loginHref(boardId: string): string {
@@ -29,46 +39,41 @@ function loginHref(boardId: string): string {
 }
 
 // UTC with a fixed locale, so the server render and the browser agree.
-function formatArchiveDate(iso: string): string {
+function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
 }
 
-export function ArchiveNotice({
+const FOOTER = "w-full mt-6 text-center text-sm text-gray-500 dark:text-gray-400";
+const LINK = "font-semibold text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300";
+
+// "Kept until" is the last day the board is certain to be there: the archive
+// job takes it on its first daily run after that moment.
+export function KeepNotice({
   archivesAt,
   boardId,
   isGuest,
-  hasOwner,
   isOwner,
 }: {
   archivesAt: string;
   boardId: string;
   isGuest: boolean;
-  hasOwner: boolean;
   isOwner: boolean;
 }) {
-  let action: React.ReactNode = null;
+  const until = formatDate(archivesAt);
   if (isGuest) {
-    action = (
-      <>
-        {" "}
-        <a href={loginHref(boardId)} className="font-semibold underline hover:text-amber-700 dark:hover:text-amber-100">
+    return (
+      <p className={FOOTER}>
+        This guest board is kept until {until}.{" "}
+        <a href={loginHref(boardId)} className={LINK}>
           Log in
         </a>{" "}
-        and claim it to keep it.
-      </>
+        and claim it to keep it for good.
+      </p>
     );
-  } else if (!hasOwner) {
-    action = " Claim it to keep it.";
-  } else if (isOwner) {
-    action = " Move it to a crew to keep it.";
   }
-
   return (
-    <p
-      role="status"
-      className="w-full rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-center text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
-    >
-      This board will be archived after {formatArchiveDate(archivesAt)}.{action}
+    <p className={FOOTER}>
+      This board is kept until {until}. {isOwner ? "Move it to a crew" : "Claim it"} to keep it for good.
     </p>
   );
 }
@@ -77,9 +82,9 @@ export function ArchiveNotice({
 // open for everyone and floats over the right of the page.
 export function StartYourOwnBoard() {
   return (
-    <p className="w-full mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+    <p className={FOOTER}>
       Want Retrograde for your own team?{" "}
-      <a href={`/#${CREATE_FORM_ID}`} className="font-semibold text-blue-600 underline hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+      <a href={`/#${CREATE_FORM_ID}`} className={LINK}>
         Start a free board
       </a>
       , no account needed.
@@ -89,12 +94,38 @@ export function StartYourOwnBoard() {
 
 export function ClaimReminder({ boardId }: { boardId: string }) {
   return (
-    <p className="w-full mt-6 text-center text-sm text-gray-400 dark:text-gray-500">
+    <p className={FOOTER}>
       You are using this board anonymously.{" "}
-      <a href={loginHref(boardId)} className="underline hover:text-gray-600 dark:hover:text-gray-300">
+      <a href={loginHref(boardId)} className={LINK}>
         Log in
       </a>{" "}
       to claim this board and manage your boards from your dashboard.
     </p>
   );
+}
+
+export function GuestFooter({
+  boardId,
+  archivesAt,
+  isGuest,
+  isReadOnly,
+  isCreator,
+  hasOwner,
+  isOwner,
+}: {
+  boardId: string;
+  archivesAt: string | null;
+  isGuest: boolean;
+  isReadOnly: boolean;
+  isCreator: boolean;
+  hasOwner: boolean;
+  isOwner: boolean;
+}) {
+  const kind = guestFooterFor({ isGuest, isReadOnly, isCreator, hasArchiveDate: Boolean(archivesAt), hasOwner, isOwner });
+  if (kind === "keep" && archivesAt) {
+    return <KeepNotice archivesAt={archivesAt} boardId={boardId} isGuest={isGuest} isOwner={isOwner} />;
+  }
+  if (kind === "claim") return <ClaimReminder boardId={boardId} />;
+  if (kind === "invite") return <StartYourOwnBoard />;
+  return null;
 }
