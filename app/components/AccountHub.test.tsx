@@ -53,6 +53,16 @@ describe("AccountHub", () => {
     expect(screen.queryByText("Admin Dashboard")).not.toBeInTheDocument();
   });
 
+  // Page content (the landing hero and its create-board form) sits at z-10, so
+  // the dropdown has to stack above that or the form paints over it.
+  it("stacks the dropdown above page content", () => {
+    render(<AccountHub user={user} hideLogout={false} />);
+    fireEvent.click(screen.getByText("testuser"));
+    const container = screen.getByRole("menu").parentElement!;
+    const zIndex = Number(container.className.match(/\bz-(\d+)\b/)?.[1]);
+    expect(zIndex).toBeGreaterThan(10);
+  });
+
   it("shows a login button when no user is present", () => {
     render(<AccountHub hideLogout={false} />);
     expect(screen.getByText("Log In").closest("a")).toHaveAttribute("href", "/auth/login");
