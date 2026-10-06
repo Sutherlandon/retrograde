@@ -54,7 +54,7 @@ export default function AccountHub({ user, closeMenu, hideLogout, buttonClassNam
   }, []);
 
   return (
-    <div className="relative z-1" ref={containerRef}>
+    <div className="relative z-30" ref={containerRef}>
       {user ? (
         <Button
           ref={buttonRef}
