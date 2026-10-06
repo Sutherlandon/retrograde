@@ -3,7 +3,7 @@ import { requireRegisteredUser } from "~/hooks/useAuth";
 import { pool } from "~/server/db_config";
 import { ensurePersonalTeam } from "~/server/team_model";
 import { logMetric } from "~/server/logger";
-import { recordGrowthEvent } from "~/server/growth_model";
+import { recordEvent } from "~/server/event_model";
 
 export async function action({ request }: ActionFunctionArgs) {
   const user = await requireRegisteredUser(request);
@@ -76,8 +76,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   logMetric("Claim Board", { userId: user.id, boardId });
-  // Durable: the kept-until line's conversion (BRD-021), whichever control
-  // the claim came from — a follow-up matches it to that board's keep_click.
-  await recordGrowthEvent("board_claimed", { boardId, userId: user.id });
+  // The kept-until line's conversion (BRD-021), whichever control the claim
+  // came from: a follow-up matches it to that board's keep_click. Tagged
+  // BRD-020; DASH-016 posts to this same action and cannot be told apart.
+  await recordEvent("board_claimed", { actionId: "BRD-020", boardId, userId: user.id, teamId });
   return { success: true };
 }

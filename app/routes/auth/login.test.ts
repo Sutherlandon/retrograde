@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockRecordGrowthEvent = vi.fn();
-vi.mock("~/server/growth_model", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/growth_model")>()),
-  recordGrowthEvent: (...args: unknown[]) => mockRecordGrowthEvent(...args),
+const mockRecordEvent = vi.fn();
+vi.mock("~/server/event_model", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/event_model")>()),
+  recordEvent: (...args: unknown[]) => mockRecordEvent(...args),
 }));
 
 // The visitor's existing session, if any (a guest's userId).
@@ -74,7 +74,7 @@ describe("GET /auth/login", () => {
 // counted against the board it came from before sign-in starts.
 describe("GET /auth/login from a board's Log in link [BRD-021]", () => {
   beforeEach(() => {
-    mockRecordGrowthEvent.mockClear();
+    mockRecordEvent.mockClear();
     seed.userId = undefined;
   });
 
@@ -85,7 +85,7 @@ describe("GET /auth/login from a board's Log in link [BRD-021]", () => {
 
     const res = (await loader({ request })) as unknown as Response;
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("keep_click", { boardId: "board-1", userId: "guest-1" });
+    expect(mockRecordEvent).toHaveBeenCalledWith("keep_click", { actionId: "BRD-021", boardId: "board-1", userId: "guest-1" });
     expect(res.status).toBe(302);
   });
 
@@ -95,7 +95,7 @@ describe("GET /auth/login from a board's Log in link [BRD-021]", () => {
 
     await loader({ request });
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("claim_reminder_click", { boardId: "board-1", userId: null });
+    expect(mockRecordEvent).toHaveBeenCalledWith("claim_reminder_click", { actionId: "BRD-020", boardId: "board-1", userId: null });
   });
 
   it("records nothing for a login without a known ref", async () => {
@@ -104,6 +104,6 @@ describe("GET /auth/login from a board's Log in link [BRD-021]", () => {
     await loader({ request: new Request("http://localhost:3000/auth/login?returnTo=/app/dashboard") });
     await loader({ request: new Request("http://localhost:3000/auth/login?returnTo=/app/board/b&ref=other") });
 
-    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+    expect(mockRecordEvent).not.toHaveBeenCalled();
   });
 });

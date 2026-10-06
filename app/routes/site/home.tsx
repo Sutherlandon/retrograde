@@ -17,7 +17,7 @@ import CreateBoardLink from "~/components/landing/CreateBoardLink";
 import { HowItWorks, IdeaBoards, WhatsNew, SectionIntro } from "~/components/landing/LandingFeatures";
 import { Pricing, Faq } from "~/components/landing/LandingPricing";
 import { selfHosted } from "~/server/db_config";
-import { boardIdFromParam, recordGrowthEvent } from "~/server/growth_model";
+import { boardIdFromParam, recordEvent } from "~/server/event_model";
 import { INVITE_REF } from "~/config/growth_refs";
 
 // Link previews fetch og:image from whichever deployment served the page, so
@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!selfHosted && url.searchParams.get("ref") === INVITE_REF) {
     const from = boardIdFromParam(url.searchParams.get("from"));
     const session = await getSession(request.headers.get("Cookie"));
-    await recordGrowthEvent("invite_click", { boardId: from, userId: session.get("userId") ?? null });
+    await recordEvent("invite_click", { actionId: "BRD-022", boardId: from, userId: session.get("userId") ?? null });
     invite = { from };
   }
   return { origin: url.origin, invite };
@@ -123,11 +123,13 @@ export async function action({ request }: ActionFunctionArgs) {
   await setBoardCreator(board_id, user.id);
 
   // BRD-022: the invite's conversion — a board started from another board.
+  // The event's board is the new one; the board the invite was on is a property.
   if (formData.get("ref") === INVITE_REF) {
-    await recordGrowthEvent("invite_board_created", {
-      boardId: boardIdFromParam(formData.get("from")?.toString()),
-      resultBoardId: board_id,
+    await recordEvent("invite_board_created", {
+      actionId: "SITE-003",
+      boardId: board_id,
       userId: user.id,
+      properties: { from_board_id: boardIdFromParam(formData.get("from")?.toString()) },
     });
   }
 

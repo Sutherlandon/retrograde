@@ -120,14 +120,18 @@ describe("initializeDatabase", () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  // The follow-up on the board calls to action reads this table; [METRIC]
-  // lines only last as long as Vercel keeps runtime logs.
-  it("creates the growth_events table idempotently", async () => {
+  // ADR-0026: one append-only events table, tagged with registry IDs, that
+  // feature tracking and the board calls to action read. [METRIC] lines only
+  // last as long as Vercel keeps runtime logs.
+  it("creates the events table idempotently", async () => {
     await runInit();
 
-    const ddl = schemaConnect.queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS growth_events"));
+    const ddl = schemaConnect.queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS events"));
     expect(ddl).toBeDefined();
-    expect(ddl).toContain("event TEXT NOT NULL");
+    expect(ddl).toContain("name TEXT NOT NULL");
+    expect(ddl).toContain("action_id TEXT");
+    expect(ddl).toContain("properties JSONB NOT NULL DEFAULT '{}'");
     expect(ddl).toContain("created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
+    expect(ddl).toContain("CREATE INDEX IF NOT EXISTS idx_events_action_created ON events(action_id, created_at)");
   });
 });

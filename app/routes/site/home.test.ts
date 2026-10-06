@@ -27,10 +27,10 @@ vi.mock("~/server/db_config", () => ({
   },
 }));
 
-const mockRecordGrowthEvent = vi.fn();
-vi.mock("~/server/growth_model", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("~/server/growth_model")>()),
-  recordGrowthEvent: (...args: unknown[]) => mockRecordGrowthEvent(...args),
+const mockRecordEvent = vi.fn();
+vi.mock("~/server/event_model", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/event_model")>()),
+  recordEvent: (...args: unknown[]) => mockRecordEvent(...args),
 }));
 
 const mockCreateBoard = vi.fn();
@@ -173,7 +173,7 @@ describe("invite attribution [BRD-022]", () => {
 
     const data = await loader({ request } as never);
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_click", { boardId: "board-1", userId: "guest-1" });
+    expect(mockRecordEvent).toHaveBeenCalledWith("invite_click", { actionId: "BRD-022", boardId: "board-1", userId: "guest-1" });
     expect(data).toEqual({ origin: "http://localhost:3000", invite: { from: "board-1" } });
   });
 
@@ -183,7 +183,7 @@ describe("invite attribution [BRD-022]", () => {
 
     const data = await loader({ request } as never);
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_click", { boardId: null, userId: null });
+    expect(mockRecordEvent).toHaveBeenCalledWith("invite_click", { actionId: "BRD-022", boardId: null, userId: null });
     expect(data).toEqual({ origin: "http://localhost:3000", invite: { from: null } });
   });
 
@@ -192,7 +192,7 @@ describe("invite attribution [BRD-022]", () => {
 
     await loader({ request: new Request("http://localhost:3000/?utm_source=slack") } as never);
 
-    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+    expect(mockRecordEvent).not.toHaveBeenCalled();
   });
 
   it("records the board created from an invite, with the board it came from", async () => {
@@ -205,10 +205,13 @@ describe("invite attribution [BRD-022]", () => {
 
     await action({ request, params: {}, context: {} } as never);
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_board_created", {
-      boardId: "board-1",
-      resultBoardId: "new-board-id",
+    // The event's board is the one created (SITE-003); the board the invite
+    // was on rides in properties.
+    expect(mockRecordEvent).toHaveBeenCalledWith("invite_board_created", {
+      actionId: "SITE-003",
+      boardId: "new-board-id",
       userId: "guest-2",
+      properties: { from_board_id: "board-1" },
     });
   });
 
@@ -222,7 +225,7 @@ describe("invite attribution [BRD-022]", () => {
 
     await action({ request, params: {}, context: {} } as never);
 
-    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+    expect(mockRecordEvent).not.toHaveBeenCalled();
   });
 
   // React Router reruns a route's loader after its action. A validation error

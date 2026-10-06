@@ -100,7 +100,7 @@ Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 
 
 | ID       | Action                                                    | Who            | Code path                    | Guard       | Status   |
 | -------- | --------------------------------------------------------- | -------------- | ---------------------------- | ----------- | -------- |
-| AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —; a link from under a board (`ref=keep-notice` or `ref=claim-reminder`) records `keep_click` or `claim_reminder_click` in `growth_events` first (BRD-021) | Verified |
+| AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —; a link from under a board (`ref=keep-notice` or `ref=claim-reminder`) records `keep_click` or `claim_reminder_click` in `events` first (BRD-021, ADR-0026) | Verified |
 | AUTH-002 | OAuth callback; create/refresh user; ensure personal crew | Anyone         | `routes/auth/callback.ts`    | state param | Verified |
 | AUTH-003 | Log out                                                   | Session holder | `routes/auth/logout.ts`      | —; redirects to `OAUTH_LOGOUT_REDIRECT_URL` (default `/`); the logout control is hidden when `HIDE_LOGOUT=true` (ADR-0017) | Verified |
 | AUTH-004 | Get an anonymous user record on first board visit         | Anyone         | `components/BoardLayout.tsx` | —; never on a self-hosted instance, which sends the visitor to sign in instead (ADR-0021) | Verified |

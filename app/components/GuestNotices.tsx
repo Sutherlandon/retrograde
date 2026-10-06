@@ -36,7 +36,7 @@ export function guestFooterFor({
 }
 
 // Each link carries a ref so the route it lands on can record the click
-// (growth_model.ts): login for the two Log in links, the homepage for the invite.
+// (event_model.ts): login for the two Log in links, the homepage for the invite.
 function loginHref(boardId: string, ref: string): string {
   return `/auth/login?returnTo=${encodeURIComponent(`/app/board/${boardId}`)}&ref=${ref}`;
 }

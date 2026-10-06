@@ -506,21 +506,25 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_users_stripe_customer_id ON users(stripe_customer_id);
     `);
 
-    // 34 Growth events (growth_model.ts): the board calls to action and the
-    //    clicks, boards and claims they lead to. [METRIC] lines last only as
-    //    long as Vercel keeps runtime logs; these rows are what a follow-up
-    //    reads. No foreign keys: the example boards have no boards row, and an
-    //    event must outlive a deleted board or user.
+    // 34 Events (event_model.ts, ADR-0026): one append-only record of what
+    //    people do, each tagged with the registry ID of its action, so feature
+    //    use is counted against the registry. [METRIC] lines last only as long
+    //    as Vercel keeps runtime logs; these rows are what a follow-up reads.
+    //    No foreign keys: the example boards have no boards row, and an event
+    //    must outlive a deleted board, crew or user.
     await client.query(`
-      CREATE TABLE IF NOT EXISTS growth_events (
+      CREATE TABLE IF NOT EXISTS events (
         id BIGSERIAL PRIMARY KEY,
-        event TEXT NOT NULL,
-        board_id TEXT,
-        result_board_id TEXT,
+        name TEXT NOT NULL,
+        action_id TEXT,
         user_id UUID,
+        board_id TEXT,
+        team_id UUID,
+        properties JSONB NOT NULL DEFAULT '{}',
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
-      CREATE INDEX IF NOT EXISTS idx_growth_events_event_created ON growth_events(event, created_at);
+      CREATE INDEX IF NOT EXISTS idx_events_name_created ON events(name, created_at);
+      CREATE INDEX IF NOT EXISTS idx_events_action_created ON events(action_id, created_at);
     `);
 
     console.log("Done");

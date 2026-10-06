@@ -22,9 +22,9 @@ vi.mock("~/server/db_config", () => ({
   },
 }));
 
-const mockRecordGrowthEvent = vi.fn();
-vi.mock("~/server/growth_model", () => ({
-  recordGrowthEvent: (...args: unknown[]) => mockRecordGrowthEvent(...args),
+const mockRecordEvent = vi.fn();
+vi.mock("~/server/event_model", () => ({
+  recordEvent: (...args: unknown[]) => mockRecordEvent(...args),
 }));
 
 const mockEnsurePersonalTeam = vi.fn();
@@ -218,14 +218,19 @@ describe("board.claim action (DASH-016)", () => {
 // BRD-021: a claim is the kept-until line's conversion. Every successful claim
 // is recorded, whichever control it came from, so a follow-up can match it to
 // the keep_click on the same board.
-describe("board.claim growth event", () => {
+describe("board.claim event", () => {
   it("records board_claimed with the board and the claimer", async () => {
     const { action } = await import("./board.claim");
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ owner_id: null }] });
 
     await action({ request: claimRequest("http://localhost:3000/app/board/board-1"), params: {}, context: {} } as never);
 
-    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("board_claimed", { boardId: "board-1", userId: "human-1" });
+    expect(mockRecordEvent).toHaveBeenCalledWith("board_claimed", {
+      actionId: "BRD-020",
+      boardId: "board-1",
+      userId: "human-1",
+      teamId: "personal-team-1",
+    });
   });
 
   it("records nothing when the claim is refused", async () => {
@@ -234,6 +239,6 @@ describe("board.claim growth event", () => {
 
     await action({ request: claimRequest("http://localhost:3000/app/board/board-1"), params: {}, context: {} } as never);
 
-    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+    expect(mockRecordEvent).not.toHaveBeenCalled();
   });
 });
