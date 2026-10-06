@@ -23,14 +23,14 @@ export function Pricing() {
           name="Guest"
           price="Free"
           blurb="For a one-off retro, right now."
-          perks={["Board in seconds, no account", "Everyone with the link can join", "Board lives for 30 days"]}
+          perks={["Create a board in seconds", "Everyone with the link can join", "Full-featured board", "Boards archive after 30 days"]}
           cta={<CreateBoardLink className="w-full" />}
         />
         <Plan
-          name="Registered"
+          name="Pilot"
           price="Free"
           blurb="For facilitators who run retros every sprint."
-          perks={["Boards you keep for good", "Claim guest boards you started", "Facilitator controls", "One AI crewmate"]}
+          perks={["Permanent boards, all in one place", "Claim guest boards to keep them", "You choose who facilitates", "1 AI crewmate"]}
           cta={<a href="/auth/login" className={CTA_SECONDARY}>Sign in free</a>}
         />
         <Plan
@@ -38,8 +38,8 @@ export function Pricing() {
           name="Crew"
           price="$39.99"
           period="/month"
-          blurb="For teams that retro together."
-          perks={["Named crews with human members", "Members-only boards", "Crew action items", "Unlimited AI crewmates"]}
+          blurb="One flat price, however many teams you run."
+          perks={["Unlimited crews and members", "Unlimited AI crewmates", "Private, members-only boards", "Crew-level action items"]}
           cta={<a href="/auth/login?returnTo=%2Fapp%2Fcrews" className={CTA_SECONDARY}>Start a crew</a>}
         />
       </div>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, within } from "@testing-library/react";
 import React from "react";
 
 // Track session data across mock calls
@@ -392,11 +392,46 @@ describe("homepage [SITE-001]", () => {
 
     const pricing = screen.getByRole("region", { name: /Bring the crew/i });
     expect(pricing).toHaveTextContent("$39.99");
-    expect(pricing).toHaveTextContent("Guest");
-    expect(pricing).toHaveTextContent("Registered");
-    expect(pricing).toHaveTextContent("Crew");
+    for (const name of ["Guest", "Pilot", "Crew"]) {
+      expect(within(pricing).getByRole("heading", { name, level: 3 })).toBeInTheDocument();
+    }
     const contact = screen.getAllByRole("link", { name: /Contact us/i });
     expect(contact[0]).toHaveAttribute("href", "/contact");
+  });
+
+  // Each plan's list is what that tier adds. Guest boards have open
+  // facilitation (ADR-0011), so the free account's perk is choosing who
+  // facilitates, and the crew plan is one flat price for any number of crews.
+  it("lists what each plan adds", async () => {
+    const { default: Home } = await import("./home");
+    render(React.createElement(Home));
+
+    const perksByPlan: Record<string, string[]> = {
+      Guest: [
+        "Create a board in seconds",
+        "Everyone with the link can join",
+        "Full-featured board",
+        "Boards archive after 30 days",
+      ],
+      Pilot: [
+        "Permanent boards, all in one place",
+        "Claim guest boards to keep them",
+        "You choose who facilitates",
+        "1 AI crewmate",
+      ],
+      Crew: [
+        "Unlimited crews and members",
+        "Unlimited AI crewmates",
+        "Private, members-only boards",
+        "Crew-level action items",
+      ],
+    };
+    const pricing = screen.getByRole("region", { name: /Bring the crew/i });
+    for (const [name, perks] of Object.entries(perksByPlan)) {
+      const plan = within(pricing).getByRole("heading", { name, level: 3 }).closest("article")!;
+      expect(within(plan).getAllByRole("listitem").map((li) => li.textContent?.trim())).toEqual(perks);
+    }
+    expect(pricing).toHaveTextContent("One flat price, however many teams you run.");
   });
 
   it("points every create-board CTA at the hero form", async () => {
