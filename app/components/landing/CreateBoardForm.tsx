@@ -4,10 +4,21 @@
 import { Form, Link } from "react-router";
 import { RocketIcon } from "~/images/icons";
 import { CREATE_FORM_ID } from "./CreateBoardLink";
+import { INVITE_REF } from "~/config/growth_refs";
 
 export type CreateBoardErrors = { title?: string; no_jerks?: string };
 
-export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors }) {
+// Set when the visitor followed a board's invite (BRD-022); `from` is the
+// board they came from, or null when its id was malformed.
+export type InviteReferral = { from: string | null };
+
+export default function CreateBoardForm({
+  errors,
+  invite = null,
+}: {
+  errors?: CreateBoardErrors;
+  invite?: InviteReferral | null;
+}) {
   return (
     <div
       id={CREATE_FORM_ID}
@@ -18,6 +29,12 @@ export default function CreateBoardForm({ errors }: { errors?: CreateBoardErrors
       </p>
       <h2 className="py-0 mb-6 text-2xl font-bold text-white">Create Your First Board</h2>
       <Form method="post">
+        {invite && (
+          <>
+            <input type="hidden" name="ref" value={INVITE_REF} />
+            {invite.from && <input type="hidden" name="from" value={invite.from} />}
+          </>
+        )}
         <div aria-hidden="true" style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>
           <label htmlFor="website">Website</label>
           <input type="text" id="website" name="website" autoComplete="off" tabIndex={-1} />

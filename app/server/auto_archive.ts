@@ -9,8 +9,28 @@
 // Boards on a team (personal or otherwise) are never auto-archived: being on
 // a team signals "this matters and I have an account here."
 
-import { pool } from "./db_config";
+import { pool, selfHosted } from "./db_config";
 import { GRANDFATHER_CUTOFF, FREE_TIER_TTL_DAYS } from "~/config/grandfather";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The moment archiveStaleBoards becomes free to take this board, as an ISO
+ * string, or null when it never will. Mirrors that query's WHERE clause so the
+ * date a guest sees on the board is the rule that will be applied. The job
+ * runs daily, so the board goes on its first run after this moment.
+ */
+export function archiveDateFor(board: {
+  team_id?: string | null;
+  createdAt?: string;
+  archivedAt?: string | null;
+}): string | null {
+  // A self-hosted instance runs no scheduled cleanup (ADR-0020).
+  if (selfHosted || board.team_id || board.archivedAt || !board.createdAt) return null;
+  const created = new Date(board.createdAt).getTime();
+  if (Number.isNaN(created) || created <= new Date(GRANDFATHER_CUTOFF).getTime()) return null;
+  return new Date(created + FREE_TIER_TTL_DAYS * DAY_MS).toISOString();
+}
 
 export interface ArchiveStaleResult {
   archived: number;

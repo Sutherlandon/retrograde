@@ -9,6 +9,7 @@ import { getBoardServer, stopTimerServer } from "~/server/board_model";
 import { getAttachmentsServer } from "~/server/attachment_model";
 import { getOptionalUser } from "~/hooks/useAuth";
 import { requireBoardAccess } from "~/server/board_permissions";
+import { archiveDateFor } from "~/server/auto_archive";
 import { exampleBoardTutorial } from "~/example-data/example_board_tutorial";
 import { exampleBoardRealWorld } from "~/example-data/real_ai_example";
 import { isExampleBoardId } from "~/example-data/example_board_ids";
@@ -54,6 +55,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   board.attachments = await getAttachmentsServer(board_id);
+  // Shown to guests so a crewless board is not archived without warning.
+  board.archivesAt = archiveDateFor(board);
 
   return board;
 }

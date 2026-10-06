@@ -5,6 +5,7 @@ vi.mock("~/server/db_config", () => ({
   pool: {
     query: (...args: unknown[]) => mockPoolQuery(...args),
   },
+  selfHosted: false,
 }));
 
 const mockRequireBoardAccess = vi.fn();
@@ -86,5 +87,39 @@ describe("board.tsx loader", () => {
     });
     expect(mockGetBoardServer).toHaveBeenCalledWith("real-board-1", undefined);
     expect((result as { id: string }).id).toBe("real-board-1");
+  });
+
+  it("attaches the date a crewless guest board will be archived", async () => {
+    const { loader } = await import("./board");
+    mockGetBoardServer.mockResolvedValueOnce({
+      id: "guest-board",
+      team_id: null,
+      createdAt: "2026-10-05T14:30:00Z",
+      archivedAt: null,
+      timerRunning: false,
+      timerEndsAt: null,
+    });
+
+    const request = new Request("http://localhost:3000/app/board/guest-board");
+    const result = await loader({ request, params: { id: "guest-board" }, context: {} } as never);
+
+    expect((result as { archivesAt: string | null }).archivesAt).toBe("2026-11-04T14:30:00.000Z");
+  });
+
+  it("attaches no archive date to a board on a crew", async () => {
+    const { loader } = await import("./board");
+    mockGetBoardServer.mockResolvedValueOnce({
+      id: "crew-board",
+      team_id: "team-1",
+      createdAt: "2026-10-05T14:30:00Z",
+      archivedAt: null,
+      timerRunning: false,
+      timerEndsAt: null,
+    });
+
+    const request = new Request("http://localhost:3000/app/board/crew-board");
+    const result = await loader({ request, params: { id: "crew-board" }, context: {} } as never);
+
+    expect((result as { archivesAt: string | null }).archivesAt).toBeNull();
   });
 });

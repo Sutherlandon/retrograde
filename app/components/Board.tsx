@@ -20,6 +20,7 @@ import { AttachmentsList } from "./AttachmentsList";
 import { CommandDeck } from "./CommandDeck";
 import { ActionItemsPanel } from "./ActionItemsPanel";
 import { useOptionalUser } from "~/context/userContext";
+import { GuestFooter } from "./GuestNotices";
 
 const noteColors = [
   'bg-yellow-200',
@@ -31,8 +32,10 @@ const noteColors = [
 ];
 
 export default function Board() {
-  const { columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, canFacilitate, readonly: isReadOnly } = useBoard();
+  const { id: boardId, columns, title, offline, timeLeft, reorderNote, moveNoteLocally, notesLocked, boardLocked, boardLockedAt, canFacilitate, readonly: isReadOnly, hasOwner, isOwner, isCreator, archivesAt } = useBoard();
   const user = useOptionalUser();
+  // A visitor with no session yet is a guest too: they arrive from a shared link.
+  const isGuest = !user || user.is_anonymous;
   const [showTimerEndModal, setShowTimerEndModal] = useState(false);
   const prevTimeLeft = useRef<number | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -191,11 +194,15 @@ export default function Board() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {!isReadOnly && user?.username === "Guest" && (
-        <p className="w-full mt-6 text-center text-sm text-gray-400 dark:text-gray-500">
-          You are using this board anonymously. <a href="/auth/login" className="underline hover:text-gray-600 dark:hover:text-gray-300">Log in</a> to claim this board and manage your boards from your dashboard.
-        </p>
-      )}
+      <GuestFooter
+        boardId={boardId}
+        archivesAt={archivesAt}
+        isGuest={isGuest}
+        isReadOnly={isReadOnly}
+        isCreator={isCreator}
+        hasOwner={hasOwner}
+        isOwner={isOwner}
+      />
       <AttachmentsList />
       {canFacilitate && <CommandDeck />}
       <TimerEndModal

@@ -127,6 +127,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // BRD-020: default TRUE (not false) — an older/incomplete loader response
   // should never spuriously offer to claim a board that already has an owner.
   const hasOwner = loaderData.hasOwner ?? true;
+  // Guest-board notices. Default to "the creator" and "never archived" so an
+  // incomplete loader response shows neither the invite nor a false deadline.
+  const isCreator = loaderData.isCreator ?? true;
+  const archivesAt = loaderData.archivesAt ?? null;
 
   // ---------------------------------------------------------------------------
   // Sync server → local when loader revalidates
@@ -698,6 +702,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     readonly: isReadOnly,
     hasOwner,
     isOwner,
+    isCreator,
+    archivesAt,
     columns,
     nextColOrder: deriveNextColOrder(columns),
     offline,

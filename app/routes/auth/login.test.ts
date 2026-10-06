@@ -1,4 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockRecordEvent = vi.fn();
+vi.mock("~/server/event_model", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/event_model")>()),
+  recordEvent: (...args: unknown[]) => mockRecordEvent(...args),
+}));
+
+// The visitor's existing session, if any (a guest's userId).
+const seed = vi.hoisted(() => ({ userId: undefined as string | undefined }));
 
 // OAuth settings are read and validated once in db_config.ts (CLAUDE.md rule 5).
 vi.mock("~/server/db_config", () => ({
@@ -10,7 +19,7 @@ vi.mock("~/server/db_config", () => ({
 
 vi.mock("~/session.server", () => ({
   getSession: vi.fn(async () => {
-    const data: Record<string, string> = {};
+    const data: Record<string, string> = seed.userId ? { userId: seed.userId } : {};
     return {
       get: (key: string) => data[key],
       set: (key: string, value: string) => { data[key] = value; },
@@ -58,5 +67,43 @@ describe("GET /auth/login", () => {
 
     const res = await loader({ request }) as unknown as Response;
     expect(res.headers.get("Set-Cookie")).toBe("session-cookie-value");
+  });
+});
+
+// BRD-021: the Log in links under a board carry a ref, so the click is
+// counted against the board it came from before sign-in starts.
+describe("GET /auth/login from a board's Log in link [BRD-021]", () => {
+  beforeEach(() => {
+    mockRecordEvent.mockClear();
+    seed.userId = undefined;
+  });
+
+  it("records a keep_click for the kept-until line, with the board and the guest", async () => {
+    seed.userId = "guest-1";
+    const { loader } = await import("./login");
+    const request = new Request("http://localhost:3000/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1&ref=keep-notice");
+
+    const res = (await loader({ request })) as unknown as Response;
+
+    expect(mockRecordEvent).toHaveBeenCalledWith("keep_click", { actionId: "BRD-021", boardId: "board-1", userId: "guest-1" });
+    expect(res.status).toBe(302);
+  });
+
+  it("records a claim_reminder_click for the claim reminder", async () => {
+    const { loader } = await import("./login");
+    const request = new Request("http://localhost:3000/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1&ref=claim-reminder");
+
+    await loader({ request });
+
+    expect(mockRecordEvent).toHaveBeenCalledWith("claim_reminder_click", { actionId: "BRD-020", boardId: "board-1", userId: null });
+  });
+
+  it("records nothing for a login without a known ref", async () => {
+    const { loader } = await import("./login");
+
+    await loader({ request: new Request("http://localhost:3000/auth/login?returnTo=/app/dashboard") });
+    await loader({ request: new Request("http://localhost:3000/auth/login?returnTo=/app/board/b&ref=other") });
+
+    expect(mockRecordEvent).not.toHaveBeenCalled();
   });
 });
