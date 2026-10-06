@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const connectError = new Error("self-signed certificate in certificate chain");
-const schemaConnect = vi.hoisted(() => ({ calls: 0, errors: [] as unknown[], always: null as unknown }));
+const schemaConnect = vi.hoisted(() => ({ calls: 0, errors: [] as unknown[], always: null as unknown, queries: [] as string[] }));
 vi.mock("./db_config", () => ({
   schemaPool: {
     connect: async () => {
@@ -14,7 +14,13 @@ vi.mock("./db_config", () => ({
       if (schemaConnect.always) throw schemaConnect.always;
       const next = schemaConnect.errors.shift();
       if (next) throw next;
-      return { query: async () => ({ rows: [], rowCount: 0 }), release() {} };
+      return {
+        query: async (sql: string) => {
+          schemaConnect.queries.push(sql);
+          return { rows: [], rowCount: 0 };
+        },
+        release() {},
+      };
     },
   },
 }));
@@ -45,6 +51,7 @@ beforeEach(() => {
   schemaConnect.calls = 0;
   schemaConnect.errors = [];
   schemaConnect.always = null;
+  schemaConnect.queries = [];
   exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
   errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -111,5 +118,16 @@ describe("initializeDatabase", () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("FATAL: could not connect to the database"), reset);
     expect(exitSpy).toHaveBeenCalledTimes(1);
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  // The follow-up on the board calls to action reads this table; [METRIC]
+  // lines only last as long as Vercel keeps runtime logs.
+  it("creates the growth_events table idempotently", async () => {
+    await runInit();
+
+    const ddl = schemaConnect.queries.find((q) => q.includes("CREATE TABLE IF NOT EXISTS growth_events"));
+    expect(ddl).toBeDefined();
+    expect(ddl).toContain("event TEXT NOT NULL");
+    expect(ddl).toContain("created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
   });
 });

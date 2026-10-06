@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-09-21 · **Branch:** `staging` (2.0.0)
+**Updated:** 2026-10-06 · **Branch:** `staging` (2.0.0)
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
@@ -87,7 +87,7 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 | -------- | -------------------------------------- | ------ | ------------------------ | --------------------------- | ---------- |
 | SITE-001 | View homepage                          | Anyone | `routes/site/home.tsx`   | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-002 | View about / contact / terms / privacy | Anyone | `routes/site/*.tsx`      | none needed; the `SiteLayout` loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
-| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only · records the visitor as `created_by` without an owner row, so the board stays ownerless · on a self-hosted instance the action redirects to `/app/dashboard` and creates nothing (ADR-0021) | Verified   |
+| SITE-003 | Create a board from the homepage       | Anyone | `home.tsx` action        | honeypot field only · records the visitor as `created_by` without an owner row, so the board stays ownerless · a board started from a board's invite records `invite_board_created` (BRD-022) · on a self-hosted instance the action redirects to `/app/dashboard` and creates nothing (ADR-0021) | Verified   |
 | SITE-004 | Healthcheck                            | Anyone | `routes/healthcheck.tsx` | none needed                 | Verified |
 | SITE-005 | Sitemap                                | Anyone | `routes/sitemap.ts`      | none needed; 404 when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
@@ -100,7 +100,7 @@ Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 
 
 | ID       | Action                                                    | Who            | Code path                    | Guard       | Status   |
 | -------- | --------------------------------------------------------- | -------------- | ---------------------------- | ----------- | -------- |
-| AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —           | Verified |
+| AUTH-001 | Log in via OAuth                                          | Anyone         | `routes/auth/login.ts`       | —; a link from under a board (`ref=keep-notice` or `ref=claim-reminder`) records `keep_click` or `claim_reminder_click` in `growth_events` first (BRD-021) | Verified |
 | AUTH-002 | OAuth callback; create/refresh user; ensure personal crew | Anyone         | `routes/auth/callback.ts`    | state param | Verified |
 | AUTH-003 | Log out                                                   | Session holder | `routes/auth/logout.ts`      | —; redirects to `OAUTH_LOGOUT_REDIRECT_URL` (default `/`); the logout control is hidden when `HIDE_LOGOUT=true` (ADR-0017) | Verified |
 | AUTH-004 | Get an anonymous user record on first board visit         | Anyone         | `components/BoardLayout.tsx` | —; never on a self-hosted instance, which sends the visitor to sign in instead (ADR-0021) | Verified |
@@ -130,7 +130,9 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before the access check, after resolving the caller — so a self-hosted instance requires sign-in (ADR-0021) | Verified |
 | BRD-018 | Follow a legacy `/board/:id` link        | Anyone             | `board.legacy.tsx`                                      | redirect only                                    | Verified |
 | BRD-019 | List a board's attachments | Anyone w/ access | `board.attachments.ts` loader | `requireBoardAccess` | Verified |
-| BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists; assigns the personal crew (ADR-0012) | Verified |
+| BRD-020 | Claim an unowned board from the board itself | Registered | `board.claim.ts` · `BoardToolbar` | `requireRegisteredUser`; succeeds only when no owner row exists; assigns the personal crew (ADR-0012); a successful claim records `board_claimed` | Verified |
+| BRD-021 | See how long a crewless board is kept, and follow its Log in link to keep it | The guest who started it · a registered user while it is unclaimed · its owner | `GuestNotices.tsx` (`KeepNotice`, `guestFooterFor`) · `board.tsx` loader (`archiveDateFor`) · `auth/login.ts` | inherits BRD-001 · shown only to those viewers, only while the archive job will take the board (`auto_archive.ts`); its Log in link carries `ref=keep-notice`, which AUTH-001 records as `keep_click` | Verified |
+| BRD-022 | Follow the invite to start your own board | A guest who did not start the board · a signed-out visitor on an example board | `GuestNotices.tsx` (`StartYourOwnBoard`) → `/?ref=board-invite&from=<board>` · `home.tsx` loader | inherits BRD-001 / BRD-017 · a plain link to the homepage form; the homepage records `invite_click` and carries the referral through the form, so SITE-003 records `invite_board_created`; never shown on a self-hosted instance, which has no guests | Verified |
 
 Locks are enforced on the server with exactly the matrix the UI applies (documented above `requireUnlocked` in `board_permissions.ts`): `notesLocked` blocks BRD-004 – BRD-008 and BRD-011; `boardLocked` blocks those plus BRD-009, BRD-010, BRD-012, BRD-013, BRD-014, the timer, adding a column, the title, and action items. Facilitators do not bypass locks. `board.settings.ts` is never lock-gated, because it is how a board unlocks.
 

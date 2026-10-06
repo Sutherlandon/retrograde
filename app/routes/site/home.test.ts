@@ -27,6 +27,12 @@ vi.mock("~/server/db_config", () => ({
   },
 }));
 
+const mockRecordGrowthEvent = vi.fn();
+vi.mock("~/server/growth_model", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/growth_model")>()),
+  recordGrowthEvent: (...args: unknown[]) => mockRecordGrowthEvent(...args),
+}));
+
 const mockCreateBoard = vi.fn();
 const mockSetBoardCreator = vi.fn();
 vi.mock("~/server/board_model", () => ({
@@ -38,6 +44,7 @@ vi.mock("~/server/board_model", () => ({
 // up here; stub the pieces the component needs while keeping `redirect`
 // (used by both the loader and action under test) as the real implementation.
 let mockActionData: unknown = undefined;
+let mockLoaderData: unknown = { origin: "http://localhost:3000", invite: null };
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
   return {
@@ -47,6 +54,7 @@ vi.mock("react-router", async (importOriginal) => {
     Form: ({ children, ...rest }: { children?: React.ReactNode }) =>
       React.createElement("form", { ...rest }, children),
     useActionData: () => mockActionData,
+    useLoaderData: () => mockLoaderData,
   };
 });
 
@@ -57,6 +65,7 @@ beforeEach(() => {
   sessionData = {};
   hosting.selfHosted = false;
   mockActionData = undefined;
+  mockLoaderData = { origin: "http://localhost:3000", invite: null };
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockCreateBoard.mockResolvedValue("new-board-id");
 });
@@ -153,6 +162,97 @@ describe("home page action", () => {
   });
 });
 
+// BRD-022: "Start a free board" on a board links to /?ref=board-invite&from=<board>.
+// The homepage counts the click, carries the referral through its form, and
+// counts the board created from it, so the invite's effect can be measured.
+describe("invite attribution [BRD-022]", () => {
+  it("records the click with the board it came from and the visitor, and hands the referral to the form", async () => {
+    const { loader } = await import("./home");
+    sessionData["userId"] = "guest-1";
+    const request = new Request("http://localhost:3000/?ref=board-invite&from=board-1");
+
+    const data = await loader({ request } as never);
+
+    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_click", { boardId: "board-1", userId: "guest-1" });
+    expect(data).toEqual({ origin: "http://localhost:3000", invite: { from: "board-1" } });
+  });
+
+  it("still counts a click whose board id is malformed, without storing the id", async () => {
+    const { loader } = await import("./home");
+    const request = new Request("http://localhost:3000/?ref=board-invite&from=%3Cscript%3E");
+
+    const data = await loader({ request } as never);
+
+    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_click", { boardId: null, userId: null });
+    expect(data).toEqual({ origin: "http://localhost:3000", invite: { from: null } });
+  });
+
+  it("records nothing for an ordinary visit", async () => {
+    const { loader } = await import("./home");
+
+    await loader({ request: new Request("http://localhost:3000/?utm_source=slack") } as never);
+
+    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+  });
+
+  it("records the board created from an invite, with the board it came from", async () => {
+    const { action } = await import("./home");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "guest-2" }] });
+    const request = new Request("http://localhost:3000/", {
+      method: "POST",
+      body: makeFormData({ title: "Our Retro", no_jerks: "on", ref: "board-invite", from: "board-1" }),
+    });
+
+    await action({ request, params: {}, context: {} } as never);
+
+    expect(mockRecordGrowthEvent).toHaveBeenCalledWith("invite_board_created", {
+      boardId: "board-1",
+      resultBoardId: "new-board-id",
+      userId: "guest-2",
+    });
+  });
+
+  it("records nothing for a board created without an invite", async () => {
+    const { action } = await import("./home");
+    mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: "guest-2" }] });
+    const request = new Request("http://localhost:3000/", {
+      method: "POST",
+      body: makeFormData({ title: "Our Retro", no_jerks: "on" }),
+    });
+
+    await action({ request, params: {}, context: {} } as never);
+
+    expect(mockRecordGrowthEvent).not.toHaveBeenCalled();
+  });
+
+  // React Router reruns a route's loader after its action. A validation error
+  // on the form would otherwise count the invite click a second time.
+  it("does not rerun the loader after a form submission", async () => {
+    const { shouldRevalidate } = await import("./home");
+
+    expect(shouldRevalidate({ formMethod: "POST", defaultShouldRevalidate: true } as never)).toBe(false);
+    expect(shouldRevalidate({ defaultShouldRevalidate: true } as never)).toBe(true);
+  });
+
+  it("carries the referral in the board form as hidden fields", async () => {
+    mockLoaderData = { origin: "http://localhost:3000", invite: { from: "board-1" } };
+    const { default: Home } = await import("./home");
+
+    const { container } = render(React.createElement(Home));
+
+    expect(container.querySelector('input[type="hidden"][name="ref"]')?.getAttribute("value")).toBe("board-invite");
+    expect(container.querySelector('input[type="hidden"][name="from"]')?.getAttribute("value")).toBe("board-1");
+  });
+
+  it("adds no referral fields for an ordinary visit", async () => {
+    const { default: Home } = await import("./home");
+
+    const { container } = render(React.createElement(Home));
+
+    expect(container.querySelector('input[name="ref"]')).toBeNull();
+  });
+});
+
 describe("homepage link preview", () => {
   it("shares the night-sky card, with its size and alt text", async () => {
     const { meta } = await import("./home");
@@ -181,7 +281,7 @@ describe("homepage link preview", () => {
   it("hands meta the origin the request arrived on", async () => {
     const { loader } = await import("./home");
     const request = new Request("https://staging.retrograde.sh/?utm_source=slack");
-    expect(await loader({ request } as never)).toEqual({ origin: "https://staging.retrograde.sh" });
+    expect(await loader({ request } as never)).toEqual({ origin: "https://staging.retrograde.sh", invite: null });
   });
 
   it("ships the preview image at the size the tags declare", async () => {

@@ -1,21 +1,47 @@
-import { redirect, useActionData, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
+import {
+  redirect,
+  useActionData,
+  useLoaderData,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import { createBoard, setBoardCreator } from "~/server/board_model";
 import { getOrCreateUser } from "~/hooks/useAuth";
-import { commitSession } from "~/session.server";
+import { commitSession, getSession } from "~/session.server";
 import retrogradeSnapshot from "~/images/retrograde-snapshot.png";
 import Horizon from "~/components/landing/Horizon";
 import SkyFade from "~/components/landing/SkyFade";
-import CreateBoardForm, { type CreateBoardErrors } from "~/components/landing/CreateBoardForm";
+import CreateBoardForm, { type CreateBoardErrors, type InviteReferral } from "~/components/landing/CreateBoardForm";
 import CreateBoardLink from "~/components/landing/CreateBoardLink";
 import { HowItWorks, IdeaBoards, WhatsNew, SectionIntro } from "~/components/landing/LandingFeatures";
 import { Pricing, Faq } from "~/components/landing/LandingPricing";
 import { selfHosted } from "~/server/db_config";
+import { boardIdFromParam, recordGrowthEvent } from "~/server/growth_model";
+import { INVITE_REF } from "~/config/growth_refs";
 
 // Link previews fetch og:image from whichever deployment served the page, so
 // staging previews staging's card before it ships. Search engines still treat
 // production as the real page (canonical).
 export async function loader({ request }: LoaderFunctionArgs) {
-  return { origin: new URL(request.url).origin };
+  const url = new URL(request.url);
+  // BRD-022: a visitor who followed "Start a free board" from a board. Count
+  // the click, and hand the referral to the form so the board it leads to is
+  // counted too.
+  let invite: InviteReferral | null = null;
+  if (!selfHosted && url.searchParams.get("ref") === INVITE_REF) {
+    const from = boardIdFromParam(url.searchParams.get("from"));
+    const session = await getSession(request.headers.get("Cookie"));
+    await recordGrowthEvent("invite_click", { boardId: from, userId: session.get("userId") ?? null });
+    invite = { from };
+  }
+  return { origin: url.origin, invite };
+}
+
+// The form's action either redirects or returns validation errors; neither
+// changes the loader's data. Rerunning it would count an invite click twice.
+export function shouldRevalidate({ formMethod, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return formMethod ? false : defaultShouldRevalidate;
 }
 
 export const meta = ({ data }: { data?: { origin: string } }) => {
@@ -96,6 +122,15 @@ export async function action({ request }: ActionFunctionArgs) {
   const { user, session, isNew } = await getOrCreateUser(request, board_id);
   await setBoardCreator(board_id, user.id);
 
+  // BRD-022: the invite's conversion — a board started from another board.
+  if (formData.get("ref") === INVITE_REF) {
+    await recordGrowthEvent("invite_board_created", {
+      boardId: boardIdFromParam(formData.get("from")?.toString()),
+      resultBoardId: board_id,
+      userId: user.id,
+    });
+  }
+
   // redirect with session cookie if a new anonymous user was created
   const headers: HeadersInit = {};
   if (isNew) {
@@ -106,10 +141,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Home() {
   const actionData = useActionData<{ errors?: CreateBoardErrors }>();
+  const { invite } = useLoaderData<typeof loader>();
 
   return (
     <div className="min-w-[380px] overflow-x-clip bg-night-950 text-slate-300">
-      <Hero errors={actionData?.errors} />
+      <Hero errors={actionData?.errors} invite={invite} />
       <HowItWorks />
       <Snapshot />
       <IdeaBoards />
@@ -127,7 +163,7 @@ const TWINKLES = [
   "top-[38%] right-[6%]", "top-[52%] left-[30%]", "top-[30%] left-[70%]",
 ];
 
-function Hero({ errors }: { errors?: CreateBoardErrors }) {
+function Hero({ errors, invite }: { errors?: CreateBoardErrors; invite: InviteReferral | null }) {
   return (
     <section className="night-sky relative overflow-hidden">
       {/* The header is a solid band; the sky comes up out of it. */}
@@ -153,7 +189,7 @@ function Hero({ errors }: { errors?: CreateBoardErrors }) {
             Bring your team into a crew, and let your AI agents prep the board and read the results back.
           </p>
         </div>
-        <CreateBoardForm errors={errors} />
+        <CreateBoardForm errors={errors} invite={invite} />
       </div>
       <Horizon className="absolute inset-x-0 bottom-0 h-40 md:h-56" />
     </section>

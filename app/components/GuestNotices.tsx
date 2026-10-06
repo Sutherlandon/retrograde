@@ -4,6 +4,7 @@
 // someone else's board, or a signed-out visitor on an example board, is
 // invited to start their own. Nobody is shown both.
 import { CREATE_FORM_ID } from "~/components/landing/CreateBoardLink";
+import { CLAIM_REMINDER_REF, INVITE_REF, KEEP_REF } from "~/config/growth_refs";
 
 type GuestFooterKind = "keep" | "claim" | "invite" | null;
 
@@ -34,8 +35,14 @@ export function guestFooterFor({
   return null;
 }
 
-function loginHref(boardId: string): string {
-  return `/auth/login?returnTo=${encodeURIComponent(`/app/board/${boardId}`)}`;
+// Each link carries a ref so the route it lands on can record the click
+// (growth_model.ts): login for the two Log in links, the homepage for the invite.
+function loginHref(boardId: string, ref: string): string {
+  return `/auth/login?returnTo=${encodeURIComponent(`/app/board/${boardId}`)}&ref=${ref}`;
+}
+
+function inviteHref(boardId: string): string {
+  return `/?ref=${INVITE_REF}&from=${encodeURIComponent(boardId)}#${CREATE_FORM_ID}`;
 }
 
 // UTC with a fixed locale, so the server render and the browser agree.
@@ -64,7 +71,7 @@ export function KeepNotice({
     return (
       <p className={FOOTER}>
         This guest board is kept until {until}.{" "}
-        <a href={loginHref(boardId)} className={LINK}>
+        <a href={loginHref(boardId, KEEP_REF)} className={LINK}>
           Log in
         </a>{" "}
         and claim it to keep it for good.
@@ -80,11 +87,11 @@ export function KeepNotice({
 
 // Kept to one short centred line: on an ownerless board the Command Deck is
 // open for everyone and floats over the right of the page.
-export function StartYourOwnBoard() {
+export function StartYourOwnBoard({ boardId }: { boardId: string }) {
   return (
     <p className={FOOTER}>
       Want Retrograde for your own team?{" "}
-      <a href={`/#${CREATE_FORM_ID}`} className={LINK}>
+      <a href={inviteHref(boardId)} className={LINK}>
         Start a free board
       </a>
       , no account needed.
@@ -96,7 +103,7 @@ export function ClaimReminder({ boardId }: { boardId: string }) {
   return (
     <p className={FOOTER}>
       You are using this board anonymously.{" "}
-      <a href={loginHref(boardId)} className={LINK}>
+      <a href={loginHref(boardId, CLAIM_REMINDER_REF)} className={LINK}>
         Log in
       </a>{" "}
       to claim this board and manage your boards from your dashboard.
@@ -126,6 +133,6 @@ export function GuestFooter({
     return <KeepNotice archivesAt={archivesAt} boardId={boardId} isGuest={isGuest} isOwner={isOwner} />;
   }
   if (kind === "claim") return <ClaimReminder boardId={boardId} />;
-  if (kind === "invite") return <StartYourOwnBoard />;
+  if (kind === "invite") return <StartYourOwnBoard boardId={boardId} />;
   return null;
 }

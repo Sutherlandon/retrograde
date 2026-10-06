@@ -5,7 +5,7 @@
 // someone else's board is invited to start their own. Nobody gets both.
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
-import { GuestFooter, KeepNotice, StartYourOwnBoard, guestFooterFor } from "./GuestNotices";
+import { ClaimReminder, GuestFooter, KeepNotice, StartYourOwnBoard, guestFooterFor } from "./GuestNotices";
 
 afterEach(() => cleanup());
 
@@ -54,8 +54,9 @@ describe("KeepNotice", () => {
     expect(screen.getByText(/This guest board is kept until November 4\./).textContent).toContain(
       "Log in and claim it to keep it for good."
     );
+    // The ref lets the login route count this click (keep_click).
     expect(screen.getByRole("link", { name: "Log in" }).getAttribute("href")).toBe(
-      "/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1"
+      "/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1&ref=keep-notice"
     );
   });
 
@@ -82,11 +83,23 @@ describe("KeepNotice", () => {
 });
 
 describe("StartYourOwnBoard", () => {
-  it("links to the homepage form to start a free board", () => {
-    render(<StartYourOwnBoard />);
+  it("links to the homepage form, carrying the board it came from so the click and any board created can be counted", () => {
+    render(<StartYourOwnBoard boardId="board-1" />);
 
     expect(screen.getByText(/Want Retrograde for your own team\?/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Start a free board" }).getAttribute("href")).toBe("/#create-form");
+    expect(screen.getByRole("link", { name: "Start a free board" }).getAttribute("href")).toBe(
+      "/?ref=board-invite&from=board-1#create-form"
+    );
+  });
+});
+
+describe("ClaimReminder", () => {
+  it("tags its Log in link so the login route can count it apart from the keep notice", () => {
+    render(<ClaimReminder boardId="board-1" />);
+
+    expect(screen.getByRole("link", { name: "Log in" }).getAttribute("href")).toBe(
+      "/auth/login?returnTo=%2Fapp%2Fboard%2Fboard-1&ref=claim-reminder"
+    );
   });
 });
 
