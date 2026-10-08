@@ -316,6 +316,7 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
   const notesLockedCases: [string, ActorId][] = [
     ["BRD-004", "board-owner"], ["BRD-005", "facilitator"], ["BRD-006", "board-owner"],
     ["BRD-007", "facilitator"], ["BRD-008", "board-owner"], ["BRD-011", "facilitator"],
+    ["API-004", "board-owner"],
   ];
   it.each(notesLockedCases)("%s denies %s when notes are locked, even though the role would otherwise allow it", async (id, actor) => {
     const verdict = await invoke(id, actorState(actor, notesLockedFixture), notesLockedFixture);
@@ -327,10 +328,16 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
     ["BRD-012", "facilitator"], ["BRD-013", "board-owner"],
     ["DECK-002", "facilitator"], ["DECK-003", "board-owner"], ["DECK-006", "facilitator"],
     ["DECK-023", "board-owner"], ["DECK-024", "facilitator"], ["DECK-025", "board-owner"],
+    ["API-004", "facilitator"], ["API-005", "board-owner"],
   ];
   it.each(boardLockedCases)("%s denies %s when the board is locked, even though the role would otherwise allow it", async (id, actor) => {
     const verdict = await invoke(id, actorState(actor, boardLockedFixture), boardLockedFixture);
     expect(verdict).toBe("deny");
+  });
+
+  it("API-005 (action items) is NOT blocked by notes_locked — action items aren't notes", async () => {
+    const verdict = await invoke("API-005", actorState("facilitator", notesLockedFixture), notesLockedFixture);
+    expect(verdict).toBe("allow");
   });
 
   it("DECK-008 (settings) is NOT blocked by board_locked — settings are how a board unlocks", async () => {

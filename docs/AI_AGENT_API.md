@@ -89,6 +89,7 @@ Every error is JSON: `{ "error": { "code": "...", "message": "..." } }`.
 | 404    | `NOT_FOUND`          | The board does not exist.                                                              |
 | 405    | `METHOD_NOT_ALLOWED` | Wrong HTTP method.                                                                     |
 | 413    | `PAYLOAD_TOO_LARGE`  | More than 200 notes or 100 action items in one request.                                |
+| 423    | `LOCKED`             | A facilitator locked the board (or, for notes, just the notes). Nothing was written.   |
 
 ## Endpoints
 
@@ -180,6 +181,7 @@ Any caller with board access may add notes; facilitation is not required.
 - `403 FORBIDDEN` — no board access (see Board access).
 - `404 NOT_FOUND` — board does not exist.
 - `413 PAYLOAD_TOO_LARGE` — more than 200 notes in one request.
+- `423 LOCKED` — the notes or the whole board are locked; nothing was added.
 
 ### POST /api/v1/boards/:id/action-items
 
@@ -191,7 +193,8 @@ through after the session, shown in the board's Action Items panel. See issue
 facilitate the board, or gets `403`. Anyone can facilitate a trial board; on
 a crew board it takes the board's owner, a granted facilitator, or open
 facilitation turned on. An API key's agent owns the boards it creates, so
-those always pass.
+those always pass. A locked board returns `423 LOCKED` and adds nothing;
+locking only the notes does not block action items.
 
 **Request:**
 ```json

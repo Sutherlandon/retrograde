@@ -7,9 +7,11 @@ vi.mock("~/server/action_item_model", () => ({
 
 const mockUserCanFacilitate = vi.fn();
 const mockGetBoardAccess = vi.fn();
+const mockLockReason = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   userCanFacilitate: (...args: unknown[]) => mockUserCanFacilitate(...args),
   getBoardAccess: (...args: unknown[]) => mockGetBoardAccess(...args),
+  lockReason: (...args: unknown[]) => mockLockReason(...args),
 }));
 
 const mockGetApiUser = vi.fn();
@@ -23,6 +25,7 @@ beforeEach(() => {
   mockUserCanFacilitate.mockResolvedValue(true);
   mockGetBoardAccess.mockResolvedValue({ exists: true, allowed: true, userIsRegistered: true });
   mockBulkCreate.mockResolvedValue({ id: "board-1", actionItems: [{ id: "a1" }] });
+  mockLockReason.mockResolvedValue(null);
 });
 
 function req(body: unknown) {
@@ -130,5 +133,28 @@ describe("POST /api/v1/boards/:id/action-items", () => {
   it("rejects GET with 405", async () => {
     const { loader } = await import("./board.action-items");
     expect((loader() as Response).status).toBe(405);
+  });
+
+  it("checks only the board lock — notes_locked never applies to action items (GAP-003)", async () => {
+    const { action } = await import("./board.action-items");
+    await action({
+      request: req({ items: [{ text: "x" }] }),
+      params: { id: "board-1" }, context: {},
+    } as never);
+    expect(mockLockReason).toHaveBeenCalledWith("board-1", { board: true });
+  });
+
+  it("423 LOCKED as JSON and creates nothing on a locked board (#108)", async () => {
+    const { action } = await import("./board.action-items");
+    mockLockReason.mockResolvedValueOnce("Board is locked");
+
+    const res = (await action({
+      request: req({ items: [{ text: "x" }] }),
+      params: { id: "board-1" }, context: {},
+    } as never)) as Response;
+    expect(res.status).toBe(423);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error).toEqual({ code: "LOCKED", message: "Board is locked" });
+    expect(mockBulkCreate).not.toHaveBeenCalled();
   });
 });

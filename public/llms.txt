@@ -20,7 +20,7 @@ Base URL: this site's origin (e.g. https://retrograde.sh)
   needs an API key or a signed-in session, and returns 401 without one.
 - Errors are JSON: `{ "error": { "code": "...", "message": "..." } }`, with
   codes BAD_REQUEST (400), UNAUTHORIZED (401), FORBIDDEN (403), NOT_FOUND
-  (404), METHOD_NOT_ALLOWED (405), and PAYLOAD_TOO_LARGE (413).
+  (404), METHOD_NOT_ALLOWED (405), PAYLOAD_TOO_LARGE (413), and LOCKED (423).
 
 ### POST /api/v1/boards
 
@@ -102,7 +102,8 @@ Bulk add notes to columns of an existing board. Authenticated by any of:
 - session cookie (in-browser)
 
 Without credentials the call returns 401. Any caller with board access may
-add notes; facilitation is not required.
+add notes; facilitation is not required. While a facilitator has locked the
+notes or the whole board, the call returns 423 LOCKED and adds nothing.
 
 Request body (JSON):
 ```
@@ -130,7 +131,9 @@ notes endpoint (401 without credentials). The caller needs board access and
 must be able to facilitate the board (403 otherwise). Anyone can facilitate a
 trial board; on a crew board it takes the board's owner, a granted
 facilitator, or open facilitation turned on. An API key's agent owns the
-boards it creates, so those always pass.
+boards it creates, so those always pass. While a facilitator has locked the
+board, the call returns 423 LOCKED and adds nothing; locking only the notes
+does not block action items.
 
 Request body (JSON):
 ```

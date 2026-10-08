@@ -11,14 +11,17 @@ vi.mock("~/hooks/useAuth", () => ({
 }));
 
 const mockGetBoardAccess = vi.fn();
+const mockLockReason = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   getBoardAccess: (...args: unknown[]) => mockGetBoardAccess(...args),
+  lockReason: (...args: unknown[]) => mockLockReason(...args),
 }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockBulkInsertNotesServer.mockResolvedValue({ id: "board-1", columns: [] });
   mockGetBoardAccess.mockResolvedValue({ exists: true, allowed: true, userIsRegistered: true });
+  mockLockReason.mockResolvedValue(null);
 });
 
 function req(body: unknown, opts: { auth?: string } = {}) {
@@ -197,5 +200,35 @@ describe("POST /api/v1/boards/:id/notes", () => {
     const body = (await response.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe("BAD_REQUEST");
     expect(body.error.message).toContain("col-x");
+  });
+
+  it("checks the notes lock, which either lock trips (GAP-003)", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1" });
+
+    await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never);
+
+    expect(mockLockReason).toHaveBeenCalledWith("board-1", { notes: true });
+  });
+
+  it("returns 423 LOCKED as JSON and inserts nothing on a locked board (#108)", async () => {
+    const { action } = await import("./board.notes");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1" });
+    mockLockReason.mockResolvedValueOnce("Notes are locked");
+
+    const response = (await action({
+      request: req({ notes: [{ columnId: "c1", text: "hello" }] }, { auth: "Bearer token-x" }),
+      params: { id: "board-1" },
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(423);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expect(body.error).toEqual({ code: "LOCKED", message: "Notes are locked" });
+    expect(mockBulkInsertNotesServer).not.toHaveBeenCalled();
   });
 });
