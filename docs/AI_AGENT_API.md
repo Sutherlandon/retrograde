@@ -84,7 +84,7 @@ Every error is JSON: `{ "error": { "code": "...", "message": "..." } }`.
 | Status | `code`               | When                                                                                   |
 |--------|----------------------|----------------------------------------------------------------------------------------|
 | 400    | `BAD_REQUEST`        | Malformed JSON, or a field fails validation.                                           |
-| 401    | `UNAUTHORIZED`       | A notes or action-items call without valid credentials; any call without them on a self-hosted instance. |
+| 401    | `UNAUTHORIZED`       | A notes or action-items call without valid credentials; a board-create call whose `Authorization` header doesn't resolve (revoked or unknown key, expired `agent_token`); any call without credentials on a self-hosted instance. |
 | 403    | `FORBIDDEN`          | No board access, or (action items only) the caller cannot facilitate the board.        |
 | 404    | `NOT_FOUND`          | The board does not exist.                                                              |
 | 405    | `METHOD_NOT_ALLOWED` | Wrong HTTP method.                                                                     |
@@ -149,6 +149,11 @@ where the board lands:
 - Signed-in session → the account's personal crew.
 - `agent_token` → another crewless trial board for the same agent;
   `team_id` is `null`.
+
+**Errors:** an `Authorization` header that doesn't resolve to a user — an
+unknown or revoked API key, an expired or garbled `agent_token` — returns
+`401 UNAUTHORIZED` and creates nothing. Only a call with no `Authorization`
+header at all takes the trial flow.
 
 ### POST /api/v1/boards/:id/notes
 

@@ -55,10 +55,10 @@ beforeEach(() => {
   mockGetPersonalTeamForUser.mockResolvedValue({ id: "personal-team-1", name: "Personal", is_personal: true, created_at: "" });
 });
 
-function req(body: unknown, method = "POST") {
+function req(body: unknown, method = "POST", auth?: string) {
   return new Request("http://localhost:3000/api/v1/boards", {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(auth !== undefined ? { Authorization: auth } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
@@ -199,6 +199,45 @@ describe("POST /api/v1/boards", () => {
       "agent-legacy-1",
       null
     );
+  });
+
+  // #109: an Authorization header means the caller meant to authenticate. If
+  // it resolves to nobody, say so instead of quietly minting a trial board.
+  it.each([
+    ["an unknown or revoked API key", "Bearer rk_live_unknown"],
+    ["an expired or garbled agent_token", "Bearer not-a-live-session"],
+    ["an empty bearer token", "Bearer "],
+    ["a non-Bearer scheme", "Basic dXNlcjpwYXNz"],
+  ])("returns 401 and creates nothing for %s (#109)", async (_label, auth) => {
+    const { action } = await import("./boards");
+    mockGetApiUser.mockResolvedValueOnce(null);
+
+    const response = (await action({
+      request: req({ title: "Roadmap" }, "POST", auth),
+      params: {},
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(401);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("UNAUTHORIZED");
+    expect(response.headers.get("Set-Cookie")).toBeNull();
+    expect(mockCreateAgentUser).not.toHaveBeenCalled();
+    expect(mockCreateBoardWithColumns).not.toHaveBeenCalled();
+  });
+
+  it("still takes the trial flow when no Authorization header is sent (#109)", async () => {
+    const { action } = await import("./boards");
+    mockGetApiUser.mockResolvedValueOnce(null);
+
+    const response = (await action({
+      request: req({ title: "Roadmap" }),
+      params: {},
+      context: {},
+    } as never)) as Response;
+
+    expect(response.status).toBe(201);
+    expect(mockCreateAgentUser).toHaveBeenCalledWith(null, "Agent");
   });
 
   it("rejects missing title with 400", async () => {

@@ -256,8 +256,8 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 
 | ID      | Action                                                                   | Who                      | Code path                        | Guard                  | Status   |
 | ------- | ------------------------------------------------------------------------ | ------------------------ | -------------------------------- | ---------------------- | -------- |
-| API-001 | Create a board with columns (authenticated → caller's crew; a registered cookie caller with no crew gets their personal crew) | API key or session | `api/boards.ts` POST | `getApiUser` | Verified |
-| API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone | `api/boards.ts` POST | none, by design · **401 on a self-hosted instance** (ADR-0021) | Verified |
+| API-001 | Create a board with columns (authenticated → caller's crew; a registered cookie caller with no crew gets their personal crew) | API key or session | `api/boards.ts` POST | `getApiUser` · an `Authorization` header that doesn't resolve → 401, never the trial flow | Verified |
+| API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone sending no `Authorization` header | `api/boards.ts` POST | none, by design · an `Authorization` header that doesn't resolve → 401 (#109) · **401 on a self-hosted instance** (ADR-0021) | Verified |
 | API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 · `lockReason(notes)` → 423 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` · `lockReason(board)` → 423 | Verified |

@@ -38,6 +38,11 @@ The caller's credentials decide where the board lands:
 - **Signed-in browser session**: the board goes into that account's personal
   crew.
 
+An `Authorization` header that doesn't resolve to a user (an unknown or
+revoked API key, an expired `agent_token`) returns 401 and creates nothing;
+it never falls back to the trial flow. Only a call with no `Authorization`
+header gets a trial board.
+
 The trial-to-paid path does not break the agent. A human claims the board
 from the board page ("Claim this board"), which makes them its owner and
 moves the board into their personal crew, so it no longer auto-archives; the
