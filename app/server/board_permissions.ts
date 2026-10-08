@@ -130,29 +130,42 @@ export async function getBoardAccess(
 // | DECK-002/DECK-003       | Start / stop the timer               |  —  |  X  | board.timer.ts             |
 // | DECK-006                | Add a column                         |  —  |  X  | board.columns.ts (POST)    |
 // | BRD-014, DECK-023–025   | Action item complete / add / edit / delete | — | X | board.action-items.ts        |
+// | API-004                 | Bulk-add notes (JSON API)            |  X  |  X  | api/board.notes.ts (lockReason → 423 JSON) |
+// | API-005                 | Bulk-add action items (JSON API)     |  —  |  X  | api/board.action-items.ts (lockReason → 423 JSON) |
 // | DECK-017–019             | Attach / delete an attachment         |  —  |  —  | never locked — gated by `requireFacilitator` only |
 // | DECK-008–016             | Board settings, incl. the locks themselves | — | — | never locked — `board.settings.ts` is how a board unlocks |
 //
 // "—" means the client never disables that control for that lock. notes_locked
 // never applies to action items — they aren't notes.
 
-export async function requireUnlocked(
+/**
+ * Which lock, if any, blocks a write gated by `flags` — "Board is locked",
+ * "Notes are locked", or null. `notes: true` is tripped by either lock.
+ * Non-throwing so the JSON API can answer in its own error shape.
+ */
+export async function lockReason(
   boardId: string,
   flags: { notes?: boolean; board?: boolean }
-): Promise<void> {
+): Promise<string | null> {
   const res = await pool.query<{ notes_locked: boolean; board_locked: boolean }>(
     `SELECT notes_locked, board_locked FROM boards WHERE id = $1`,
     [boardId]
   );
-  if (res.rowCount === 0) return; // missing board — the caller's own access check already 404s
+  if (res.rowCount === 0) return null; // missing board — the caller's own access check already 404s
 
   const { notes_locked, board_locked } = res.rows[0];
-  if (flags.board && board_locked) {
-    throw new Response("Board is locked", { status: 423 });
-  }
-  if (flags.notes && (notes_locked || board_locked)) {
-    throw new Response("Notes are locked", { status: 423 });
-  }
+  if (flags.board && board_locked) return "Board is locked";
+  if (flags.notes && (notes_locked || board_locked)) return "Notes are locked";
+  return null;
+}
+
+/** Throws a plain-text 423 when `lockReason` names a lock. */
+export async function requireUnlocked(
+  boardId: string,
+  flags: { notes?: boolean; board?: boolean }
+): Promise<void> {
+  const reason = await lockReason(boardId, flags);
+  if (reason) throw new Response(reason, { status: 423 });
 }
 
 /**

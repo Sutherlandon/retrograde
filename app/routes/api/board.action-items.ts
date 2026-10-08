@@ -7,7 +7,7 @@
 
 import type { ActionFunctionArgs } from "react-router";
 import { bulkCreateBoardActionItems } from "~/server/action_item_model";
-import { userCanFacilitate, getBoardAccess } from "~/server/board_permissions";
+import { userCanFacilitate, getBoardAccess, lockReason } from "~/server/board_permissions";
 import { getApiUser } from "~/hooks/useAuth";
 
 const MAX_ITEMS_PER_REQUEST = 100;
@@ -49,6 +49,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!(await userCanFacilitate(user.id, boardId))) {
     return err("FORBIDDEN", "Caller cannot facilitate this board", 403);
   }
+
+  // GAP-003: same lock rule as the UI's add-item — only board_locked blocks.
+  const locked = await lockReason(boardId, { board: true });
+  if (locked) return err("LOCKED", locked, 423);
 
   let body: BulkActionItemsRequest;
   try {

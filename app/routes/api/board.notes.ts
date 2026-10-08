@@ -5,7 +5,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { bulkInsertNotesServer } from "~/server/board_model";
 import { getApiUser } from "~/hooks/useAuth";
-import { getBoardAccess } from "~/server/board_permissions";
+import { getBoardAccess, lockReason } from "~/server/board_permissions";
 
 const MAX_NOTES_PER_REQUEST = 200;
 const MAX_NOTE_LENGTH = 2000;
@@ -48,6 +48,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!access.allowed) {
     return err("FORBIDDEN", "This board is restricted to its crew", 403);
   }
+
+  // GAP-003: same lock rule as the UI's add-note — either lock blocks.
+  const locked = await lockReason(boardId, { notes: true });
+  if (locked) return err("LOCKED", locked, 423);
 
   let body: BulkNotesRequest;
   try {

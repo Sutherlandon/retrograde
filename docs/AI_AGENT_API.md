@@ -84,11 +84,12 @@ Every error is JSON: `{ "error": { "code": "...", "message": "..." } }`.
 | Status | `code`               | When                                                                                   |
 |--------|----------------------|----------------------------------------------------------------------------------------|
 | 400    | `BAD_REQUEST`        | Malformed JSON, or a field fails validation.                                           |
-| 401    | `UNAUTHORIZED`       | A notes or action-items call without valid credentials; any call without them on a self-hosted instance. |
+| 401    | `UNAUTHORIZED`       | A notes or action-items call without valid credentials; a board-create call whose `Authorization` header doesn't resolve (revoked or unknown key, expired `agent_token`); any call without credentials on a self-hosted instance. |
 | 403    | `FORBIDDEN`          | No board access, or (action items only) the caller cannot facilitate the board.        |
 | 404    | `NOT_FOUND`          | The board does not exist.                                                              |
 | 405    | `METHOD_NOT_ALLOWED` | Wrong HTTP method.                                                                     |
 | 413    | `PAYLOAD_TOO_LARGE`  | More than 200 notes or 100 action items in one request.                                |
+| 423    | `LOCKED`             | A facilitator locked the board (or, for notes, just the notes). Nothing was written.   |
 
 ## Endpoints
 
@@ -149,6 +150,11 @@ where the board lands:
 - `agent_token` → another crewless trial board for the same agent;
   `team_id` is `null`.
 
+**Errors:** an `Authorization` header that doesn't resolve to a user — an
+unknown or revoked API key, an expired or garbled `agent_token` — returns
+`401 UNAUTHORIZED` and creates nothing. Only a call with no `Authorization`
+header at all takes the trial flow.
+
 ### POST /api/v1/boards/:id/notes
 
 Bulk add notes to columns of an existing board.
@@ -180,6 +186,7 @@ Any caller with board access may add notes; facilitation is not required.
 - `403 FORBIDDEN` — no board access (see Board access).
 - `404 NOT_FOUND` — board does not exist.
 - `413 PAYLOAD_TOO_LARGE` — more than 200 notes in one request.
+- `423 LOCKED` — the notes or the whole board are locked; nothing was added.
 
 ### POST /api/v1/boards/:id/action-items
 
@@ -191,7 +198,8 @@ through after the session, shown in the board's Action Items panel. See issue
 facilitate the board, or gets `403`. Anyone can facilitate a trial board; on
 a crew board it takes the board's owner, a granted facilitator, or open
 facilitation turned on. An API key's agent owns the boards it creates, so
-those always pass.
+those always pass. A locked board returns `423 LOCKED` and adds nothing;
+locking only the notes does not block action items.
 
 **Request:**
 ```json

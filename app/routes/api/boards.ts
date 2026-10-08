@@ -91,11 +91,28 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // If the caller is authenticated (real API key or logged-in browser), use
-  // their identity + team. Otherwise fall through to the legacy trial flow:
-  // mint an anonymous agent user, return an agent_token, leave the board
-  // teamless. See ADR-0004 and ADR-0005.
+  // their identity + team. A caller with no credentials at all gets the
+  // legacy trial flow: mint an anonymous agent user, return an agent_token,
+  // leave the board teamless. See ADR-0004 and ADR-0005.
   const authedUser = await getApiUser(request);
   const url = new URL(request.url);
+
+  // #109: an Authorization header that resolves to nobody (a revoked or
+  // mistyped API key, an expired agent_token) is a failed login, not a trial
+  // request. Answer 401 like the other write endpoints rather than minting an
+  // ownerless board the caller will never find on its crew.
+  if (!authedUser && request.headers.has("Authorization")) {
+    return Response.json(
+      {
+        error: {
+          code: "UNAUTHORIZED",
+          message:
+            "Authorization did not resolve to a user: the API key is unknown or revoked, or the agent_token has expired. Omit Authorization to create a trial board.",
+        },
+      },
+      { status: 401 }
+    );
+  }
 
   if (authedUser) {
     const teamId = await resolveTeamIdForAuthedUser(

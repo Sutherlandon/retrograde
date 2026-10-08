@@ -143,6 +143,45 @@ describe("getBoardAccess", () => {
   });
 });
 
+describe("lockReason", () => {
+  const row = (notes_locked: boolean, board_locked: boolean) => ({
+    rowCount: 1,
+    rows: [{ notes_locked, board_locked }],
+  });
+
+  it("returns null when the checked locks are off", async () => {
+    const { lockReason } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row(false, false));
+    expect(await lockReason("board-1", { notes: true, board: true })).toBeNull();
+  });
+
+  it("names the board lock for a board: true check", async () => {
+    const { lockReason } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row(false, true));
+    expect(await lockReason("board-1", { board: true })).toBe("Board is locked");
+  });
+
+  it("names the notes lock for a notes: true check when either lock is set", async () => {
+    const { lockReason } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row(true, false));
+    expect(await lockReason("board-1", { notes: true })).toBe("Notes are locked");
+    mockPoolQuery.mockResolvedValueOnce(row(false, true));
+    expect(await lockReason("board-1", { notes: true })).toBe("Notes are locked");
+  });
+
+  it("ignores notes_locked for a board: true check", async () => {
+    const { lockReason } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row(true, false));
+    expect(await lockReason("board-1", { board: true })).toBeNull();
+  });
+
+  it("returns null for a missing board (the caller's access check owns 404)", async () => {
+    const { lockReason } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    expect(await lockReason("missing", { notes: true, board: true })).toBeNull();
+  });
+});
+
 describe("requireUnlocked", () => {
   it("passes through when neither lock is set", async () => {
     const { requireUnlocked } = await import("./board_permissions");
