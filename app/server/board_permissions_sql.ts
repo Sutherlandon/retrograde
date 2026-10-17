@@ -32,11 +32,9 @@ export function canFacilitateSql(board: string, user: string): string {
 }
 
 /**
- * May the user delete, archive or unarchive the board? Its owner (ADR-0006),
- * or the owner of its crew when the board's owner is the agent of one of that
- * crew's API keys (ADR-0027). A board a human owns stays that human's alone.
- * A revoked key still counts: its agent's boards are the ones nobody else
- * could reach.
+ * May the user manage the board as an object — delete, archive, unarchive,
+ * duplicate, move? Its owner (ADR-0006), or the owner of its crew, whoever
+ * owns the board, human or agent (ADR-0027).
  */
 export function canManageBoardSql(board: string, user: string): string {
   return `(
@@ -45,10 +43,8 @@ export function canManageBoardSql(board: string, user: string): string {
       WHERE lbm.board_id = ${board}.id AND lbm.user_id = ${user} AND lbm.role = 'owner'
     )
     OR EXISTS (
-      SELECT 1 FROM board_members abm
-      JOIN api_keys lak ON lak.agent_user_id = abm.user_id AND lak.team_id = ${board}.team_id
-      JOIN team_members ltm ON ltm.team_id = ${board}.team_id AND ltm.user_id = ${user} AND ltm.role = 'owner'
-      WHERE abm.board_id = ${board}.id AND abm.role = 'owner'
+      SELECT 1 FROM team_members ltm
+      WHERE ltm.team_id = ${board}.team_id AND ltm.user_id = ${user} AND ltm.role = 'owner'
     )
   )`;
 }

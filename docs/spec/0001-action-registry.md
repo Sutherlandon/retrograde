@@ -57,9 +57,9 @@ The handoff at step 4 is real friction — the human mints a key and must get it
 |                                                                                                         | Facilitator | Owner                | Crew owner (ADR-0027)                    |
 | ------------------------------------------------------------------------------------------------------- | ----------- | -------------------- | ---------------------------------------- |
 | Run the retro — timer, locks, settings, columns, attachments, action items, granting other facilitators | ✓           | ✓ (as a facilitator) | ✓ on every board on the crew             |
-| Delete, archive, unarchive the board                                                                    | —           | ✓                    | ✓ only when one of the crew's agents owns it |
-| Duplicate the board, move it to a crew                                                                  | —           | ✓                    | —                                        |
+| Board lifecycle — delete, archive, duplicate, move to a crew                                            | —           | ✓                    | ✓ on every board on the crew             |
 | Can be revoked                                                                                          | ✓           | —                    | — (the role comes from the crew, not a grant) |
+| Can remove the owner                                                                                    | —           | —                    | —                                        |
 
 This ordering is what makes all three tiers describable with one primitive. At tier 1 there is no meaningful owner at all, so a model rooted in ownership has nothing to say about an anonymous board; a model rooted in facilitation says "everyone is a facilitator" and the tier falls out.
 
@@ -67,9 +67,9 @@ This is ADR-0006's decision, not a new one: facilitators get "settings, locks, t
 
 `userCanFacilitate` gets it right — it resolves `open_facilitation OR role IN ('owner','facilitator') OR` ownership of the board's crew, folding the owner into the facilitator set. That predicate is written once, in `app/server/board_permissions_sql.ts`, and every query that reports facilitation (`getBoardServer`'s `canFacilitate`, the action-item lists' `can_manage`) embeds it. So do `Column.tsx` and `AttachmentsList.tsx`, which gate on `canFacilitate`.
 
-The crew owner's rights come from their crew role, not a `board_members` row: they hold on boards created before ADR-0027, follow a board that moves crews, and cannot be revoked from the Crew Access modal. A crew owner may also delete, archive and unarchive a board whose owner is the agent of one of the crew's API keys, revoked keys included, so an agent's board is never stranded. A board a human owns stays that human's (ADR-0006).
+**The crew owner has full authority over every board on their crew** (ADR-0027), whoever owns it, human or agent: everything the owner can do, except remove the owner. It comes from their crew role, not a `board_members` row, so it holds on boards created before ADR-0027, follows a board that moves crews, and cannot be revoked from the Crew Access modal. A crewless board has no crew owner. The lifecycle predicate is `canManageBoardSql` in the same file.
 
-`isOwner` is the correct gate in exactly one place — the dashboard's duplicate and move controls (`BoardActionsMenu`, DASH-006, DASH-010 – DASH-012). Archive and delete gate on the row's `can_manage` (DASH-007 – DASH-009).
+On the dashboard, the lifecycle controls (`BoardActionsMenu`, bulk selection; DASH-006 – DASH-012) gate on the row's `can_manage`, never on `isOwner`.
 
 ## Status vocabulary
 
@@ -190,13 +190,13 @@ Registered users only; `AppLayout` requires a registered session, and every acti
 | DASH-003 | Create a board (into selected crew, else personal) | Registered                | `dashboard.tsx` action          | `requireRegisteredUser` + `userIsTeamMember` | Verified             |
 | DASH-004 | Filter boards by fuzzy text                        | Registered                | `dashboard.tsx`                 | client-side                                  | Verified |
 | DASH-005 | Sort by updated / created / title, persisted       | Registered                | `SortBoardsBanner`              | client-side                                  | Verified             |
-| DASH-006 | Duplicate a board | Board owner | `board_actions.ts` `duplicate` | role check in model; the copy lands on the original's crew if the caller is a member, else their personal crew — never crewless | Verified |
-| DASH-007 | Delete a board | Board owner · the crew owner, when one of the crew's agents owns the board (ADR-0027) | `board_actions.ts` `delete` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
-| DASH-008 | Archive a board | Board owner · the crew owner, when one of the crew's agents owns the board (ADR-0027) | `board_actions.ts` `archive` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
-| DASH-009 | Unarchive a board | Board owner · the crew owner, when one of the crew's agents owns the board (ADR-0027) | `board_actions.ts` `unarchive` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
-| DASH-010 | Move a board to a crew                             | Board owner + crew member | `board_actions.ts` `moveBoard`  | SQL `EXISTS` owner + membership              | Verified             |
-| DASH-011 | Bulk-move boards                                   | Board owner + crew member | `board_actions.ts` `bulkMove`   | SQL `EXISTS`                                 | Verified             |
-| DASH-012 | Bulk-delete boards                                 | Board owner               | `board_actions.ts` `bulkDelete` | SQL join on `board_members`                  | Verified             |
+| DASH-006 | Duplicate a board | Board owner · crew owner (ADR-0027) | `board_actions.ts` `duplicate` · `BoardActionsMenu` | `canManageBoardSql` in the model; the copy lands on the original's crew if the caller is a member, else their personal crew — never crewless | Verified |
+| DASH-007 | Delete a board | Board owner · crew owner (ADR-0027) | `board_actions.ts` `delete` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
+| DASH-008 | Archive a board | Board owner · crew owner (ADR-0027) | `board_actions.ts` `archive` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
+| DASH-009 | Unarchive a board | Board owner · crew owner (ADR-0027) | `board_actions.ts` `unarchive` · `BoardActionsMenu` | `canManageBoardSql` in the model; UI gates on the row's `can_manage` | Verified |
+| DASH-010 | Move a board to a crew | (Board owner · crew owner) + member of the destination | `board_actions.ts` `moveBoard` · `BoardActionsMenu` | `canManageBoardSql` + membership in the `UPDATE` | Verified |
+| DASH-011 | Bulk-move boards | (Board owner · crew owner) + member of the destination | `board_actions.ts` `bulkMove` | `canManageBoardSql` + membership in the `UPDATE`; selection gates on `can_manage` | Verified |
+| DASH-012 | Bulk-delete boards | Board owner · crew owner | `board_actions.ts` `bulkDelete` | `canManageBoardSql` in the `SELECT`; selection gates on `can_manage` | Verified |
 | DASH-013 | Filter to unassigned boards (`?team=unassigned`)   | Registered                | `dashboard.tsx` · `Sidebar`     | scoped to caller                             | Verified             |
 | DASH-014 | View archived boards                               | Registered                | `dashboard.tsx`                 | scoped to caller                             | Verified             |
 | DASH-015 | View open action items across own boards           | Registered                | `listOpenActionItemsForUser`    | scoped to caller                             | Verified             |
@@ -292,7 +292,7 @@ A divergence between this document and the code is recorded here first, with an 
 
 | ID | Divergence | Rows | Found |
 |----|-----------|------|-------|
-| GAP-009 | `requireBoardAccess` checks the board in the URL, but several browser writes then match their note or column by id alone: `upsertNoteServer`, `moveNoteServer`, `reorderNotesServer`, `likeNoteServer`, `voteNoteServer`, `updateColumnTitleServer`, `updateColumnPromptServer`. A caller with access to one board who knows a note or column id on another can write to it. Deleting a note or column (BRD-006, BRD-013) and every JSON API write (API-008 – API-017) are scoped to the board in SQL. | BRD-004, BRD-005, BRD-007 – BRD-012 | 2026-10-17 |
+| GAP-009 ([#120](https://github.com/Sutherlandon/retrograde/issues/120)) | `requireBoardAccess` checks the board in the URL, but several browser writes then match their note or column by id alone: `upsertNoteServer`, `moveNoteServer`, `reorderNotesServer`, `likeNoteServer`, `voteNoteServer`, `updateColumnTitleServer`, `updateColumnPromptServer`. A caller with access to one board who knows a note or column id on another can write to it. Deleting a note or column (BRD-006, BRD-013) and every JSON API write (API-008 – API-017) are scoped to the board in SQL. | BRD-004, BRD-005, BRD-007 – BRD-012 | 2026-10-17 |
 
 
 ## Untested paths

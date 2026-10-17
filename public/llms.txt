@@ -23,8 +23,8 @@ Base URL: this site's origin (e.g. https://retrograde.sh)
   facilitation (every trial board does), you own it (an API key's agent owns
   the boards it creates), someone granted you facilitation, or you own the
   board's crew. `canFacilitate` on the board tells you. The human who minted
-  your key owns your crew, so they can always facilitate, archive and delete
-  the boards you create.
+  your key owns your crew, so they have full authority over every board on
+  it, yours included: facilitate, archive, delete, duplicate, move.
 - Locks: a facilitator can lock the notes or the whole board. Note writes
   (add, edit, move, delete) and renaming a column fail with 423 under either
   lock; renaming the board, column changes that need facilitation, and

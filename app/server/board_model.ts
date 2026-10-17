@@ -658,19 +658,30 @@ export async function stopTimerServer(boardId: string): Promise<void> {
   );
 }
 
+// DASH-006–009: board lifecycle belongs to the board's owner (ADR-0006) and
+// to the owner of its crew (ADR-0027). Moves and bulk deletes embed the same
+// predicate in their own statements.
+const CAN_MANAGE_BOARD_SQL =
+  `SELECT ${canManageBoardSql("b", "$2::uuid")} AS can_manage FROM boards b WHERE b.id = $1`;
+
+async function canManageBoard(
+  db: Pick<typeof pool, "query">,
+  boardId: string,
+  userId: string
+): Promise<boolean> {
+  const res = await db.query<{ can_manage: boolean }>(CAN_MANAGE_BOARD_SQL, [boardId, userId]);
+  return res.rows[0]?.can_manage === true;
+}
+
 export async function duplicateBoardServer(
   boardId: string,
   userId: string
 ): Promise<string> {
-  // DASH-006: board lifecycle is owner-only (ADR-0006), mirroring
-  // deleteBoardServer / archiveBoardServer. Checked before opening the
-  // transaction, same as those two.
-  const memberRes = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, userId]
-  );
-  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
-    throw new Error("Only the board owner can duplicate a board");
+  // DASH-006: board lifecycle belongs to the owner and the crew's owner
+  // (ADR-0006, ADR-0027), as in deleteBoardServer / archiveBoardServer.
+  // Checked before opening the transaction.
+  if (!(await canManageBoard(pool, boardId, userId))) {
+    throw new Error("Only the board's owner or its crew's owner can duplicate a board");
   }
 
   // ADR-0011 / DASH-006: a duplicate is never crewless — a crewless board
@@ -755,13 +766,15 @@ export async function duplicateBoardServer(
 
 /**
  * Move one or more boards to a team (or to no team with teamId = null).
- * Permission is enforced in SQL: the caller must own each board, and when
- * moving TO a team, must be a member of that team. Boards that fail either
- * guard are silently skipped; the returned ids are the boards actually moved.
+ * Permission is enforced in SQL: the caller must own each board or its crew
+ * (ADR-0027), and when moving TO a team, must be a member of that team.
+ * Boards that fail either guard are silently skipped; the returned ids are
+ * the boards actually moved.
  *
- * A move never changes open_facilitation (ADR-0022). Only an owner can move
- * a board, so every moved board is owned, and on an owned board opening the
- * Command Deck is the facilitator's choice, crew or no crew.
+ * A move never changes open_facilitation (ADR-0022). Every board a caller can
+ * move has an owner row — crew boards always do, and a crewless one can only
+ * be moved by its owner — and on an owned board opening the Command Deck is
+ * the facilitator's choice, crew or no crew.
  */
 export async function moveBoardsToTeamServer(
   boardIds: string[],
@@ -773,10 +786,7 @@ export async function moveBoardsToTeamServer(
   const res = await pool.query<{ id: string }>(
     `UPDATE boards b SET team_id = $2
      WHERE b.id = ANY($1)
-       AND EXISTS (
-         SELECT 1 FROM board_members bm
-         WHERE bm.board_id = b.id AND bm.user_id = $3 AND bm.role = 'owner'
-       )
+       AND ${canManageBoardSql("b", "$3::uuid")}
        AND ($2::uuid IS NULL OR EXISTS (
          SELECT 1 FROM team_members tm
          WHERE tm.team_id = $2 AND tm.user_id = $3
@@ -804,8 +814,8 @@ export async function countUnassignedBoardsForUser(userId: string): Promise<numb
 
 /**
  * Delete multiple boards in a single transaction. Only boards the caller
- * owns are deleted; others in the list are silently skipped. Returns the
- * ids that were actually deleted.
+ * owns, or whose crew the caller owns (ADR-0027), are deleted; others in the
+ * list are silently skipped. Returns the ids that were actually deleted.
  */
 export async function bulkDeleteBoardsServer(
   boardIds: string[],
@@ -818,9 +828,7 @@ export async function bulkDeleteBoardsServer(
     await client.query("BEGIN");
 
     const owned = await client.query<{ id: string }>(
-      `SELECT b.id FROM boards b
-       JOIN board_members bm ON bm.board_id = b.id
-       WHERE b.id = ANY($1) AND bm.user_id = $2 AND bm.role = 'owner'`,
+      `SELECT b.id FROM boards b WHERE b.id = ANY($1) AND ${canManageBoardSql("b", "$2::uuid")}`,
       [boardIds, userId]
     );
     const ownedIds = owned.rows.map((r) => r.id);
@@ -845,21 +853,6 @@ export async function bulkDeleteBoardsServer(
   }
 }
 
-// DASH-007–009: deleting, archiving and unarchiving belong to the board's
-// owner (ADR-0006), and to the crew owner on a board one of their crew's
-// agents owns (ADR-0027). Duplicating and moving stay owner-only.
-const CAN_MANAGE_BOARD_SQL =
-  `SELECT ${canManageBoardSql("b", "$2::uuid")} AS can_manage FROM boards b WHERE b.id = $1`;
-
-async function canManageBoard(
-  db: Pick<typeof pool, "query">,
-  boardId: string,
-  userId: string
-): Promise<boolean> {
-  const res = await db.query<{ can_manage: boolean }>(CAN_MANAGE_BOARD_SQL, [boardId, userId]);
-  return res.rows[0]?.can_manage === true;
-}
-
 export async function deleteBoardServer(
   boardId: string,
   userId: string
@@ -870,7 +863,7 @@ export async function deleteBoardServer(
     await client.query("BEGIN");
 
     if (!(await canManageBoard(client, boardId, userId))) {
-      throw new Error("Only the board owner can delete a board");
+      throw new Error("Only the board's owner or its crew's owner can delete a board");
     }
 
     // Delete notes for all columns in this board
@@ -981,14 +974,14 @@ export async function updateBoardTitleServer(boardId: string, newTitle: string, 
 
 export async function archiveBoardServer(boardId: string, userId: string): Promise<void> {
   if (!(await canManageBoard(pool, boardId, userId))) {
-    throw new Error("Only the board owner can archive a board");
+    throw new Error("Only the board's owner or its crew's owner can archive a board");
   }
   await pool.query(`UPDATE boards SET archived_at = NOW() WHERE id = $1`, [boardId]);
 }
 
 export async function unarchiveBoardServer(boardId: string, userId: string): Promise<void> {
   if (!(await canManageBoard(pool, boardId, userId))) {
-    throw new Error("Only the board owner can unarchive a board");
+    throw new Error("Only the board's owner or its crew's owner can unarchive a board");
   }
   await pool.query(`UPDATE boards SET archived_at = NULL WHERE id = $1`, [boardId]);
 }

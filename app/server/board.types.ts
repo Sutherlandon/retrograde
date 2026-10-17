@@ -108,7 +108,7 @@ export interface DashboardBoardRow {
   team_id: string | null;
   team_name: string | null;
   role: string;              // 'owner' | 'facilitator' | 'team'
-  can_manage: boolean;       // may archive/delete: the owner, or the crew owner on an agent's board (ADR-0027)
+  can_manage: boolean;       // may duplicate/move/archive/delete: the owner, or the crew's owner (ADR-0027)
   open_action_items: number;
   created_at: string;
   updated_at: string;

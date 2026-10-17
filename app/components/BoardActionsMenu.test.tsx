@@ -23,20 +23,20 @@ describe("BoardActionsMenu — move to team", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it("shows Move to Crew for owners when crews are provided", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} teams={teams} currentTeamId="t1" />);
+  it("shows Move to Crew to whoever may manage the board when crews are provided", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId="t1" />);
     openMenu();
     expect(screen.getByText("Move to Crew")).toBeInTheDocument();
   });
 
-  it("hides Move to Crew for non-owners", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} isArchived={false} teams={teams} currentTeamId="t1" />);
+  it("hides Move to Crew from someone who may not manage the board", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage={false} isArchived={false} teams={teams} currentTeamId="t1" />);
     openMenu();
     expect(screen.queryByText("Move to Crew")).toBeNull();
   });
 
   it("lists destination teams excluding the board's current team", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} teams={teams} currentTeamId="t1" />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId="t1" />);
     openMenu();
     fireEvent.click(screen.getByText("Move to Crew"));
     expect(screen.getByText("Design Crew")).toBeInTheDocument();
@@ -44,7 +44,7 @@ describe("BoardActionsMenu — move to team", () => {
   });
 
   it("submits a moveBoard intent when a destination team is picked", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} teams={teams} currentTeamId="t1" />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId="t1" />);
     openMenu();
     fireEvent.click(screen.getByText("Move to Crew"));
     fireEvent.click(screen.getByText("Design Crew"));
@@ -55,7 +55,7 @@ describe("BoardActionsMenu — move to team", () => {
   });
 
   it("offers Remove from crew only when the board is on a crew, submitting 'none'", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} teams={teams} currentTeamId="t2" />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId="t2" />);
     openMenu();
     fireEvent.click(screen.getByText("Move to Crew"));
     fireEvent.click(screen.getByText("Remove from crew"));
@@ -66,14 +66,14 @@ describe("BoardActionsMenu — move to team", () => {
   });
 
   it("does not offer Remove from crew for an unassigned board", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} teams={teams} currentTeamId={null} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId={null} />);
     openMenu();
     fireEvent.click(screen.getByText("Move to Crew"));
     expect(screen.queryByText("Remove from crew")).toBeNull();
   });
 
   it("still renders the classic actions without team props (board page usage)", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />);
     openMenu();
     expect(screen.getByText("Duplicate Board")).toBeInTheDocument();
     expect(screen.queryByText("Move to Crew")).toBeNull();
@@ -87,7 +87,7 @@ describe("BoardActionsMenu — dropdown escapes a clipping ancestor", () => {
   it("portals the menu to document.body, outside the scrolling table container", () => {
     const { container } = render(
       <div style={{ overflow: "hidden" }}>
-        <BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />
+        <BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />
       </div>
     );
     openMenu();
@@ -97,14 +97,14 @@ describe("BoardActionsMenu — dropdown escapes a clipping ancestor", () => {
   });
 
   it("positions the portaled menu with position: fixed, not absolute", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />);
     openMenu();
     const menu = screen.getByText("Duplicate Board").closest("div[style]") as HTMLElement;
     expect(menu.style.position).toBe("fixed");
   });
 
   it("closes on scroll rather than drifting away from the button", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />);
     openMenu();
     expect(screen.getByText("Duplicate Board")).toBeInTheDocument();
     fireEvent.scroll(window);
@@ -112,50 +112,43 @@ describe("BoardActionsMenu — dropdown escapes a clipping ancestor", () => {
   });
 
   it("does not close on an outside click that lands inside the portaled panel", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />);
     openMenu();
     fireEvent.mouseDown(screen.getByText("Duplicate Board"));
     expect(screen.getByText("Duplicate Board")).toBeInTheDocument();
   });
 
   it("closes on a click outside both the button and the portaled panel", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} />);
     openMenu();
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText("Duplicate Board")).toBeNull();
   });
 });
 
-// ADR-0027: a crew owner may archive and delete a board one of their crew's
-// agents owns, without owning it — so Move to Crew stays hidden.
-describe("BoardActionsMenu — lifecycle without ownership", () => {
+// ADR-0027: canManage is true for the board's owner and for its crew's owner.
+describe("BoardActionsMenu — lifecycle controls", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it("shows Archive and Delete but not Move when the viewer may manage a board they don't own", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage isArchived={false} teams={teams} currentTeamId="t2" />);
+  it("shows Move, Archive and Delete to someone who may manage the board", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived={false} teams={teams} currentTeamId="t2" />);
     openMenu();
+    expect(screen.getByText("Move to Crew")).toBeInTheDocument();
     expect(screen.getByText("Archive Board")).toBeInTheDocument();
     expect(screen.getByText("Delete Board")).toBeInTheDocument();
-    expect(screen.queryByText("Move to Crew")).toBeNull();
   });
 
-  it("shows Unarchive on an archived board the viewer may manage", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage isArchived teams={teams} currentTeamId="t2" />);
+  it("shows Unarchive on an archived board they may manage", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage isArchived teams={teams} currentTeamId="t2" />);
     openMenu();
     expect(screen.getByText("Unarchive Board")).toBeInTheDocument();
   });
 
-  it("hides Archive and Delete when the viewer may not manage the board", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage={false} isArchived={false} teams={teams} currentTeamId="t2" />);
+  it("hides Archive and Delete from someone who may not manage the board", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" canManage={false} isArchived={false} teams={teams} currentTeamId="t2" />);
     openMenu();
     expect(screen.queryByText("Archive Board")).toBeNull();
     expect(screen.queryByText("Delete Board")).toBeNull();
-  });
-
-  it("defaults canManage to isOwner", () => {
-    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
-    openMenu();
-    expect(screen.getByText("Delete Board")).toBeInTheDocument();
   });
 });

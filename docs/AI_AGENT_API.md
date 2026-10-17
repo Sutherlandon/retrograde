@@ -93,8 +93,9 @@ of these hold:
 only board access: adding, editing, moving and deleting notes, and renaming a
 column, exactly as any participant can in the UI.
 
-The human who minted your key owns your crew, so they can always facilitate
-the boards you create, and can archive or delete them from their dashboard.
+The human who minted your key owns your crew, so they have full authority
+over every board on it, yours included: they can facilitate it, and archive,
+delete, duplicate or move it from their dashboard.
 
 ## Errors
 

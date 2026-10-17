@@ -54,9 +54,6 @@ export interface FixtureState {
   openFacilitation: boolean;
   notesLocked: boolean;
   boardLocked: boolean;
-  /** The board's owner row belongs to the agent of an API key on the board's
-   *  crew (ADR-0027). False on every base fixture: their owners are human. */
-  ownerIsCrewAgent: boolean;
 }
 
 // Matches ADR-0011 / the registry's tier table exactly:
@@ -67,17 +64,14 @@ export const FIXTURE_DATA: Record<BoardFixtureId, FixtureState> = {
   anonymous: {
     id: "anonymous", boardId: "board-anonymous", teamId: null, isPersonal: false,
     restricted: false, openFacilitation: true, notesLocked: false, boardLocked: false,
-    ownerIsCrewAgent: false,
   },
   personal: {
     id: "personal", boardId: "board-personal", teamId: "team-personal", isPersonal: true,
     restricted: false, openFacilitation: false, notesLocked: false, boardLocked: false,
-    ownerIsCrewAgent: false,
   },
   "members-only": {
     id: "members-only", boardId: "board-members-only", teamId: "team-crew", isPersonal: false,
     restricted: true, openFacilitation: false, notesLocked: false, boardLocked: false,
-    ownerIsCrewAgent: false,
   },
 };
 
@@ -87,11 +81,6 @@ export function lockedVariant(
   flags: { notes?: boolean; board?: boolean }
 ): FixtureState {
   return { ...fixture, notesLocked: !!flags.notes, boardLocked: !!flags.board };
-}
-
-/** A crew fixture whose owner is one of the crew's agents (ADR-0027). */
-export function agentOwnedVariant(fixture: FixtureState): FixtureState {
-  return { ...fixture, ownerIsCrewAgent: true };
 }
 
 export interface ActorState {
@@ -210,12 +199,11 @@ export function canFacilitateViaSession(actor: ActorState, fixture: FixtureState
 }
 
 /**
- * The model's lifecycle check (delete/archive/unarchive): the board's owner,
- * or the crew's owner when one of the crew's agents owns the board (ADR-0027).
+ * The model's lifecycle check (delete, archive, unarchive, duplicate, move):
+ * the board's owner, or the owner of its crew, whoever owns the board (ADR-0027).
  */
 export function canManageBoard(actor: ActorState, fixture: FixtureState): boolean {
-  if (actor.boardRole === "owner") return true;
-  return fixture.ownerIsCrewAgent && ownsBoardCrew(actor, fixture);
+  return actor.boardRole === "owner" || ownsBoardCrew(actor, fixture);
 }
 
 /** getApiUser resolves to a non-null caller (bearer key OR session cookie). */
@@ -306,8 +294,8 @@ function resolveBoardGuardQueries(
     const can = fixture.openFacilitation || (params[1] === actor.userId && canFacilitateDirect(actor, fixture));
     return { rowCount: 1, rows: [{ can }] };
   }
-  // board_model's lifecycle check — deleteBoardServer / archiveBoardServer /
-  // unarchiveBoardServer (DASH-007–009)
+  // board_model's lifecycle check — duplicateBoardServer / deleteBoardServer /
+  // archiveBoardServer / unarchiveBoardServer (DASH-006–009)
   if (s.includes("AS can_manage FROM boards b")) {
     const can_manage = params[1] === actor.userId && canManageBoard(actor, fixture);
     return { rowCount: 1, rows: [{ can_manage }] };
@@ -322,10 +310,6 @@ function resolveBoardGuardQueries(
 function resolveMembershipQueries(
   s: string, params: unknown[], fixture: FixtureState, actor: ActorState
 ): QueryResult | undefined {
-  // board_members role lookup — duplicateBoardServer's owner check.
-  if (s === "SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2") {
-    return actor.boardRole ? { rowCount: 1, rows: [{ role: actor.boardRole }] } : { rowCount: 0, rows: [] };
-  }
   // duplicateBoardServer: the ORIGINAL board's team_id
   if (s === "SELECT team_id FROM boards WHERE id = $1") {
     return { rowCount: 1, rows: [{ team_id: fixture.teamId }] };
@@ -385,29 +369,29 @@ function resolveMembershipQueries(
 }
 
 // DASH-010/011/012: moveBoardsToTeamServer and bulkDeleteBoardsServer embed
-// their owner/membership checks INSIDE a single UPDATE/SELECT ... RETURNING
-// statement (no separate guard query to intercept), so the resolver has to
-// evaluate those conditions itself rather than deferring to a generic
-// fallback — otherwise it would silently return zero rows for everyone,
-// including an actual owner, and the matrix could never see "allow".
+// their lifecycle/membership checks INSIDE a single UPDATE/SELECT statement
+// (no separate guard query to intercept), so the resolver has to evaluate
+// those conditions itself rather than deferring to a generic fallback —
+// otherwise it would silently return zero rows for everyone, including an
+// actual owner, and the matrix could never see "allow".
 function resolveDashboardLifecycleQueries(
-  s: string, params: unknown[], actor: ActorState
+  s: string, params: unknown[], fixture: FixtureState, actor: ActorState
 ): QueryResult | undefined {
-  const isOwner = actor.boardRole === "owner";
+  const canManage = canManageBoard(actor, fixture);
   const isTeamMember = actor.teamRole !== null; // destination team is abstract — see actorState's doc comment
 
-  // moveBoardsToTeamServer (DASH-010/011): UPDATE ... WHERE EXISTS(owner) AND (teamId IS NULL OR EXISTS(team_members))
+  // moveBoardsToTeamServer (DASH-010/011): UPDATE ... WHERE canManage AND (teamId IS NULL OR EXISTS(team_members))
   if (s.includes("UPDATE boards b SET team_id = $2")) {
     const boardIds = (params[0] as string[]) ?? [];
     const teamId = params[1] as string | null;
-    const ok = isOwner && (teamId === null || isTeamMember);
+    const ok = canManage && (teamId === null || isTeamMember);
     return ok ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
   }
 
-  // bulkDeleteBoardsServer (DASH-012): SELECT ids the caller owns, out of a given set.
-  if (s.includes("JOIN board_members bm") && s.includes("bm.role = 'owner'") && s.includes("ANY($1)")) {
+  // bulkDeleteBoardsServer (DASH-012): SELECT the ids the caller may manage, out of a given set.
+  if (s.startsWith("SELECT b.id FROM boards b WHERE b.id = ANY($1)")) {
     const boardIds = (params[0] as string[]) ?? [];
-    return isOwner ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
+    return canManage ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
   }
 
   return undefined;
@@ -424,7 +408,7 @@ export function makeResolver(actor: ActorState, fixture: FixtureState) {
       resolveIdentityQueries(s, params, actor) ??
       resolveBoardGuardQueries(s, params, fixture, actor) ??
       resolveMembershipQueries(s, params, fixture, actor) ??
-      resolveDashboardLifecycleQueries(s, params, actor) ??
+      resolveDashboardLifecycleQueries(s, params, fixture, actor) ??
       { rows: [], rowCount: 0 } // generic INSERT/UPDATE/DELETE — result unused by the guards under test
     );
   };
@@ -519,20 +503,16 @@ export const RULES = {
     return "allow";
   },
 
-  dashboardOwner: (actor: ActorState): Verdict => {
-    if (!isRegisteredHuman(actor)) return "deny";
-    return actor.boardRole === "owner" ? "allow" : "deny";
-  },
-
-  // DASH-007–009: the owner, or the crew owner on an agent-owned crew board.
+  // DASH-006–009, DASH-012: the board's owner or its crew's owner (ADR-0027).
   dashboardLifecycle: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!isRegisteredHuman(actor)) return "deny";
     return canManageBoard(actor, fixture) ? "allow" : "deny";
   },
 
-  dashboardMove: (actor: ActorState): Verdict => {
+  // DASH-010/011: the same, plus membership of the destination crew.
+  dashboardMove: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!isRegisteredHuman(actor)) return "deny";
-    return actor.boardRole === "owner" && actor.teamRole !== null ? "allow" : "deny";
+    return canManageBoard(actor, fixture) && actor.teamRole !== null ? "allow" : "deny";
   },
 
   siteAdmin: (actor: ActorState): Verdict => {
@@ -737,7 +717,7 @@ const DASH_SPECS: ActionSpec[] = [
     build: (actor) => ({ request: getRequest("http://localhost:3000/app/dashboard", actor), params: {} }),
   },
   dashActionSpec("DASH-003", "", () => ({}), RULES.registeredOnly), // no intent -> falls through to create-board
-  dashActionSpec("DASH-006", "duplicate", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
+  dashActionSpec("DASH-006", "duplicate", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
   dashActionSpec("DASH-007", "delete", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
   dashActionSpec("DASH-008", "archive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
   dashActionSpec("DASH-009", "unarchive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
@@ -745,7 +725,7 @@ const DASH_SPECS: ActionSpec[] = [
     { denyWhenResult: (r) => (r as { moved?: number })?.moved === 0 }),
   dashActionSpec("DASH-011", "bulkMove", (f) => ({ boardIds: f.boardId, teamId: "team-move-target" }), RULES.dashboardMove,
     { denyWhenResult: (r) => (r as { moved?: number })?.moved === 0 }),
-  dashActionSpec("DASH-012", "bulkDelete", (f) => ({ boardIds: f.boardId }), RULES.dashboardOwner,
+  dashActionSpec("DASH-012", "bulkDelete", (f) => ({ boardIds: f.boardId }), RULES.dashboardLifecycle,
     { denyWhenResult: (r) => (r as { deleted?: number })?.deleted === 0 }),
   {
     id: "DASH-016", kind: "action", module: () => import("~/routes/app/board.claim"), rule: RULES.registeredOnly,

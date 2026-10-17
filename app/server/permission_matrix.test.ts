@@ -15,7 +15,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   ACTORS, FIXTURES, FIXTURE_DATA, ACTION_CATALOG, SITE_ADMIN_EXTERNAL_ID,
-  actorState, makeResolver, lockedVariant, agentOwnedVariant,
+  actorState, makeResolver, lockedVariant,
   type ActorId, type BoardFixtureId, type ActorState, type FixtureState, type Verdict,
 } from "./permission_matrix.fixtures";
 import { parseRegistry, isServerEnforced, MATRIX_EXTRA_EXCLUDED_IDS } from "./registry_parser";
@@ -369,35 +369,29 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
 });
 
 // ---------------------------------------------------------------------------
-// ADR-0027: a crew owner may delete, archive and unarchive a board on their
-// crew that one of the crew's agents owns. The base fixtures' owners are
-// human, so the main matrix already proves the crew owner is refused there
-// (ADR-0006 unchanged for human owners); these cells cover the agent-owned case.
+// ADR-0027: the owner of a board's crew has full authority over it — every
+// lifecycle action an owner has — whoever owns the board. The main matrix
+// computes these cells from the same rule; this block states the intent.
 // ---------------------------------------------------------------------------
 
-describe("crew owners manage boards their crew's agents own (ADR-0027)", () => {
-  const agentOwnedFixtures = [agentOwnedVariant(FIXTURE_DATA.personal), agentOwnedVariant(FIXTURE_DATA["members-only"])];
-  const lifecycleIds = ["DASH-007", "DASH-008", "DASH-009"];
+describe("crew owners have full authority over their crew's boards (ADR-0027)", () => {
+  const LIFECYCLE = ["DASH-006", "DASH-007", "DASH-008", "DASH-009", "DASH-010", "DASH-011", "DASH-012"];
+  const crewFixtures = [FIXTURE_DATA.personal, FIXTURE_DATA["members-only"]];
 
-  const allowCases = lifecycleIds.flatMap((id) => agentOwnedFixtures.map((f) => [id, f] as const));
-  it.each(allowCases)("%s allows the crew owner on an agent-owned board (%o)", async (id, fixture) => {
+  const allowCases = LIFECYCLE.flatMap((id) => crewFixtures.map((f) => [id, f.id, f] as const));
+  it.each(allowCases)("%s allows the crew owner on a %s board someone else owns", async (id, _name, fixture) => {
     expect(await invoke(id, actorState("crew-owner", fixture), fixture)).toBe("allow");
   });
 
-  const denyActors: ActorId[] = ["crew-member", "facilitator", "registered-non-member", "api-key-in-crew"];
-  const denyCases = lifecycleIds.flatMap((id) => denyActors.map((actor) => [id, actor] as const));
-  it.each(denyCases)("%s still denies %s on an agent-owned board", async (id, actor) => {
-    const fixture = agentOwnedFixtures[1];
-    expect(await invoke(id, actorState(actor, fixture), fixture)).toBe("deny");
-  });
-
-  it.each(["DASH-006", "DASH-010", "DASH-012"])("%s stays owner-only on an agent-owned board", async (id) => {
-    const fixture = agentOwnedFixtures[1];
+  it.each(LIFECYCLE)("%s gives nobody crew-owner rights on a crewless board", async (id) => {
+    const fixture = FIXTURE_DATA.anonymous;
     expect(await invoke(id, actorState("crew-owner", fixture), fixture)).toBe("deny");
   });
 
-  it.each(lifecycleIds)("%s denies the crew owner on a board a human owns", async (id) => {
+  const denyActors: ActorId[] = ["crew-member", "facilitator", "registered-non-member"];
+  const denyCases = LIFECYCLE.flatMap((id) => denyActors.map((actor) => [id, actor] as const));
+  it.each(denyCases)("%s still denies %s on a members-only board", async (id, actor) => {
     const fixture = FIXTURE_DATA["members-only"];
-    expect(await invoke(id, actorState("crew-owner", fixture), fixture)).toBe("deny");
+    expect(await invoke(id, actorState(actor, fixture), fixture)).toBe("deny");
   });
 });

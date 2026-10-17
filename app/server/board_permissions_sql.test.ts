@@ -44,12 +44,9 @@ describe("canManageBoardSql", () => {
     expect(sql).toContain("lbm.board_id = b.id AND lbm.user_id = $2::uuid AND lbm.role = 'owner'");
   });
 
-  it("admits the crew owner only when an agent of that crew owns the board (ADR-0027)", () => {
-    // The owner row's user must be the agent of an API key on the board's own
-    // crew, and the caller must own that crew.
-    expect(sql).toContain("JOIN api_keys lak ON lak.agent_user_id = abm.user_id AND lak.team_id = b.team_id");
-    expect(sql).toContain("JOIN team_members ltm ON ltm.team_id = b.team_id AND ltm.user_id = $2::uuid AND ltm.role = 'owner'");
-    expect(sql).toContain("abm.board_id = b.id AND abm.role = 'owner'");
+  it("admits the owner of the board's crew, whoever owns the board (ADR-0027)", () => {
+    expect(sql).toContain("FROM team_members ltm");
+    expect(sql).toContain("ltm.team_id = b.team_id AND ltm.user_id = $2::uuid AND ltm.role = 'owner'");
   });
 
   it("never consults open_facilitation or facilitator grants", () => {

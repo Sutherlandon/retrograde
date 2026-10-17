@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-07-07) — §1 amended by [ADR-0027](0027-crew-owners-facilitate-crew-boards.md): the owner of a board's crew is also a facilitator of it, and may delete, archive and unarchive a board one of the crew's agents owns. Lifecycle on a board a human owns stays with that owner.
+Accepted (2026-07-07) — §1 amended by [ADR-0027](0027-crew-owners-have-full-authority-over-crew-boards.md): the owner of a board's crew facilitates it and holds every lifecycle right its owner has (delete, archive, duplicate, move), whoever owns it. The owner still cannot be removed.
 
 ## Context
 
