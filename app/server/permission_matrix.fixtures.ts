@@ -54,6 +54,9 @@ export interface FixtureState {
   openFacilitation: boolean;
   notesLocked: boolean;
   boardLocked: boolean;
+  /** The board's owner row belongs to the agent of an API key on the board's
+   *  crew (ADR-0027). False on every base fixture: their owners are human. */
+  ownerIsCrewAgent: boolean;
 }
 
 // Matches ADR-0011 / the registry's tier table exactly:
@@ -64,14 +67,17 @@ export const FIXTURE_DATA: Record<BoardFixtureId, FixtureState> = {
   anonymous: {
     id: "anonymous", boardId: "board-anonymous", teamId: null, isPersonal: false,
     restricted: false, openFacilitation: true, notesLocked: false, boardLocked: false,
+    ownerIsCrewAgent: false,
   },
   personal: {
     id: "personal", boardId: "board-personal", teamId: "team-personal", isPersonal: true,
     restricted: false, openFacilitation: false, notesLocked: false, boardLocked: false,
+    ownerIsCrewAgent: false,
   },
   "members-only": {
     id: "members-only", boardId: "board-members-only", teamId: "team-crew", isPersonal: false,
     restricted: true, openFacilitation: false, notesLocked: false, boardLocked: false,
+    ownerIsCrewAgent: false,
   },
 };
 
@@ -81,6 +87,11 @@ export function lockedVariant(
   flags: { notes?: boolean; board?: boolean }
 ): FixtureState {
   return { ...fixture, notesLocked: !!flags.notes, boardLocked: !!flags.board };
+}
+
+/** A crew fixture whose owner is one of the crew's agents (ADR-0027). */
+export function agentOwnedVariant(fixture: FixtureState): FixtureState {
+  return { ...fixture, ownerIsCrewAgent: true };
 }
 
 export interface ActorState {
@@ -176,10 +187,15 @@ export function hasSession(actor: ActorState): boolean {
   return actor.hasSessionCookie;
 }
 
+/** Owner of the board's crew — a facilitator of every board on it (ADR-0027). */
+export function ownsBoardCrew(actor: ActorState, fixture: FixtureState): boolean {
+  return fixture.teamId !== null && actor.teamRole === "owner";
+}
+
 /** userCanFacilitate, given whatever userId the caller resolved to. */
 export function canFacilitateDirect(actor: ActorState, fixture: FixtureState): boolean {
   if (fixture.openFacilitation) return true;
-  return actor.boardRole === "owner" || actor.boardRole === "facilitator";
+  return actor.boardRole === "owner" || actor.boardRole === "facilitator" || ownsBoardCrew(actor, fixture);
 }
 
 /**
@@ -190,7 +206,16 @@ export function canFacilitateDirect(actor: ActorState, fixture: FixtureState): b
 export function canFacilitateViaSession(actor: ActorState, fixture: FixtureState): boolean {
   if (fixture.openFacilitation) return true;
   if (!actor.hasSessionCookie) return false;
-  return actor.boardRole === "owner" || actor.boardRole === "facilitator";
+  return canFacilitateDirect(actor, fixture);
+}
+
+/**
+ * The model's lifecycle check (delete/archive/unarchive): the board's owner,
+ * or the crew's owner when one of the crew's agents owns the board (ADR-0027).
+ */
+export function canManageBoard(actor: ActorState, fixture: FixtureState): boolean {
+  if (actor.boardRole === "owner") return true;
+  return fixture.ownerIsCrewAgent && ownsBoardCrew(actor, fixture);
 }
 
 /** getApiUser resolves to a non-null caller (bearer key OR session cookie). */
@@ -277,12 +302,15 @@ function resolveBoardGuardQueries(
     };
   }
   // userCanFacilitate (board_permissions.ts)
-  if (s.includes("open_facilitation") && s.includes("AS can")) {
-    const userIdParam = params[1];
-    const can =
-      fixture.openFacilitation ||
-      (userIdParam === actor.userId && (actor.boardRole === "owner" || actor.boardRole === "facilitator"));
+  if (s.includes("open_facilitation") && s.includes("AS can FROM boards b")) {
+    const can = fixture.openFacilitation || (params[1] === actor.userId && canFacilitateDirect(actor, fixture));
     return { rowCount: 1, rows: [{ can }] };
+  }
+  // board_model's lifecycle check — deleteBoardServer / archiveBoardServer /
+  // unarchiveBoardServer (DASH-007–009)
+  if (s.includes("AS can_manage FROM boards b")) {
+    const can_manage = params[1] === actor.userId && canManageBoard(actor, fixture);
+    return { rowCount: 1, rows: [{ can_manage }] };
   }
   // requireUnlocked (board_permissions.ts)
   if (s.startsWith("SELECT notes_locked, board_locked")) {
@@ -294,8 +322,7 @@ function resolveBoardGuardQueries(
 function resolveMembershipQueries(
   s: string, params: unknown[], fixture: FixtureState, actor: ActorState
 ): QueryResult | undefined {
-  // board_members role lookup — duplicateBoardServer / deleteBoardServer /
-  // archiveBoardServer / unarchiveBoardServer all issue this exact text.
+  // board_members role lookup — duplicateBoardServer's owner check.
   if (s === "SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2") {
     return actor.boardRole ? { rowCount: 1, rows: [{ role: actor.boardRole }] } : { rowCount: 0, rows: [] };
   }
@@ -497,6 +524,12 @@ export const RULES = {
     return actor.boardRole === "owner" ? "allow" : "deny";
   },
 
+  // DASH-007–009: the owner, or the crew owner on an agent-owned crew board.
+  dashboardLifecycle: (actor: ActorState, fixture: FixtureState): Verdict => {
+    if (!isRegisteredHuman(actor)) return "deny";
+    return canManageBoard(actor, fixture) ? "allow" : "deny";
+  },
+
   dashboardMove: (actor: ActorState): Verdict => {
     if (!isRegisteredHuman(actor)) return "deny";
     return actor.boardRole === "owner" && actor.teamRole !== null ? "allow" : "deny";
@@ -515,7 +548,8 @@ export const RULES = {
   apiBoardAccess: (actor: ActorState, fixture: FixtureState): Verdict =>
     hasBoardAccess(actor, fixture) ? "allow" : "deny",
 
-  apiBulkNotes: (actor: ActorState, fixture: FixtureState): Verdict => {
+  // API-004, API-009, API-010, API-012: any credentialed caller with board access.
+  apiParticipant: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!hasApiIdentity(actor)) return "deny";
     return hasBoardAccess(actor, fixture) ? "allow" : "deny";
   },
@@ -704,9 +738,9 @@ const DASH_SPECS: ActionSpec[] = [
   },
   dashActionSpec("DASH-003", "", () => ({}), RULES.registeredOnly), // no intent -> falls through to create-board
   dashActionSpec("DASH-006", "duplicate", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-007", "delete", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-008", "archive", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-009", "unarchive", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
+  dashActionSpec("DASH-007", "delete", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
+  dashActionSpec("DASH-008", "archive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
+  dashActionSpec("DASH-009", "unarchive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
   dashActionSpec("DASH-010", "moveBoard", (f) => ({ boardId: f.boardId, teamId: "team-move-target" }), RULES.dashboardMove,
     { denyWhenResult: (r) => (r as { moved?: number })?.moved === 0 }),
   dashActionSpec("DASH-011", "bulkMove", (f) => ({ boardIds: f.boardId, teamId: "team-move-target" }), RULES.dashboardMove,
@@ -778,6 +812,50 @@ const ADMIN_SPECS: ActionSpec[] = [
   },
 ];
 
+/** A JSON API call on the fixture's board; `params` adds item ids to `{ id }`. */
+function apiSpec(
+  id: string, kind: ActionSpec["kind"], module: () => Promise<Record<string, unknown>>,
+  method: string, path: string, params: Record<string, string>, body: unknown,
+  rule: (actor: ActorState, fixture: FixtureState) => Verdict
+): ActionSpec {
+  return {
+    id, kind, module, rule,
+    build: (actor, fixture) => ({
+      request: body === undefined
+        ? new Request(`http://localhost:3000/api/v1/boards/${fixture.boardId}${path}`, { method, headers: actorHeaders(actor) })
+        : jsonRequest(`http://localhost:3000/api/v1/boards/${fixture.boardId}${path}`, method, actor, body),
+      params: { id: fixture.boardId, ...params },
+    }),
+  };
+}
+
+// A users.id for API-017's path — the route 404s anything that isn't a UUID.
+const FACILITATOR_USER_ID = "00000000-0000-4000-8000-000000000017";
+
+// API-008 – API-017: the agent API's board writes (ADR-0027).
+const API_WRITE_SPECS: ActionSpec[] = [
+  apiSpec("API-008", "action", () => import("~/routes/api/board"), "PATCH", "", {},
+    { title: "Renamed" }, RULES.apiFacilitate),
+  apiSpec("API-009", "action", () => import("~/routes/api/board.notes.$noteId"), "PATCH", "/notes/note-1",
+    { noteId: "note-1" }, { text: "edited", columnId: "col-2" }, RULES.apiParticipant),
+  apiSpec("API-010", "action", () => import("~/routes/api/board.notes.$noteId"), "DELETE", "/notes/note-1",
+    { noteId: "note-1" }, undefined, RULES.apiParticipant),
+  apiSpec("API-011", "action", () => import("~/routes/api/board.columns"), "POST", "/columns", {},
+    { title: "New Column" }, RULES.apiFacilitate),
+  apiSpec("API-012", "action", () => import("~/routes/api/board.columns.$columnId"), "PATCH", "/columns/col-1",
+    { columnId: "col-1" }, { title: "Renamed" }, RULES.apiParticipant),
+  apiSpec("API-013", "action", () => import("~/routes/api/board.columns.$columnId"), "PATCH", "/columns/col-1",
+    { columnId: "col-1" }, { prompt: "Think about it" }, RULES.apiFacilitate),
+  apiSpec("API-014", "action", () => import("~/routes/api/board.columns.$columnId"), "DELETE", "/columns/col-1",
+    { columnId: "col-1" }, undefined, RULES.apiFacilitate),
+  apiSpec("API-015", "loader", () => import("~/routes/api/board.facilitators"), "GET", "/facilitators", {},
+    undefined, RULES.apiFacilitate),
+  apiSpec("API-016", "action", () => import("~/routes/api/board.facilitators"), "POST", "/facilitators", {},
+    { username: "target" }, RULES.apiFacilitate),
+  apiSpec("API-017", "action", () => import("~/routes/api/board.facilitators.$userId"), "DELETE",
+    `/facilitators/${FACILITATOR_USER_ID}`, { userId: FACILITATOR_USER_ID }, undefined, RULES.apiFacilitate),
+];
+
 // API rows
 const API_SPECS: ActionSpec[] = [
   {
@@ -788,7 +866,7 @@ const API_SPECS: ActionSpec[] = [
     }),
   },
   {
-    id: "API-004", kind: "action", module: () => import("~/routes/api/board.notes"), rule: RULES.apiBulkNotes,
+    id: "API-004", kind: "action", module: () => import("~/routes/api/board.notes"), rule: RULES.apiParticipant,
     build: (actor, fixture) => ({
       request: jsonRequest(`http://localhost:3000/api/v1/boards/${fixture.boardId}/notes`, "POST", actor, {
         notes: [{ columnId: "col-1", text: "hello" }],
@@ -808,5 +886,5 @@ const API_SPECS: ActionSpec[] = [
 ];
 
 export const ACTION_CATALOG: ActionSpec[] = [
-  ...BRD_SPECS, ...DECK_SPECS, ...DASH_SPECS, ...CREW_SPECS, ...ADMIN_SPECS, ...API_SPECS,
+  ...BRD_SPECS, ...DECK_SPECS, ...DASH_SPECS, ...CREW_SPECS, ...ADMIN_SPECS, ...API_SPECS, ...API_WRITE_SPECS,
 ];

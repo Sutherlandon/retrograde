@@ -1,9 +1,10 @@
 # Retrograde JSON API (Agent-Facing)
 
-Four endpoints let an AI agent create a board with custom columns,
+These endpoints let an AI agent create a board with custom columns,
 bulk-populate it with notes and action items, hand the URL to humans for
-async review, then read the final state back after humans have voted, moved,
-and edited.
+async review, read the final state back after humans have voted, moved, and
+edited, and keep curating the board itself: rename it, edit, move and delete
+notes, restructure its columns, and manage who facilitates it.
 
 `/llms.txt` (source: `public/llms.txt`) carries the same API in compact form
 for AI discoverability.
@@ -53,7 +54,7 @@ response includes an `agent_token` (a session-cookie value) that the agent
 uses on subsequent calls. Trial boards are **crewless**, have **no owner**,
 and auto-archive 30 days after creation (ADR-0005). Everyone with the link
 can facilitate them: humans in the UI (timer, locks, settings, columns), the
-agent over the API (action items).
+agent over the API (title, columns, action items, facilitators).
 
 The path from trial to paid is designed not to break the agent:
 
@@ -74,8 +75,26 @@ Nothing is handed over until the human asks for control.
 
 A board in a members-only crew admits only that crew's members, the board's
 owner and facilitators, and API keys minted for that crew; every other caller
-gets `403 FORBIDDEN` from all four endpoints. Crewless boards and boards on
+gets `403 FORBIDDEN` from every endpoint below. Crewless boards and boards on
 crews with members-only turned off admit anyone with the board id.
+
+### Facilitation
+
+Some writes need the caller to be able to **facilitate** the board, the same
+rule as the Command Deck in the UI. A caller can facilitate a board when any
+of these hold:
+
+- the board has open facilitation on (every trial board does);
+- the caller owns the board — an API key's agent owns the boards it creates;
+- a facilitator granted the caller facilitation;
+- the caller owns the board's crew (ADR-0027).
+
+`GET /api/v1/boards/:id` reports it as `canFacilitate`. Everything else needs
+only board access: adding, editing, moving and deleting notes, and renaming a
+column, exactly as any participant can in the UI.
+
+The human who minted your key owns your crew, so they can always facilitate
+the boards you create, and can archive or delete them from their dashboard.
 
 ## Errors
 
@@ -83,13 +102,21 @@ Every error is JSON: `{ "error": { "code": "...", "message": "..." } }`.
 
 | Status | `code`               | When                                                                                   |
 |--------|----------------------|----------------------------------------------------------------------------------------|
-| 400    | `BAD_REQUEST`        | Malformed JSON, or a field fails validation.                                           |
-| 401    | `UNAUTHORIZED`       | A notes or action-items call without valid credentials; a board-create call whose `Authorization` header doesn't resolve (revoked or unknown key, expired `agent_token`); any call without credentials on a self-hosted instance. |
-| 403    | `FORBIDDEN`          | No board access, or (action items only) the caller cannot facilitate the board.        |
-| 404    | `NOT_FOUND`          | The board does not exist.                                                              |
+| 400    | `BAD_REQUEST`        | Malformed JSON, a body that isn't a JSON object, or a field fails validation.          |
+| 401    | `UNAUTHORIZED`       | A write without valid credentials; a board-create call whose `Authorization` header doesn't resolve (revoked or unknown key, expired `agent_token`); any call without credentials on a self-hosted instance. |
+| 403    | `FORBIDDEN`          | No board access, or the call needs facilitation and the caller cannot facilitate the board. |
+| 404    | `NOT_FOUND`          | The board does not exist, or the note, column or facilitator named in the path is not on this board. |
 | 405    | `METHOD_NOT_ALLOWED` | Wrong HTTP method.                                                                     |
 | 413    | `PAYLOAD_TOO_LARGE`  | More than 200 notes or 100 action items in one request.                                |
-| 423    | `LOCKED`             | A facilitator locked the board (or, for notes, just the notes). Nothing was written.   |
+| 423    | `LOCKED`             | A facilitator locked the board (or, where noted, just the notes). Nothing was written. |
+
+### Locks
+
+| Call | Notes locked | Board locked |
+|---|:---:|:---:|
+| Add, edit, move or delete notes; rename a column | blocked | blocked |
+| Add action items; rename the board; add, re-prompt or delete a column | — | blocked |
+| Read the board; list, grant or revoke facilitators | — | — |
 
 ## Endpoints
 
@@ -195,11 +222,10 @@ through after the session, shown in the board's Action Items panel. See issue
 #88 / ADR-0006.
 
 **Credentials required.** The caller needs board access and must be able to
-facilitate the board, or gets `403`. Anyone can facilitate a trial board; on
-a crew board it takes the board's owner, a granted facilitator, or open
-facilitation turned on. An API key's agent owns the boards it creates, so
-those always pass. A locked board returns `423 LOCKED` and adds nothing;
-locking only the notes does not block action items.
+facilitate the board (see Facilitation), or gets `403`. An API key's agent
+owns the boards it creates, so those always pass. A locked board returns
+`423 LOCKED` and adds nothing; locking only the notes does not block action
+items.
 
 **Request:**
 ```json
@@ -220,6 +246,112 @@ locking only the notes does not block action items.
 
 Humans check items off in the UI; poll `GET /api/v1/boards/:id` and read
 `actionItems[].completed` to see progress.
+
+### PATCH /api/v1/boards/:id
+
+Rename the board. **Needs facilitation.** Blocked by a board lock.
+
+**Request:** `{ "title": "Deprecated — moved to Q3 board" }` — `title` is
+required, 1-200 chars after trimming.
+
+**Response (200):** full board state JSON.
+
+### PATCH /api/v1/boards/:id/notes/:noteId
+
+Edit a note's text, move it to another column, or both. Needs board access
+only. Blocked by either lock.
+
+**Request:**
+```json
+{ "text": "Passkeys shipped", "columnId": "<column-uuid>" }
+```
+
+| Field      | Required | Notes |
+|------------|----------|-------|
+| `text`     | one of the two | Non-empty, max 2000 chars. Replaces the note's text. |
+| `columnId` | one of the two | A column on this board. The note moves to the end of that column; naming its current column leaves it where it is. |
+
+**Response (200):** full board state JSON.
+
+**Errors:** `404` if the note isn't on this board; `400` if `columnId` isn't
+a column on this board.
+
+### DELETE /api/v1/boards/:id/notes/:noteId
+
+Delete a note. Needs board access only. Blocked by either lock.
+
+**Response (200):** full board state JSON. `404` if the note isn't on this board.
+
+### POST /api/v1/boards/:id/columns
+
+Add a column after the board's last one. **Needs facilitation.** Blocked by a
+board lock.
+
+**Request:** `{ "title": "Blocked", "prompt": "Waiting on someone else" }` —
+`title` is required (1-100 chars after trimming); `prompt` is optional (max
+2000 chars, default empty).
+
+**Response (201):** full board state JSON. The new column is the last entry
+in `columns`, and the `Location` header is its URL,
+`/api/v1/boards/:id/columns/:columnId`.
+
+### PATCH /api/v1/boards/:id/columns/:columnId
+
+Rename a column, set its prompt, or both. Send at least one field.
+
+| Field    | Rule | Notes |
+|----------|------|-------|
+| `title`  | board access; blocked by either lock | 1-100 chars after trimming. |
+| `prompt` | **needs facilitation**; blocked by a board lock | Max 2000 chars. `""` clears it. |
+
+A request with both fields must satisfy both rules; nothing is written
+otherwise.
+
+**Response (200):** full board state JSON. `404` if the column isn't on this board.
+
+### DELETE /api/v1/boards/:id/columns/:columnId
+
+Delete a column **and every note in it**. **Needs facilitation.** Blocked by a
+board lock.
+
+**Response (200):** full board state JSON. `404` if the column isn't on this board.
+
+### GET /api/v1/boards/:id/facilitators
+
+List the board's owner and granted facilitators. **Needs facilitation.**
+
+**Response (200):**
+```json
+{
+  "facilitators": [
+    { "user_id": "uuid", "role": "owner", "username": "Claude (roadmap)" },
+    { "user_id": "uuid", "role": "facilitator", "username": "landon" }
+  ],
+  "openFacilitation": false
+}
+```
+
+The crew owner is not listed: they facilitate by owning the crew, not by a
+grant.
+
+### POST /api/v1/boards/:id/facilitators
+
+Grant facilitation to a registered user. **Needs facilitation.** Never
+blocked by a lock.
+
+**Request:** `{ "username": "landon" }` — the user's Retrograde username.
+
+**Response (201):** the facilitator list, as for `GET`. `404` if no
+registered user has that username. Granting the owner, or someone who is
+already a facilitator, changes nothing.
+
+### DELETE /api/v1/boards/:id/facilitators/:userId
+
+Revoke a facilitator grant, by the `user_id` from the list. **Needs
+facilitation.** Never blocked by a lock. The owner can never be removed.
+
+**Response (200):** the facilitator list. `404` if that user holds no
+facilitator grant on this board, which includes the owner.
 
 ### GET /api/v1/boards/:id
 
@@ -365,7 +497,21 @@ curl -s -X POST $BASE/api/v1/boards/$BOARD_ID/action-items \
 
 # 6. Agent reads back the final state
 curl -s $BASE/api/v1/boards/$BOARD_ID | jq
+
+# 7. Agent closes an item it was tracking: delete the note...
+NOTE_ID=$(curl -s $BASE/api/v1/boards/$BOARD_ID | jq -r '.columns[0].notes[0].id')
+curl -s -X DELETE $BASE/api/v1/boards/$BOARD_ID/notes/$NOTE_ID \
+  -H "Authorization: Bearer $TOKEN" | jq '.columns[0].notes | length'
+
+# 8. ...and renames the board when the work is done
+curl -s -X PATCH $BASE/api/v1/boards/$BOARD_ID \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Roadmap H2 2026 (closed)"}' | jq .title
 ```
+
+Anyone can facilitate a trial board, so the trial `agent_token` passes step 8.
+With an API key, the agent owns the boards it creates and passes it too.
 
 ## Not in the API
 
@@ -375,7 +521,12 @@ curl -s $BASE/api/v1/boards/$BOARD_ID | jq
   are no read-only or per-board keys.
 - **No agent name verification.** Anyone can claim `display_name: "Claude"`.
   The `is_agent` flag tells humans the source is agent-claimed, not verified.
-- **No update / delete via the API.** The agent creates; humans curate in the
-  UI.
+- **Not every board control yet.** The API cannot like or vote on notes,
+  reorder notes within a column, change board settings or locks, run the
+  timer, manage attachments, edit, check off or delete action items, toggle
+  open facilitation, or delete, archive, duplicate or move a board. Those
+  stay in the UI.
+- **No facilitation for agents on boards they don't own.** Agents are not
+  registered users, so a human can't grant one facilitation by username.
 - **No webhooks or push.** The agent polls `GET /api/v1/boards/:id` to see
   what humans did.

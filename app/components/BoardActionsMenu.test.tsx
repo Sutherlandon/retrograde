@@ -125,3 +125,37 @@ describe("BoardActionsMenu — dropdown escapes a clipping ancestor", () => {
     expect(screen.queryByText("Duplicate Board")).toBeNull();
   });
 });
+
+// ADR-0027: a crew owner may archive and delete a board one of their crew's
+// agents owns, without owning it — so Move to Crew stays hidden.
+describe("BoardActionsMenu — lifecycle without ownership", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => cleanup());
+
+  it("shows Archive and Delete but not Move when the viewer may manage a board they don't own", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage isArchived={false} teams={teams} currentTeamId="t2" />);
+    openMenu();
+    expect(screen.getByText("Archive Board")).toBeInTheDocument();
+    expect(screen.getByText("Delete Board")).toBeInTheDocument();
+    expect(screen.queryByText("Move to Crew")).toBeNull();
+  });
+
+  it("shows Unarchive on an archived board the viewer may manage", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage isArchived teams={teams} currentTeamId="t2" />);
+    openMenu();
+    expect(screen.getByText("Unarchive Board")).toBeInTheDocument();
+  });
+
+  it("hides Archive and Delete when the viewer may not manage the board", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner={false} canManage={false} isArchived={false} teams={teams} currentTeamId="t2" />);
+    openMenu();
+    expect(screen.queryByText("Archive Board")).toBeNull();
+    expect(screen.queryByText("Delete Board")).toBeNull();
+  });
+
+  it("defaults canManage to isOwner", () => {
+    render(<BoardActionsMenu boardId="b1" boardTitle="Retro" isOwner isArchived={false} />);
+    openMenu();
+    expect(screen.getByText("Delete Board")).toBeInTheDocument();
+  });
+});

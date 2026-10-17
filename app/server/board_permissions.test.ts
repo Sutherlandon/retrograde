@@ -26,6 +26,14 @@ describe("userCanFacilitate", () => {
     expect(call[1]).toEqual(["board-1", "user-1"]);
   });
 
+  it("counts the owner of the board's crew as a facilitator (ADR-0027)", async () => {
+    const { userCanFacilitate } = await import("./board_permissions");
+    const { canFacilitateSql } = await import("./board_permissions_sql");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: true }] });
+    await userCanFacilitate("crew-owner-1", "board-1");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain(canFacilitateSql("b", "$2::uuid"));
+  });
+
   it("returns false when board not found", async () => {
     const { userCanFacilitate } = await import("./board_permissions");
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });

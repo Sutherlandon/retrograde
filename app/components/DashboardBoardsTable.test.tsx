@@ -16,16 +16,21 @@ const teams: TeamSummary[] = [
 
 const boards: DashboardBoardRow[] = [
   {
-    id: "b1", title: "Owned Board", team_id: "t1", team_name: "Design Crew", role: "owner",
+    id: "b1", title: "Owned Board", team_id: "t1", team_name: "Design Crew", role: "owner", can_manage: true,
     open_action_items: 2, created_at: "2026-07-01", updated_at: "2026-07-10",
   },
   {
-    id: "b2", title: "Team Board", team_id: "t1", team_name: "Design Crew", role: "team",
+    id: "b2", title: "Team Board", team_id: "t1", team_name: "Design Crew", role: "team", can_manage: false,
     open_action_items: 0, created_at: "2026-07-02", updated_at: "2026-07-11",
   },
   {
-    id: "b3", title: "Drifting Board", team_id: null, team_name: null, role: "owner",
+    id: "b3", title: "Drifting Board", team_id: null, team_name: null, role: "owner", can_manage: true,
     open_action_items: 0, created_at: "2026-07-03", updated_at: "2026-07-12",
+  },
+  {
+    // ADR-0027: the crew's agent owns it; the viewer owns the crew.
+    id: "b5", title: "Agent Board", team_id: "t1", team_name: "Design Crew", role: "team", can_manage: true,
+    open_action_items: 0, created_at: "2026-07-04", updated_at: "2026-07-13",
   },
 ];
 
@@ -58,6 +63,22 @@ describe("DashboardBoardsTable", () => {
     setup();
     expect(screen.getByRole("checkbox", { name: "Select Owned Board" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Select Team Board" })).toBeDisabled();
+  });
+
+  it("a board the viewer may manage but does not own gets Delete in its menu, not a checkbox (ADR-0027)", () => {
+    setup();
+    // Bulk actions include Move, which stays owner-only.
+    expect(screen.getByRole("checkbox", { name: "Select Agent Board" })).toBeDisabled();
+    const menus = screen.getAllByRole("button", { name: "Board actions" });
+    fireEvent.click(menus[3]);
+    expect(screen.getByText("Delete Board")).toBeInTheDocument();
+    expect(screen.queryByText("Move to Crew")).toBeNull();
+  });
+
+  it("a crew board the viewer may not manage has no Delete in its menu", () => {
+    setup();
+    fireEvent.click(screen.getAllByRole("button", { name: "Board actions" })[1]);
+    expect(screen.queryByText("Delete Board")).toBeNull();
   });
 
   it("toggling a row checkbox reports the board id", () => {
@@ -103,7 +124,7 @@ describe("DashboardBoardsTable — archived mode", () => {
 
   const archivedBoards = [
     {
-      id: "b4", title: "Old Retro", team_id: "t1", team_name: "Design Crew", role: "owner",
+      id: "b4", title: "Old Retro", team_id: "t1", team_name: "Design Crew", role: "owner", can_manage: true,
       open_action_items: 0, created_at: "2026-06-01", updated_at: "2026-06-15", archived_at: "2026-07-20",
     },
   ];

@@ -1,11 +1,13 @@
 // app/server/board_permissions.ts
 // Shared authorization checks for board mutations. See ADR-0006.
 //
-// Facilitation = owner OR granted facilitator role OR the board has
-// open_facilitation enabled (in which case anyone may facilitate).
+// Facilitation = owner OR granted facilitator role OR owner of the board's
+// crew (ADR-0027) OR the board has open_facilitation enabled (in which case
+// anyone may facilitate). The SQL lives in board_permissions_sql.ts.
 
 import { redirect } from "react-router";
 import { pool } from "./db_config";
+import { canFacilitateSql } from "./board_permissions_sql";
 import { getApiUser, getOptionalUser } from "~/hooks/useAuth";
 
 export async function userCanFacilitate(
@@ -13,18 +15,7 @@ export async function userCanFacilitate(
   boardId: string
 ): Promise<boolean> {
   const res = await pool.query<{ can: boolean }>(
-    `SELECT (
-       b.open_facilitation
-       OR (
-         $2::uuid IS NOT NULL
-         AND EXISTS (
-           SELECT 1 FROM board_members bm
-           WHERE bm.board_id = b.id
-             AND bm.user_id = $2::uuid
-             AND bm.role IN ('owner', 'facilitator')
-         )
-       )
-     ) AS can
+    `SELECT ${canFacilitateSql("b", "$2::uuid")} AS can
      FROM boards b WHERE b.id = $1`,
     [boardId, userId]
   );

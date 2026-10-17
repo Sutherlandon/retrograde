@@ -67,6 +67,7 @@ function board(id: string, title: string, teamId: string | null): DashboardBoard
     team_id: teamId,
     team_name: teamId ? "Some Crew" : null,
     role: "owner",
+    can_manage: true,
     open_action_items: 0,
     created_at: "2024-01-01T00:00:00.000Z",
     updated_at: "2024-01-01T00:00:00.000Z",

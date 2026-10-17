@@ -117,6 +117,7 @@ export function DashboardBoardsTable({
                   boardId={board.id}
                   boardTitle={board.title}
                   isOwner={board.role === "owner"}
+                  canManage={board.can_manage}
                   isArchived={archived}
                   teams={teams}
                   currentTeamId={board.team_id}

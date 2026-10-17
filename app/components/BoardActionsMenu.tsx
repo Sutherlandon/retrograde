@@ -19,13 +19,16 @@ interface BoardActionsMenuProps {
   boardId: string;
   boardTitle: string;
   isOwner: boolean;
+  /** May archive, unarchive and delete. Owners always may; so may a crew owner
+   *  on a board their crew's agent owns (ADR-0027). Defaults to isOwner. */
+  canManage?: boolean;
   isArchived: boolean;
   /** When provided (dashboard), owners get a "Move to Team" submenu. */
   teams?: TeamSummary[];
   currentTeamId?: string | null;
 }
 
-export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, teams, currentTeamId }: BoardActionsMenuProps) {
+export function BoardActionsMenu({ boardId, boardTitle, isOwner, canManage = isOwner, isArchived, teams, currentTeamId }: BoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showTeamList, setShowTeamList] = useState(false);
@@ -210,7 +213,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, tea
               Move to Crew
             </button>
           )}
-          {isOwner && (
+          {canManage && (
             <button
               type="button"
               onClick={handleArchive}
@@ -220,7 +223,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, tea
               {isArchived ? "Unarchive Board" : "Archive Board"}
             </button>
           )}
-          {isOwner && !isArchived && (
+          {canManage && !isArchived && (
             <>
             <hr className="border-gray-200 dark:border-gray-700" />
             <button
