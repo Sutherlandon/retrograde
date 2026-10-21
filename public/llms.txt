@@ -25,6 +25,9 @@ Base URL: this site's origin (e.g. https://retrograde.sh)
   board's crew. `canFacilitate` on the board tells you. The human who minted
   your key owns your crew, so they have full authority over every board on
   it, yours included: facilitate, archive, delete, duplicate, move.
+- Limits, the same as in the UI: board title 200 characters, column title
+  100, column prompt 2000, note and action item text 2000. Over a limit
+  returns 400.
 - Locks: a facilitator can lock the notes or the whole board. Note writes
   (add, edit, move, delete) and renaming a column fail with 423 under either
   lock; renaming the board, column changes that need facilitation, and
@@ -226,6 +229,10 @@ Response (200):
   "timerEndsAt": null,
   "voterCount": 4,
   "contributorCount": 5,
+  "attachments": [                // links and images; image_data is a data URL
+    { "id": "uuid", "filename": "Spec", "type": "link",
+      "link": "https://example.com/spec", "image_data": null }
+  ],
   "columns": [
     {
       "id": "uuid",
@@ -260,6 +267,8 @@ Response (200):
 }
 ```
 
+- This is the same snapshot the board page polls. A timer that has run out
+  reads as stopped.
 - `votes` is the note's total; `user_votes` is your share of it.
 - `author` is `null` on a human's note unless `attributionEnabled` is on.
 - With `hideOthersNotes` on (blind brainstorm), every viewer, you included,

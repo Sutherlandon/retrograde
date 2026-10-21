@@ -15,6 +15,10 @@ vi.mock("~/server/db_config", () => ({
 
 vi.mock("~/server/db_init", () => ({}));
 
+// GAP-009: the clause that confines a note write to the board in the URL.
+const NOTE_ON_BOARD = (note: string, board: string) =>
+  `EXISTS (SELECT 1 FROM notes sn JOIN columns sc ON sc.id = sn.column_id WHERE sn.id = ${note} AND sc.board_id = ${board})`;
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
@@ -30,7 +34,9 @@ describe("updateColumnPromptServer", () => {
     await updateColumnPromptServer("board-1", "col-1", "Think about what went well");
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE columns SET prompt");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["Think about what went well", "col-1"]);
+    // GAP-009: only a column of this board.
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("WHERE id = $2 AND board_id = $3");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["Think about what went well", "col-1", "board-1"]);
   });
 
   it("allows clearing the prompt to an empty string", async () => {
@@ -41,7 +47,7 @@ describe("updateColumnPromptServer", () => {
 
     await updateColumnPromptServer("board-1", "col-1", "");
 
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["", "col-1"]);
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["", "col-1", "board-1"]);
   });
 });
 
@@ -510,7 +516,9 @@ describe("voteNoteServer", () => {
     await voteNoteServer("board-1", "note-1", "user-1", 1);
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("INSERT INTO note_votes");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", 1]);
+    // GAP-009: only a note on this board.
+    expect(mockPoolQuery.mock.calls[0][0]).toContain(NOTE_ON_BOARD("$1", "$4"));
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", 1, "board-1"]);
   });
 
   it("decrements and cleans up vote row when delta is negative", async () => {
@@ -526,7 +534,8 @@ describe("voteNoteServer", () => {
     await voteNoteServer("board-1", "note-1", "user-1", -1);
 
     expect(mockPoolQuery.mock.calls[0][0]).toContain("UPDATE note_votes SET count");
-    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", -1]);
+    expect(mockPoolQuery.mock.calls[0][0]).toContain(NOTE_ON_BOARD("$1", "$4"));
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["note-1", "user-1", -1, "board-1"]);
     expect(mockPoolQuery.mock.calls[1][0]).toContain("DELETE FROM note_votes");
     expect(mockPoolQuery.mock.calls[1][0]).toContain("count <= 0");
   });
@@ -1293,5 +1302,83 @@ describe("getFacilitatorsServer", () => {
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     expect(await getFacilitatorsServer("missing")).toEqual({ facilitators: [], openFacilitation: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GAP-009 (#120): the browser's note and column writes match only rows on the
+// board in the URL, as the JSON API's do.
+// ---------------------------------------------------------------------------
+
+describe("browser writes stay on their board (GAP-009)", () => {
+  const BOARD = { rowCount: 1, rows: [{ board: { id: "board-1", columns: [] } }] };
+  const COLUMN_ON_BOARD = (col: string, board: string) => `${col} IN (SELECT id FROM columns WHERE board_id = ${board})`;
+
+  it("upsertNoteServer inserts only into a column of this board and updates only a note on it", async () => {
+    const { upsertNoteServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await upsertNoteServer("board-1", "note-1", "col-1", "hello", 0, "1700000000000", "user-1");
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain("WHERE EXISTS (SELECT 1 FROM columns WHERE id = $2 AND board_id = $7)");
+    expect(sql).toContain("ON CONFLICT (id) DO UPDATE");
+    expect(sql).toContain(`WHERE ${COLUMN_ON_BOARD("notes.column_id", "$7")}`);
+    expect(params).toEqual(["note-1", "col-1", "hello", 0, "1700000000000", "user-1", "board-1"]);
+  });
+
+  it("moveNoteServer moves only a note on this board, only to a column on it", async () => {
+    const { moveNoteServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await moveNoteServer("board-1", "col-1", "col-2", "note-1", "user-1");
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain(COLUMN_ON_BOARD("column_id", "$3"));
+    expect(sql).toContain(COLUMN_ON_BOARD("$1", "$3"));
+    expect(params).toEqual(["col-2", "note-1", "board-1"]);
+  });
+
+  it("reorderNotesServer touches only notes on this board, only into a column on it", async () => {
+    const { reorderNotesServer } = await import("./board_model");
+    mockQuery.mockResolvedValue({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await reorderNotesServer("board-1", "col-1", ["note-1", "note-2"], "user-1");
+    const updates = mockQuery.mock.calls.filter(([sql]) => String(sql).startsWith("UPDATE notes"));
+    expect(updates).toHaveLength(2);
+    for (const [sql, params] of updates) {
+      expect(sql).toContain(COLUMN_ON_BOARD("column_id", "$4"));
+      expect(sql).toContain(COLUMN_ON_BOARD("$1", "$4"));
+      expect(params[3]).toBe("board-1");
+    }
+    expect(updates[1][1]).toEqual(["col-1", 1, "note-2", "board-1"]);
+    mockQuery.mockReset();
+  });
+
+  it("likeNoteServer likes only a note on this board, and records the like only when it did", async () => {
+    const { likeNoteServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0 }); // the note is on another board
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await likeNoteServer("board-1", "note-elsewhere", 1, "user-1");
+    const [sql, params] = mockPoolQuery.mock.calls[0];
+    expect(sql).toContain(COLUMN_ON_BOARD("column_id", "$3"));
+    expect(params).toEqual([1, "note-elsewhere", "board-1"]);
+    expect(mockPoolQuery.mock.calls.some(([q]) => String(q).includes("INSERT INTO note_likes"))).toBe(false);
+  });
+
+  it("likeNoteServer records the like when the note is on the board", async () => {
+    const { likeNoteServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await likeNoteServer("board-1", "note-1", 1, "user-1");
+    expect(mockPoolQuery.mock.calls[1][0]).toContain("INSERT INTO note_likes");
+  });
+
+  it("updateColumnTitleServer renames only a column of this board", async () => {
+    const { updateColumnTitleServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1 });
+    mockPoolQuery.mockResolvedValueOnce(BOARD);
+    await updateColumnTitleServer("board-1", "col-1", "Shipped", "user-1");
+    expect(mockPoolQuery.mock.calls[0][0]).toContain("WHERE id = $2 AND board_id = $3");
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["Shipped", "col-1", "board-1"]);
   });
 });

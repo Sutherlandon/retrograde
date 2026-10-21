@@ -281,3 +281,27 @@ describe("POST /api/v1/boards", () => {
     expect(response.status).toBe(405);
   });
 });
+
+// The same limits the browser and the column endpoints enforce (board_limits.ts).
+describe("POST /api/v1/boards — shared length limits", () => {
+  async function create(body: unknown) {
+    const { action } = await import("./boards");
+    return (await action({
+      request: new Request("http://localhost:3000/api/v1/boards", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      }),
+      params: {}, context: {},
+    } as never)) as Response;
+  }
+
+  it.each([
+    [{ title: "x".repeat(201) }, "Board title exceeds 200 chars"],
+    [{ title: "ok", columns: [{ title: "x".repeat(101) }] }, "Column title exceeds 100 chars"],
+    [{ title: "ok", columns: [{ title: "c", prompt: "p".repeat(2001) }] }, "Column prompt exceeds 2000 chars"],
+    [{ title: "ok", columns: [{ title: "c", prompt: 7 }] }, "A column's `prompt` must be a string"],
+  ])("400 for %j", async (body, message) => {
+    const res = await create(body);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { message: string } }).error.message).toBe(message);
+  });
+});

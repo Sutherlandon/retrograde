@@ -9,13 +9,17 @@ import {
   clearBoardVotesServer,
   getBoardServer,
 } from "~/server/board_model";
-import { requireFacilitator } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator } from "~/server/board_permissions";
 import { logMetric } from "~/server/logger";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
+  // DECK-008–016: board access before facilitation, as on every other board
+  // write — open_facilitation must not admit an outsider to a members-only
+  // board (GAP-008's rule).
+  await requireBoardAccess(request, boardId);
   const data = await request.formData();
 
   switch (request.method.toUpperCase()) {

@@ -6,9 +6,11 @@ vi.mock("~/server/db_config", () => ({
 }));
 vi.mock("~/server/db_init", () => ({}));
 
-const mockGetOptionalUser = vi.fn();
+// requireBoardAccess and requireFacilitator resolve the caller the same way —
+// API key, agent_token or session — so one request has one identity.
+const mockGetApiUser = vi.fn();
 vi.mock("~/hooks/useAuth", () => ({
-  getOptionalUser: (...args: unknown[]) => mockGetOptionalUser(...args),
+  getApiUser: (...args: unknown[]) => mockGetApiUser(...args),
 }));
 
 beforeEach(() => {
@@ -49,9 +51,18 @@ describe("userCanFacilitate", () => {
 });
 
 describe("requireFacilitator", () => {
+  it("admits an agent whose API key resolves to a board facilitator (ADR-0027)", async () => {
+    const { requireFacilitator } = await import("./board_permissions");
+    mockGetApiUser.mockResolvedValueOnce({ id: "agent-1", username: "Timekeeper", teamId: "team-a" });
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: true }] });
+    const user = await requireFacilitator(new Request("http://x", { headers: { Authorization: "Bearer rk_live_x" } }), "board-1");
+    expect(user).toEqual({ id: "agent-1", username: "Timekeeper", teamId: "team-a" });
+    expect(mockPoolQuery.mock.calls[0][1]).toEqual(["board-1", "agent-1"]);
+  });
+
   it("returns the user when allowed", async () => {
     const { requireFacilitator } = await import("./board_permissions");
-    mockGetOptionalUser.mockResolvedValueOnce({ id: "user-1", username: "landon" });
+    mockGetApiUser.mockResolvedValueOnce({ id: "user-1", username: "landon" });
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: true }] });
 
     const user = await requireFacilitator(new Request("http://x"), "board-1");
@@ -60,7 +71,7 @@ describe("requireFacilitator", () => {
 
   it("throws 403 when not allowed", async () => {
     const { requireFacilitator } = await import("./board_permissions");
-    mockGetOptionalUser.mockResolvedValueOnce({ id: "user-2", username: "eve" });
+    mockGetApiUser.mockResolvedValueOnce({ id: "user-2", username: "eve" });
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: false }] });
 
     try {
@@ -73,7 +84,7 @@ describe("requireFacilitator", () => {
 
   it("throws 401 when there is no session and the board is not open", async () => {
     const { requireFacilitator } = await import("./board_permissions");
-    mockGetOptionalUser.mockResolvedValueOnce(null);
+    mockGetApiUser.mockResolvedValueOnce(null);
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: false }] });
 
     try {
@@ -86,7 +97,7 @@ describe("requireFacilitator", () => {
 
   it("admits an anonymous caller when open_facilitation allows it", async () => {
     const { requireFacilitator } = await import("./board_permissions");
-    mockGetOptionalUser.mockResolvedValueOnce(null);
+    mockGetApiUser.mockResolvedValueOnce(null);
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ can: true }] });
 
     const user = await requireFacilitator(new Request("http://x"), "board-1");

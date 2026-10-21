@@ -8,7 +8,7 @@
 import { redirect } from "react-router";
 import { pool } from "./db_config";
 import { canFacilitateSql } from "./board_permissions_sql";
-import { getApiUser, getOptionalUser } from "~/hooks/useAuth";
+import { getApiUser } from "~/hooks/useAuth";
 
 export async function userCanFacilitate(
   userId: string | null,
@@ -24,12 +24,17 @@ export async function userCanFacilitate(
 }
 
 /**
- * Throws 401 (no session) / 403 (session but not permitted) unless the caller
+ * Throws 401 (no caller) / 403 (caller but not permitted) unless the caller
  * can facilitate this board. Returns the caller (null is possible when
  * open_facilitation admits an unauthenticated caller).
+ *
+ * The caller is resolved exactly as requireBoardAccess resolves it — API key,
+ * agent_token or session — so one request never has two identities: a key
+ * that passes the access check is the same caller the facilitation check and
+ * the write see (ADR-0027).
  */
 export async function requireFacilitator(request: Request, boardId: string) {
-  const user = await getOptionalUser(request);
+  const user = await getApiUser(request);
   const allowed = await userCanFacilitate(user?.id ?? null, boardId);
   if (!allowed) {
     if (!user) throw new Response("Unauthorized", { status: 401 });

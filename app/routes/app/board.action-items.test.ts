@@ -2,14 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockRequireFacilitator = vi.fn();
 const mockRequireUnlocked = vi.fn();
+const mockRequireBoardAccess = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   requireFacilitator: (...args: unknown[]) => mockRequireFacilitator(...args),
   requireUnlocked: (...args: unknown[]) => mockRequireUnlocked(...args),
-}));
-
-const mockGetOptionalUser = vi.fn();
-vi.mock("~/hooks/useAuth", () => ({
-  getOptionalUser: (...args: unknown[]) => mockGetOptionalUser(...args),
+  requireBoardAccess: (...args: unknown[]) => mockRequireBoardAccess(...args),
 }));
 
 const mockCreate = vi.fn();
@@ -27,7 +24,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRequireFacilitator.mockResolvedValue({ id: "fac-1", username: "landon" });
   mockRequireUnlocked.mockResolvedValue(undefined);
-  mockGetOptionalUser.mockResolvedValue({ id: "participant-1", username: "sam" });
+  mockRequireBoardAccess.mockResolvedValue({ id: "participant-1", username: "sam" });
   const board = { id: "board-1", actionItems: [] };
   mockCreate.mockResolvedValue(board);
   mockUpdateText.mockResolvedValue(board);
@@ -101,7 +98,7 @@ describe("board.action-items action", () => {
 
   it("PATCH intent=complete rejects sessionless callers with 401", async () => {
     const { action } = await import("./board.action-items");
-    mockGetOptionalUser.mockResolvedValueOnce(null);
+    mockRequireBoardAccess.mockResolvedValueOnce(null);
     try {
       await action({
         request: formRequest("PATCH", { intent: "complete", itemId: "item-1", completed: "true" }),
@@ -177,5 +174,39 @@ describe("board.action-items action", () => {
       expect((response as Response).status).toBe(423);
     }
     expect(mockDelete).not.toHaveBeenCalled();
+  });
+});
+
+// GAP-008's rule, as on the JSON API (BRD-014, DECK-023–025), and the shared
+// length limit.
+describe("board.action-items — board access first and shared limits", () => {
+  it.each([
+    ["POST", { text: "x" }],
+    ["PATCH", { itemId: "item-1", intent: "complete", completed: "true" }],
+    ["PATCH", { itemId: "item-1", intent: "text", text: "x" }],
+    ["DELETE", { itemId: "item-1" }],
+  ])("%s %j is refused by board access first", async (method, fields) => {
+    const { action } = await import("./board.action-items");
+    mockRequireBoardAccess.mockRejectedValueOnce(new Response("restricted", { status: 403 }));
+    const res = await action({ request: formRequest(method, fields), params: { id: "board-1" }, context: {} } as never)
+      .catch((e) => e as Response);
+    expect((res as Response).status).toBe(403);
+    expect(mockRequireFacilitator).not.toHaveBeenCalled();
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockSetCompleted).not.toHaveBeenCalled();
+    expect(mockUpdateText).not.toHaveBeenCalled();
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["POST", { text: "x".repeat(2001) }],
+    ["PATCH", { itemId: "item-1", intent: "text", text: "x".repeat(2001) }],
+  ])("%s refuses text over 2000 chars with 422", async (method, fields) => {
+    const { action } = await import("./board.action-items");
+    const res = await action({ request: formRequest(method, fields), params: { id: "board-1" }, context: {} } as never)
+      .catch((e) => e as Response);
+    expect((res as Response).status).toBe(422);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUpdateText).not.toHaveBeenCalled();
   });
 });

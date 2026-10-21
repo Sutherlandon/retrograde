@@ -13,13 +13,16 @@ import {
   setActionItemCompleted,
   deleteActionItemServer,
 } from "~/server/action_item_model";
-import { requireFacilitator, requireUnlocked } from "~/server/board_permissions";
-import { getOptionalUser } from "~/hooks/useAuth";
+import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
+import { tooLong } from "~/config/board_limits";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
+  // BRD-014, DECK-023–025: board access first, as on every other board write
+  // and as the JSON API does (GAP-008's rule). Its caller is the actor below.
+  const caller = await requireBoardAccess(request, boardId);
   const data = await request.formData();
 
   switch (request.method.toUpperCase()) {
@@ -30,6 +33,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       await requireUnlocked(boardId, { board: true });
       const text = data.get("text")?.toString().trim();
       if (!text) throw new Response("Text is required", { status: 422 });
+      const over = tooLong("actionItemText", text);
+      if (over) throw new Response(over, { status: 422 });
       return Response.json(await createBoardActionItem(boardId, text, user?.id ?? null));
     }
 
@@ -39,12 +44,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const intent = data.get("intent")?.toString();
 
       if (intent === "complete") {
-        // Any participant with a session may check off an objective.
-        const user = await getOptionalUser(request);
-        if (!user) throw new Response("Unauthorized", { status: 401 });
+        // Any participant with an identity may check off an objective.
+        if (!caller) throw new Response("Unauthorized", { status: 401 });
         await requireUnlocked(boardId, { board: true });
         const completed = data.get("completed") === "true";
-        return Response.json(await setActionItemCompleted(boardId, itemId, completed, user.id));
+        return Response.json(await setActionItemCompleted(boardId, itemId, completed, caller.id));
       }
 
       if (intent === "text") {
@@ -52,6 +56,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         await requireUnlocked(boardId, { board: true });
         const text = data.get("text")?.toString().trim();
         if (!text) throw new Response("Text is required", { status: 422 });
+        const over = tooLong("actionItemText", text);
+        if (over) throw new Response(over, { status: 422 });
         return Response.json(await updateActionItemText(boardId, itemId, text, user?.id ?? null));
       }
 

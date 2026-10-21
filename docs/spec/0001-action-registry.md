@@ -33,6 +33,8 @@ Two independent mechanisms enforce all of this, and the distinction matters for 
 - **`requireBoardAccess`** (`app/server/board_permissions.ts`) — *may you touch this board at all?* Allows unconditionally unless the board's crew is members-only, in which case it requires crew membership, board membership, or an API key belonging to that crew.
 - **`requireFacilitator`** — *may you run the retro?* True for facilitators (including the owner of the board's crew, ADR-0027), and for everyone when `open_facilitation` is on.
 
+Both resolve the caller the same way — API key, `agent_token`, or session (`getApiUser`) — so a request has one identity on both surfaces, and every write route checks board access before facilitation (ADR-0027 §3). The JSON API uses the same two checks through `api_board_guard.ts`.
+
 Tier 1's openness is deliberate. An anonymous creator returning later is indistinguishable from any other visitor, so ownership cannot be re-established and pretending otherwise would only create a lock nobody holds the key to.
 
 Agents are actors, not a separate tier. An API key is scoped to a crew and carries that crew's tier (ADR-0008).
@@ -115,19 +117,19 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | ID      | Action                                   | Who                | Code path                                               | Guard                                            | Status     |
 | ------- | ---------------------------------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------ | ---------- |
 | BRD-001 | View a board                             | Anyone w/ access   | `routes/app/board.tsx`                                  | `requireBoardAccess` (login redirect)            | Verified |
-| BRD-002 | Poll a board for updates                 | Anyone w/ access   | `board.poll.ts`                                         | `requireBoardAccess`                             | Verified |
-| BRD-003 | Edit board title | Facilitator | `board.title.ts` · `BoardToolbar` | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
-| BRD-004 | Add a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
-| BRD-005 | Edit a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
+| BRD-002 | Poll a board for updates | Anyone w/ access | `board.poll.ts` | `requireBoardAccess` · `getBoardSnapshot` (same read as API-003) | Verified |
+| BRD-003 | Edit board title | Facilitator | `board.title.ts` · `BoardToolbar` | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` · `BOARD_LIMITS.boardTitle` → 422 | Verified |
+| BRD-004 | Add a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` · `BOARD_LIMITS.noteText` → 422 | Verified |
+| BRD-005 | Edit a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` · `BOARD_LIMITS.noteText` → 422 | Verified |
 | BRD-006 | Delete a note | Anyone w/ access | `board.notes.ts` DELETE | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
 | BRD-007 | Move a note between columns | Anyone w/ access | `board.notes.ts` `intent=move` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
 | BRD-008 | Reorder notes within a column | Anyone w/ access | `board.notes.ts` `intent=reorder` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
 | BRD-009 | Like a note | Anyone w/ access | `board.notes.ts` `intent=like` | `requireBoardAccess` · `requireUnlocked(board)` | Verified |
-| BRD-010 | Vote / unvote a note | Session holder w/ access | `board.notes.ts` `intent=vote` | `requireBoardAccess` · `requireUnlocked(board)` · 401 if no session | Verified |
-| BRD-011 | Edit a column title | Anyone w/ access | `board.columns.ts` PATCH · `Column.tsx` | `requireBoardAccess` · `requireUnlocked(notes)` | Verified |
-| BRD-012 | Add / edit / delete column prompt text | Facilitator | `board.columns.ts` `intent=updatePrompt` · `Column.tsx` | `requireFacilitator` · `requireUnlocked(board)`; UI gates on `canFacilitate` | Verified |
-| BRD-013 | Delete a column | Facilitator | `board.columns.ts` DELETE · `Column.tsx` | `requireFacilitator` · `requireUnlocked(board)`; UI gates on `canFacilitate` | Verified |
-| BRD-014 | Check off an action item | Session holder w/ access | `board.action-items.ts` `intent=complete` | session required · `requireUnlocked(board)` | Verified |
+| BRD-010 | Vote / unvote a note | Any caller w/ access | `board.notes.ts` `intent=vote` | `requireBoardAccess` · `requireUnlocked(board)` · 401 without a caller | Verified |
+| BRD-011 | Edit a column title | Anyone w/ access | `board.columns.ts` PATCH · `Column.tsx` | `requireBoardAccess` · `requireUnlocked(notes)` · `BOARD_LIMITS.columnTitle` → 422 | Verified |
+| BRD-012 | Add / edit / delete column prompt text | Facilitator | `board.columns.ts` `intent=updatePrompt` · `Column.tsx` | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)` · `BOARD_LIMITS.columnPrompt` → 422; UI gates on `canFacilitate` | Verified |
+| BRD-013 | Delete a column | Facilitator | `board.columns.ts` DELETE · `Column.tsx` | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)`; UI gates on `canFacilitate` | Verified |
+| BRD-014 | Check off an action item | Any caller w/ access | `board.action-items.ts` `intent=complete` | `requireBoardAccess` · 401 without a caller · `requireUnlocked(board)` | Verified |
 | BRD-015 | View action items + progress             | Anyone w/ access   | `ActionItemsPanel` via `BoardDTO`                       | inherits BRD-001                                 | Verified   |
 | BRD-016 | View votes remaining / status indicators | Anyone w/ access   | `BoardStatusBar`                                        | inherits BRD-001                                 | Verified   |
 | BRD-017 | View read-only example boards            | Anyone             | `board.tsx` (`example-board*`)                          | short-circuits before the access check, after resolving the caller — so a self-hosted instance requires sign-in (ADR-0021) | Verified |
@@ -152,26 +154,26 @@ Facilitators — granted, or the owner in their capacity as one, or the owner of
 | DECK-003 | Stop a timer | Facilitator | `board.timer.ts` DELETE | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` | Verified |
 | DECK-004 | Adjust timer ±60s before start                  | Facilitator        | `CommandDeck`                                         | client-side                                 | Verified |
 | DECK-005 | See the timer-end modal                         | Anyone w/ access   | `TimerEndModal`                                       | —                                           | Verified |
-| DECK-006 | Add a column | Facilitator | `board.columns.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
+| DECK-006 | Add a column | Facilitator | `board.columns.ts` POST | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)` · `BOARD_LIMITS.columnTitle` → 422 | Verified |
 | DECK-007 | Sort notes by score                             | Facilitator        | `CommandDeck` → note reorder                          | inherits BRD-008                            | Verified |
-| DECK-008 | Enable / disable voting                         | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-009 | Set votes per person                            | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-010 | Set voting scope (board / column / note)        | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-011 | Clear all votes and likes                       | Facilitator        | `board.settings.ts` POST                              | `requireFacilitator`                        | Verified   |
-| DECK-012 | Toggle human attribution                        | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-013 | Toggle "Hide Others' Notes"                     | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-014 | Show / hide the action-items column             | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator`                        | Verified   |
-| DECK-015 | Lock notes                                      | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator` (setting only)         | Verified   |
-| DECK-016 | Lock the board                                  | Facilitator        | `board.settings.ts` PATCH                             | `requireFacilitator` (setting only)         | Verified   |
-| DECK-017 | Attach a link | Facilitator | `board.attachments.ts` POST | `requireFacilitator` | Verified |
-| DECK-018 | Attach an image (max 5, compressed client-side) | Facilitator | `board.attachments.ts` POST | `requireFacilitator` | Verified |
-| DECK-019 | Delete an attachment | Facilitator | `board.attachments.ts` DELETE · `AttachmentsList.tsx` | `requireFacilitator`; UI gates on `canFacilitate` | Verified |
-| DECK-020 | Grant a facilitator by username                 | Facilitator        | `board.facilitators.ts` POST                          | `requireFacilitator`                        | Verified   |
-| DECK-021 | Revoke a facilitator (never the owner)          | Facilitator        | `board.facilitators.ts` DELETE                        | `requireFacilitator`                        | Verified   |
-| DECK-022 | Toggle open facilitation | Facilitator | `board.facilitators.ts` PATCH | `requireFacilitator`; refused on a board with no owner, which is always open | Verified |
-| DECK-023 | Create an action item | Facilitator | `board.action-items.ts` POST | `requireFacilitator` · `requireUnlocked(board)` | Verified |
-| DECK-024 | Edit an action item | Facilitator | `board.action-items.ts` `intent=text` | `requireFacilitator` · `requireUnlocked(board)` | Verified |
-| DECK-025 | Delete an action item | Facilitator | `board.action-items.ts` DELETE | `requireFacilitator` · `requireUnlocked(board)` | Verified |
+| DECK-008 | Enable / disable voting | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-009 | Set votes per person | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-010 | Set voting scope (board / column / note) | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-011 | Clear all votes and likes | Facilitator | `board.settings.ts` POST | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-012 | Toggle human attribution | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-013 | Toggle "Hide Others' Notes" | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-014 | Show / hide the action-items column | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-015 | Lock notes | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` (setting only) | Verified |
+| DECK-016 | Lock the board | Facilitator | `board.settings.ts` PATCH | `requireBoardAccess` → `requireFacilitator` (setting only) | Verified |
+| DECK-017 | Attach a link | Facilitator | `board.attachments.ts` POST | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-018 | Attach an image (max 5, compressed client-side) | Facilitator | `board.attachments.ts` POST | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-019 | Delete an attachment | Facilitator | `board.attachments.ts` DELETE · `AttachmentsList.tsx` | `requireBoardAccess` → `requireFacilitator`; UI gates on `canFacilitate` | Verified |
+| DECK-020 | Grant a facilitator by username | Facilitator | `board.facilitators.ts` POST | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-021 | Revoke a facilitator (never the owner) | Facilitator | `board.facilitators.ts` DELETE | `requireBoardAccess` → `requireFacilitator` | Verified |
+| DECK-022 | Toggle open facilitation | Facilitator | `board.facilitators.ts` PATCH | `requireBoardAccess` → `requireFacilitator`; refused on a board with no owner, which is always open | Verified |
+| DECK-023 | Create an action item | Facilitator | `board.action-items.ts` POST | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)` · `BOARD_LIMITS.actionItemText` → 422 | Verified |
+| DECK-024 | Edit an action item | Facilitator | `board.action-items.ts` `intent=text` | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)` · `BOARD_LIMITS.actionItemText` → 422 | Verified |
+| DECK-025 | Delete an action item | Facilitator | `board.action-items.ts` DELETE | `requireBoardAccess` → `requireFacilitator` · `requireUnlocked(board)` | Verified |
 | DECK-026 | Export board as CSV                             | Facilitator        | `CommandDeck` → `utils/exportBoard`                   | client-side                                 | Verified   |
 | DECK-027 | Export board as Markdown                        | Facilitator        | `CommandDeck` → `utils/exportBoard`                   | client-side                                 | Verified   |
 | DECK-028 | View note / contributor / voter counts          | Facilitator        | `CommandDeck`                                         | client-side                                 | Verified   |
@@ -261,7 +263,7 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | ------- | ------------------------------------------------------------------------ | ------------------------ | -------------------------------- | ---------------------- | -------- |
 | API-001 | Create a board with columns (authenticated → caller's crew; a registered cookie caller with no crew gets their personal crew) | API key or session | `api/boards.ts` POST | `getApiUser` · an `Authorization` header that doesn't resolve → 401, never the trial flow | Verified |
 | API-002 | Create a trial board (unauthenticated → crewless, no owner, open facilitation; returns `agent_token`) | Anyone sending no `Authorization` header | `api/boards.ts` POST | none, by design · an `Authorization` header that doesn't resolve → 401 (#109) · **401 on a self-hosted instance** (ADR-0021) | Verified |
-| API-003 | Read a board as JSON                                                     | Anyone w/ access         | `api/board.ts` GET               | `getBoardAccess` → 403 | Verified |
+| API-003 | Read a board as JSON | Anyone w/ access | `api/board.ts` GET | `getBoardAccess` → 403 · `getBoardSnapshot` (same read as BRD-002: attachments, a run-out timer stopped) | Verified |
 | API-004 | Bulk-add notes (≤200, ≤2000 chars) | Any actor w/ access | `api/board.notes.ts` POST | `getApiUser` · `getBoardAccess` → 403 · `lockReason(notes)` → 423 | Verified |
 | API-005 | Bulk-add action items (≤100) | Facilitator | `api/board.action-items.ts` POST | `getBoardAccess` · `userCanFacilitate` · `lockReason(board)` → 423 | Verified |
 | API-008 | Rename a board (≤200 chars) | Facilitator | `api/board.ts` PATCH | `requireApiBoardAccess` → 403 · `requireApiFacilitator` → 403 · `requireApiUnlocked(board)` → 423 | Verified |
@@ -277,6 +279,8 @@ Authenticated by `Authorization: Bearer rk_live_*` (crew-scoped key) or, for leg
 | API-006 | Auto-archive stale trial boards                                          | Cron                     | `api/cron.archive-stale.ts` GET (Vercel cron) or POST | **404 on a self-hosted instance** (ADR-0020); `CRON_SECRET` bearer, which Vercel sends automatically | Verified |
 | API-007 | Receive a Stripe webhook (subscription lifecycle) | Stripe | `api/stripe.webhook.ts` POST | **404 on a self-hosted instance** (ADR-0016); signature verified against `STRIPE_WEBHOOK_SECRET` from the raw body; 400 otherwise; 200 for every verified event. A completed Checkout activates when `payment_status` is `paid` or `no_payment_required` (a 100%-off promotion code) | Verified |
 
+**One rule set for people and agents** (ADR-0027 §3). A browser route and its API counterpart resolve the same caller, check board access before facilitation, apply the same locks and the same length limits (`app/config/board_limits.ts`: board title 200, column title 100, prompt 2000, note and action-item text 2000; the browser answers 422, the API 400), and write only to the board in the URL. The browser's poll (BRD-002) and the API's read (API-003) return the same snapshot.
+
 API-008 – API-017 mirror their browser counterparts' rules (BRD-003, BRD-005 – BRD-007, BRD-011 – BRD-013, DECK-006, DECK-020, DECK-021) through `app/server/api_board_guard.ts`, which resolves the caller with `getApiUser` and checks board access before facilitation (GAP-008's rule), so a key from another crew gets `403` on a members-only board even when it has open facilitation. They answer with the board JSON, or `{ facilitators, openFacilitation }` for API-015 – API-017. An id from another board matches nothing: the model's writes are scoped to the board in the URL.
 
 Agent-authored notes always carry attribution, regardless of the board's attribution setting (ADR-0002).
@@ -288,11 +292,7 @@ Agent-authored notes always carry attribution, regardless of the board's attribu
 Where the code diverges from the model above. Each is a fact confirmed by reading the source on 2026-09-02, not an inference.
 
 
-A divergence between this document and the code is recorded here first, with an ID, and closed from here.
-
-| ID | Divergence | Rows | Found |
-|----|-----------|------|-------|
-| GAP-009 ([#120](https://github.com/Sutherlandon/retrograde/issues/120)) | `requireBoardAccess` checks the board in the URL, but several browser writes then match their note or column by id alone: `upsertNoteServer`, `moveNoteServer`, `reorderNotesServer`, `likeNoteServer`, `voteNoteServer`, `updateColumnTitleServer`, `updateColumnPromptServer`. A caller with access to one board who knows a note or column id on another can write to it. Deleting a note or column (BRD-006, BRD-013) and every JSON API write (API-008 – API-017) are scoped to the board in SQL. | BRD-004, BRD-005, BRD-007 – BRD-012 | 2026-10-17 |
+No open gaps as of 2026-10-21. GAP-009 (browser note and column writes matching by id alone, #120) closed with ADR-0027: every note and column write is scoped in SQL to the board in its URL. A divergence between this document and the code is recorded here first, with an ID, and closed from here.
 
 
 ## Untested paths

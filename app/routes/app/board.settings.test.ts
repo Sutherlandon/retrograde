@@ -52,15 +52,26 @@ function makePatchRequest(boardId: string, fields: Record<string, string>) {
   });
 }
 
-function setupUserAndOwnership(userId: string, isAnonymous: boolean, canFacilitate: boolean) {
+// Answers the guards' SQL by shape: the caller's user row, board access
+// (requireBoardAccess, checked first — GAP-008's rule) and facilitation
+// (requireFacilitator → userCanFacilitate, ADR-0006).
+function setupUserAndOwnership(
+  userId: string, isAnonymous: boolean, canFacilitate: boolean, hasAccess = true
+) {
   sessionData["userId"] = userId;
-  // getOptionalUser SELECT
-  mockPoolQuery.mockResolvedValueOnce({
-    rows: [{ id: userId, preferred_username: isAnonymous ? "Guest" : "realuser", is_anonymous: isAnonymous }],
-    rowCount: 1,
+  mockPoolQuery.mockImplementation(async (sql: string) => {
+    if (sql.startsWith("SELECT * FROM users")) {
+      return { rows: [{ id: userId, preferred_username: isAnonymous ? "Guest" : "realuser", is_anonymous: isAnonymous }], rowCount: 1 };
+    }
+    if (sql.includes("is_team_member")) {
+      return {
+        rows: [{ team_id: "team-1", restricted: !hasAccess, is_team_member: false, is_board_member: false, is_registered: !isAnonymous }],
+        rowCount: 1,
+      };
+    }
+    if (sql.includes("AS can")) return { rows: [{ can: canFacilitate }], rowCount: 1 };
+    return { rows: [], rowCount: 0 };
   });
-  // requireFacilitator → userCanFacilitate SELECT (ADR-0006)
-  mockPoolQuery.mockResolvedValueOnce({ rows: [{ can: canFacilitate }], rowCount: 1 });
 }
 
 describe("board.settings action", () => {
@@ -146,6 +157,14 @@ describe("board.settings action", () => {
 
     it("returns 401 when no user session exists", async () => {
       const { action } = await import("./board.settings");
+      // An existing, open board; no session, and facilitation isn't open.
+      mockPoolQuery.mockImplementation(async (sql: string) => {
+        if (sql.includes("is_team_member")) {
+          return { rows: [{ team_id: null, restricted: false, is_team_member: false, is_board_member: false, is_registered: false }], rowCount: 1 };
+        }
+        if (sql.includes("AS can")) return { rows: [{ can: false }], rowCount: 1 };
+        return { rows: [], rowCount: 0 };
+      });
 
       const request = makePatchRequest("board-1", {
         votingEnabled: "true",
@@ -179,5 +198,16 @@ describe("board.settings action", () => {
       expect(mockClearVotes).toHaveBeenCalledWith("board-1");
       expect(mockGetBoard).toHaveBeenCalledWith("board-1", "anon-user-1");
     });
+  });
+});
+
+describe("board.settings — board access first (DECK-008–016)", () => {
+  it("refuses a facilitator from outside a members-only board's crew, even with open facilitation", async () => {
+    const { action } = await import("./board.settings");
+    setupUserAndOwnership("outsider-1", false, true, false);
+    const request = makePatchRequest("board-1", { votingEnabled: "true", votingAllowed: "3", notesLocked: "false", boardLocked: "false" });
+    const res = await action({ request, params: { id: "board-1" }, context: {} } as never).catch((e) => e as Response);
+    expect((res as Response).status).toBe(403);
+    expect(mockUpdateSettings).not.toHaveBeenCalled();
   });
 });

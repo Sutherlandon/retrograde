@@ -368,13 +368,16 @@ export async function addColumnServer(
   return getBoardServer(boardId, viewerId);
 }
 
+// GAP-009: every note and column write below matches only rows on the board
+// in the URL — the board the caller's access was checked against.
+
 export async function updateColumnTitleServer(
   boardId: string,
   columnId: string,
   newTitle: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE columns SET title = $1 WHERE id = $2`, [newTitle, columnId]);
+  await pool.query(`UPDATE columns SET title = $1 WHERE id = $2 AND board_id = $3`, [newTitle, columnId, boardId]);
   return getBoardServer(boardId, viewerId);
 }
 
@@ -384,7 +387,7 @@ export async function updateColumnPromptServer(
   prompt: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2`, [prompt, columnId]);
+  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2 AND board_id = $3`, [prompt, columnId, boardId]);
   return getBoardServer(boardId, viewerId);
 }
 
@@ -479,10 +482,13 @@ export async function upsertNoteServer(
   created: string,
   userId?: string | null
 ) {
+  // Inserts only into a column of this board; updates only a note already on it.
   await pool.query(
     `
     INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order, created_by)
-    VALUES ($1, $2, $3, $4, false, $5, COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0), $6)
+    SELECT $1::text, $2::text, $3::text, $4::int, false, $5::text,
+           COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0), $6::uuid
+    WHERE EXISTS (SELECT 1 FROM columns WHERE id = $2 AND board_id = $7)
     ON CONFLICT (id) DO UPDATE
     SET
       text   = EXCLUDED.text,
@@ -491,8 +497,9 @@ export async function upsertNoteServer(
                  WHEN notes.likes > EXCLUDED.likes THEN notes.likes + 1
                  ELSE EXCLUDED.likes
                END
+    WHERE notes.column_id IN (SELECT id FROM columns WHERE board_id = $7)
     `,
-    [noteId, columnId, newText, likes, created, userId ?? null]
+    [noteId, columnId, newText, likes, created, userId ?? null, boardId]
   );
   // The author is the viewer here, so this response is correctly scoped in
   // blind mode (they only ever see their own notes anyway).
@@ -500,27 +507,36 @@ export async function upsertNoteServer(
 }
 
 export async function likeNoteServer(boardId: string, noteId: string, delta: number, userId?: string | null) {
-  await pool.query(`UPDATE notes SET likes = likes + $1 WHERE id = $2`, [delta, noteId]);
-  if (userId && delta > 0) {
+  const liked = await pool.query(
+    `UPDATE notes SET likes = likes + $1
+     WHERE id = $2 AND column_id IN (SELECT id FROM columns WHERE board_id = $3)`,
+    [delta, noteId, boardId]
+  );
+  if (userId && delta > 0 && (liked.rowCount ?? 0) > 0) {
     await pool.query(`INSERT INTO note_likes (note_id, user_id) VALUES ($1, $2)`, [noteId, userId]);
   }
   return getBoardServer(boardId, userId);
 }
+
+const NOTE_ON_BOARD = (note: string, board: string) =>
+  `EXISTS (SELECT 1 FROM notes sn JOIN columns sc ON sc.id = sn.column_id WHERE sn.id = ${note} AND sc.board_id = ${board})`;
 
 export async function voteNoteServer(boardId: string, noteId: string, userId: string, delta: number) {
   if (delta > 0) {
     // Upsert: insert or increment count
     await pool.query(
       `INSERT INTO note_votes (note_id, user_id, count)
-       VALUES ($1, $2, $3)
+       SELECT $1::text, $2::uuid, $3::int
+       WHERE ${NOTE_ON_BOARD("$1", "$4")}
        ON CONFLICT (note_id, user_id) DO UPDATE SET count = note_votes.count + $3`,
-      [noteId, userId, delta]
+      [noteId, userId, delta, boardId]
     );
   } else if (delta < 0) {
     // Decrement count, then delete row if count reached 0
     await pool.query(
-      `UPDATE note_votes SET count = count + $3 WHERE note_id = $1 AND user_id = $2`,
-      [noteId, userId, delta]
+      `UPDATE note_votes SET count = count + $3::int
+       WHERE note_id = $1 AND user_id = $2 AND ${NOTE_ON_BOARD("$1", "$4")}`,
+      [noteId, userId, delta, boardId]
     );
     await pool.query(
       `DELETE FROM note_votes WHERE note_id = $1 AND user_id = $2 AND count <= 0`,
@@ -586,7 +602,13 @@ export async function moveNoteServer(
   noteId: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE notes SET column_id = $1 WHERE id = $2`, [toColumnId, noteId]);
+  await pool.query(
+    `UPDATE notes SET column_id = $1
+     WHERE id = $2
+       AND column_id IN (SELECT id FROM columns WHERE board_id = $3)
+       AND $1 IN (SELECT id FROM columns WHERE board_id = $3)`,
+    [toColumnId, noteId, boardId]
+  );
   return getBoardServer(boardId, viewerId);
 }
 
@@ -601,8 +623,11 @@ export async function reorderNotesServer(
     await client.query("BEGIN");
     for (let i = 0; i < orderedNoteIds.length; i++) {
       await client.query(
-        `UPDATE notes SET column_id = $1, note_order = $2 WHERE id = $3`,
-        [toColumnId, i, orderedNoteIds[i]]
+        `UPDATE notes SET column_id = $1, note_order = $2
+         WHERE id = $3
+           AND column_id IN (SELECT id FROM columns WHERE board_id = $4)
+           AND $1 IN (SELECT id FROM columns WHERE board_id = $4)`,
+        [toColumnId, i, orderedNoteIds[i], boardId]
       );
     }
     await client.query("COMMIT");

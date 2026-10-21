@@ -137,3 +137,21 @@ describe("board.attachments action", () => {
     expect(mockDeleteAttachment).not.toHaveBeenCalled();
   });
 });
+
+// GAP-008's rule, as on the JSON API: open facilitation must not admit an
+// outsider to a members-only board, so board access is checked first.
+describe("board.attachments action — board access first (DECK-017–019)", () => {
+  it.each([
+    ["POST", { type: "link", filename: "a", link: "https://example.com" }],
+    ["DELETE", { attachmentId: "att-1" }],
+  ])("%s is refused by board access before facilitation is asked", async (method, fields) => {
+    const { action } = await import("./board.attachments");
+    mockRequireBoardAccess.mockRejectedValueOnce(new Response("This board is restricted to its crew", { status: 403 }));
+    const res = await action({ request: actionRequest(method, fields), params: { id: "board-1" }, context: {} } as never)
+      .catch((e) => e as Response);
+    expect((res as Response).status).toBe(403);
+    expect(mockRequireFacilitator).not.toHaveBeenCalled();
+    expect(mockAddLinkAttachment).not.toHaveBeenCalled();
+    expect(mockDeleteAttachment).not.toHaveBeenCalled();
+  });
+});

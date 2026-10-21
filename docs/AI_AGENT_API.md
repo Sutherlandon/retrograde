@@ -111,6 +111,12 @@ Every error is JSON: `{ "error": { "code": "...", "message": "..." } }`.
 | 413    | `PAYLOAD_TOO_LARGE`  | More than 200 notes or 100 action items in one request.                                |
 | 423    | `LOCKED`             | A facilitator locked the board (or, where noted, just the notes). Nothing was written. |
 
+### Limits
+
+The same limits hold in the UI and the API: board title 200 characters,
+column title 100, column prompt 2000, note text 2000, action item text 2000.
+A value over its limit returns `400 BAD_REQUEST` and writes nothing.
+
 ### Locks
 
 | Call | Notes locked | Board locked |
@@ -387,6 +393,17 @@ describe the caller.
   "timerEndsAt": null,
   "voterCount": 4,
   "contributorCount": 5,
+  "attachments": [
+    {
+      "id": "uuid",
+      "board_id": "uuid",
+      "filename": "Spec",
+      "type": "link",
+      "link": "https://example.com/spec",
+      "image_data": null,
+      "created_at": "2026-09-23T06:00:00.000000"
+    }
+  ],
   "columns": [
     {
       "id": "uuid",
@@ -421,7 +438,12 @@ describe the caller.
 }
 ```
 
+- This is the same snapshot the board page polls, so you read what people see.
 - `team_id` and `team_name` are `null` on a crewless board.
+- `attachments` are the links and images a facilitator attached (`type` is
+  `"link"` or `"image"`). An image's `image_data` is a data URL, up to 5 images
+  of 250 KB each.
+- A timer that has run out reads as stopped (`timerRunning: false`).
 - `votingScope` is `"board"`, `"column"`, or `"note"`.
 - `notes[].created` is epoch milliseconds, as a string.
 - `notes[].votes` is the note's total; `user_votes` is the caller's share.

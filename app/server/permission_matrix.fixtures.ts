@@ -171,11 +171,6 @@ export function isRegisteredHuman(actor: ActorState): boolean {
   return actor.hasSessionCookie && !actor.isAnonymousUser;
 }
 
-/** getOptionalUser resolving to a non-null user (session cookie only). */
-export function hasSession(actor: ActorState): boolean {
-  return actor.hasSessionCookie;
-}
-
 /** Owner of the board's crew — a facilitator of every board on it (ADR-0027). */
 export function ownsBoardCrew(actor: ActorState, fixture: FixtureState): boolean {
   return fixture.teamId !== null && actor.teamRole === "owner";
@@ -185,17 +180,6 @@ export function ownsBoardCrew(actor: ActorState, fixture: FixtureState): boolean
 export function canFacilitateDirect(actor: ActorState, fixture: FixtureState): boolean {
   if (fixture.openFacilitation) return true;
   return actor.boardRole === "owner" || actor.boardRole === "facilitator" || ownsBoardCrew(actor, fixture);
-}
-
-/**
- * requireFacilitator specifically: it resolves the caller via getOptionalUser
- * (session cookie only — NOT getApiUser), so an API-key actor is only ever
- * admitted through open_facilitation, never through a board_members role.
- */
-export function canFacilitateViaSession(actor: ActorState, fixture: FixtureState): boolean {
-  if (fixture.openFacilitation) return true;
-  if (!actor.hasSessionCookie) return false;
-  return canFacilitateDirect(actor, fixture);
 }
 
 /**
@@ -465,21 +449,17 @@ export const RULES = {
   boardAccessOnly: (actor: ActorState, fixture: FixtureState): Verdict =>
     hasBoardAccess(actor, fixture) ? "allow" : "deny",
 
-  // BRD-010 (vote): requireBoardAccess, then 401 if no session — via
-  // getOptionalUser, so an API-key actor (no session cookie) is denied even
-  // after passing board access.
-  boardAccessThenSession: (actor: ActorState, fixture: FixtureState): Verdict =>
-    hasBoardAccess(actor, fixture) && hasSession(actor) ? "allow" : "deny",
+  // BRD-010 (vote), BRD-014 (check off an item): board access, then 401
+  // without a caller. The caller is whoever requireBoardAccess resolved — API
+  // key, agent_token or session — so an agent can vote and check off too.
+  boardAccessThenIdentity: (actor: ActorState, fixture: FixtureState): Verdict =>
+    hasBoardAccess(actor, fixture) && hasApiIdentity(actor) ? "allow" : "deny",
 
-  facilitatorOnly: (actor: ActorState, fixture: FixtureState): Verdict =>
-    canFacilitateViaSession(actor, fixture) ? "allow" : "deny",
-
+  // Every facilitator control in the browser and the API: board access first
+  // (GAP-008's rule), then facilitation, resolved for the same caller — so an
+  // agent that facilitates a board can use the browser controls too.
   boardAccessThenFacilitator: (actor: ActorState, fixture: FixtureState): Verdict =>
-    hasBoardAccess(actor, fixture) && canFacilitateViaSession(actor, fixture) ? "allow" : "deny",
-
-  // BRD-014: board.action-items.ts's `complete` intent checks only for a
-  // session — it never calls requireBoardAccess. Documented, not assumed.
-  sessionOnly: (actor: ActorState): Verdict => (hasSession(actor) ? "allow" : "deny"),
+    hasBoardAccess(actor, fixture) && canFacilitateDirect(actor, fixture) ? "allow" : "deny",
 
   registeredOnly: (actor: ActorState): Verdict => (isRegisteredHuman(actor) ? "allow" : "deny"),
 
@@ -652,7 +632,7 @@ const BRD_SPECS: ActionSpec[] = [
   boardActionSpec("BRD-009", () => import("~/routes/app/board.notes"), "/notes", "PATCH",
     { intent: "like", noteId: "note-1", delta: "1" }, RULES.boardAccessOnly),
   boardActionSpec("BRD-010", () => import("~/routes/app/board.notes"), "/notes", "PATCH",
-    { intent: "vote", noteId: "note-1", delta: "1" }, RULES.boardAccessThenSession),
+    { intent: "vote", noteId: "note-1", delta: "1" }, RULES.boardAccessThenIdentity),
   boardActionSpec("BRD-011", () => import("~/routes/app/board.columns"), "/columns", "PATCH",
     { columnId: "col-1", title: "New Title" }, RULES.boardAccessOnly),
   boardActionSpec("BRD-012", () => import("~/routes/app/board.columns"), "/columns", "PATCH",
@@ -660,7 +640,7 @@ const BRD_SPECS: ActionSpec[] = [
   boardActionSpec("BRD-013", () => import("~/routes/app/board.columns"), "/columns", "DELETE",
     { columnId: "col-1" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("BRD-014", () => import("~/routes/app/board.action-items"), "/action-items", "PATCH",
-    { itemId: "item-1", intent: "complete", completed: "true" }, RULES.sessionOnly),
+    { itemId: "item-1", intent: "complete", completed: "true" }, RULES.boardAccessThenIdentity),
   boardLoaderSpec("BRD-019", () => import("~/routes/app/board.attachments"), "/attachments"),
 ];
 
@@ -673,41 +653,41 @@ const DECK_SPECS: ActionSpec[] = [
   boardActionSpec("DECK-006", () => import("~/routes/app/board.columns"), "/columns", "POST",
     { id: "col-new", title: "New Column", col_order: "2" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-008", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-009", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-010", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-011", () => import("~/routes/app/board.settings"), "/settings", "POST",
-    {}, RULES.facilitatorOnly),
+    {}, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-012", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-013", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-014", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-015", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-016", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-017", () => import("~/routes/app/board.attachments"), "/attachments", "POST",
-    { type: "link", filename: "a link", link: "https://example.com" }, RULES.facilitatorOnly),
+    { type: "link", filename: "a link", link: "https://example.com" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-018", () => import("~/routes/app/board.attachments"), "/attachments", "POST",
-    { type: "image", filename: "a.png", imageData: "data:image/png;base64,AAAA" }, RULES.facilitatorOnly),
+    { type: "image", filename: "a.png", imageData: "data:image/png;base64,AAAA" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-019", () => import("~/routes/app/board.attachments"), "/attachments", "DELETE",
-    { attachmentId: "att-1" }, RULES.facilitatorOnly),
+    { attachmentId: "att-1" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-020", () => import("~/routes/app/board.facilitators"), "/facilitators", "POST",
-    { username: "target" }, RULES.facilitatorOnly),
+    { username: "target" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-021", () => import("~/routes/app/board.facilitators"), "/facilitators", "DELETE",
-    { userId: "user-x" }, RULES.facilitatorOnly),
+    { userId: "user-x" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-022", () => import("~/routes/app/board.facilitators"), "/facilitators", "PATCH",
-    { openFacilitation: "true" }, RULES.facilitatorOnly),
+    { openFacilitation: "true" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-023", () => import("~/routes/app/board.action-items"), "/action-items", "POST",
-    { text: "Do the thing" }, RULES.facilitatorOnly),
+    { text: "Do the thing" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-024", () => import("~/routes/app/board.action-items"), "/action-items", "PATCH",
-    { itemId: "item-1", intent: "text", text: "Updated" }, RULES.facilitatorOnly),
+    { itemId: "item-1", intent: "text", text: "Updated" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-025", () => import("~/routes/app/board.action-items"), "/action-items", "DELETE",
-    { itemId: "item-1" }, RULES.facilitatorOnly),
+    { itemId: "item-1" }, RULES.boardAccessThenFacilitator),
 ];
 
 // DASH rows

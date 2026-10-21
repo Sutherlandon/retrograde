@@ -10,6 +10,7 @@ import { TrashIcon, PlusIcon, EditIcon } from "~/images/icons";
 import { StatusLED } from "./StatusLED";
 import Button from "./Button";
 import type { ActionItem } from "~/server/board.types";
+import { BOARD_LIMITS } from "~/config/board_limits";
 
 // One-line-tall textarea that grows to fit its content. Enter submits (handled
 // by callers); Shift+Enter inserts a newline like a normal textarea.
@@ -32,6 +33,7 @@ function AutoGrowTextarea({
       ref={ref}
       rows={1}
       value={value}
+      maxLength={BOARD_LIMITS.actionItemText}
       className={`resize-none overflow-hidden ${className}`}
       {...rest}
     />

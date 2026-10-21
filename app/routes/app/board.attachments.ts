@@ -29,6 +29,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
+  // DECK-017–019: board access before facilitation (GAP-008's rule).
+  await requireBoardAccess(request, boardId);
   const user = await requireFacilitator(request, boardId);
   const data = await request.formData();
 

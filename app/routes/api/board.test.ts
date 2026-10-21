@@ -3,8 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockGetBoardServer = vi.fn();
 const mockUpdateBoardTitle = vi.fn();
 vi.mock("~/server/board_model", () => ({
-  getBoardServer: (...args: unknown[]) => mockGetBoardServer(...args),
   updateBoardTitleServer: (...args: unknown[]) => mockUpdateBoardTitle(...args),
+}));
+// GET reads the same snapshot as the browser's poll.
+vi.mock("~/server/board_snapshot", () => ({
+  getBoardSnapshot: (...args: unknown[]) => mockGetBoardServer(...args),
 }));
 
 const mockGetApiUser = vi.fn();

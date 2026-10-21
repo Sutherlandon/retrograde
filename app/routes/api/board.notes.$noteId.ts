@@ -12,8 +12,7 @@ import {
 import {
   apiError, requireApiBoardAccess, requireApiUnlocked, readJsonObject,
 } from "~/server/api_board_guard";
-
-const MAX_NOTE_LENGTH = 2000;
+import { tooLong } from "~/config/board_limits";
 
 type NoteChanges = { text?: string; columnId?: string };
 
@@ -26,9 +25,8 @@ function parseChanges(body: Record<string, unknown>): NoteChanges | Response {
   if (text !== undefined && (typeof text !== "string" || text.trim().length === 0)) {
     return apiError("BAD_REQUEST", "`text` must be a non-empty string", 400);
   }
-  if (typeof text === "string" && text.length > MAX_NOTE_LENGTH) {
-    return apiError("BAD_REQUEST", `Note text exceeds ${MAX_NOTE_LENGTH} chars`, 400);
-  }
+  const over = tooLong("noteText", typeof text === "string" ? text : null);
+  if (over) return apiError("BAD_REQUEST", over, 400);
   if (columnId !== undefined && (typeof columnId !== "string" || columnId.length === 0)) {
     return apiError("BAD_REQUEST", "`columnId` must be a column id", 400);
   }

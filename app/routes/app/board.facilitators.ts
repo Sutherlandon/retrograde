@@ -13,7 +13,7 @@ import {
   setOpenFacilitationServer,
   getOpenFacilitationServer,
 } from "~/server/board_model";
-import { requireFacilitator } from "~/server/board_permissions";
+import { requireBoardAccess, requireFacilitator } from "~/server/board_permissions";
 import { findRegisteredUserByUsername } from "~/server/admin_model";
 
 async function crewState(boardId: string) {
@@ -27,6 +27,8 @@ async function crewState(boardId: string) {
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
+  // DECK-020–022: board access before facilitation (GAP-008's rule).
+  await requireBoardAccess(request, boardId);
   await requireFacilitator(request, boardId);
   return Response.json(await crewState(boardId));
 }
@@ -35,6 +37,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
+  await requireBoardAccess(request, boardId);
   await requireFacilitator(request, boardId);
   const data = await request.formData();
 

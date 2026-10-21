@@ -8,9 +8,7 @@ import { appendColumnServer } from "~/server/board_model";
 import {
   apiError, requireApiBoardAccess, requireApiFacilitator, requireApiUnlocked, readJsonObject,
 } from "~/server/api_board_guard";
-
-const MAX_TITLE_LENGTH = 100;
-const MAX_PROMPT_LENGTH = 2000;
+import { tooLong } from "~/config/board_limits";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   if (request.method !== "POST") return apiError("METHOD_NOT_ALLOWED", "Use POST", 405);
@@ -24,14 +22,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const body = await readJsonObject(request);
   const title = typeof body.title === "string" ? body.title.trim() : "";
   if (!title) return apiError("BAD_REQUEST", "`title` is required", 400);
-  if (title.length > MAX_TITLE_LENGTH) {
-    return apiError("BAD_REQUEST", `Column title exceeds ${MAX_TITLE_LENGTH} chars`, 400);
-  }
   const prompt = body.prompt ?? "";
   if (typeof prompt !== "string") return apiError("BAD_REQUEST", "`prompt` must be a string", 400);
-  if (prompt.length > MAX_PROMPT_LENGTH) {
-    return apiError("BAD_REQUEST", `Column prompt exceeds ${MAX_PROMPT_LENGTH} chars`, 400);
-  }
+  const over = tooLong("columnTitle", title) ?? tooLong("columnPrompt", prompt);
+  if (over) return apiError("BAD_REQUEST", over, 400);
 
   const { columnId, board } = await appendColumnServer(boardId, title, prompt, user.id);
   if (!board) return apiError("NOT_FOUND", "Board not found", 404);

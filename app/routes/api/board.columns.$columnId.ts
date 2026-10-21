@@ -12,9 +12,7 @@ import { columnIsOnBoard, updateColumnServer, deleteColumnServer } from "~/serve
 import {
   apiError, requireApiBoardAccess, requireApiFacilitator, requireApiUnlocked, readJsonObject,
 } from "~/server/api_board_guard";
-
-const MAX_TITLE_LENGTH = 100;
-const MAX_PROMPT_LENGTH = 2000;
+import { tooLong } from "~/config/board_limits";
 
 type ColumnChanges = { title?: string; prompt?: string };
 
@@ -27,15 +25,11 @@ function parseChanges(body: Record<string, unknown>): ColumnChanges | Response {
   if (title !== undefined && (typeof title !== "string" || title.trim().length === 0)) {
     return apiError("BAD_REQUEST", "`title` must be a non-empty string", 400);
   }
-  if (typeof title === "string" && title.trim().length > MAX_TITLE_LENGTH) {
-    return apiError("BAD_REQUEST", `Column title exceeds ${MAX_TITLE_LENGTH} chars`, 400);
-  }
   if (prompt !== undefined && typeof prompt !== "string") {
     return apiError("BAD_REQUEST", "`prompt` must be a string", 400);
   }
-  if (typeof prompt === "string" && prompt.length > MAX_PROMPT_LENGTH) {
-    return apiError("BAD_REQUEST", `Column prompt exceeds ${MAX_PROMPT_LENGTH} chars`, 400);
-  }
+  const over = tooLong("columnTitle", typeof title === "string" ? title.trim() : null) ?? tooLong("columnPrompt", prompt as string | undefined);
+  if (over) return apiError("BAD_REQUEST", over, 400);
   return { title: typeof title === "string" ? title.trim() : undefined, prompt: prompt as string | undefined };
 }
 

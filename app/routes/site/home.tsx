@@ -1,3 +1,4 @@
+import { BOARD_LIMITS, tooLong } from "~/config/board_limits";
 import {
   redirect,
   useActionData,
@@ -93,6 +94,8 @@ export async function action({ request }: ActionFunctionArgs) {
   // validate the form data
   if (!title || title.length < 3) {
     errors.title = "Title must be at least 3 characters.";
+  } else if (tooLong("boardTitle", title)) {
+    errors.title = `Title must be at most ${BOARD_LIMITS.boardTitle} characters.`;
   }
 
   // check if they agreed to the kindness checkbox

@@ -6,6 +6,7 @@ import type { Column } from "~/server/board.types";
 import Note from "./Note";
 import Button from "./Button";
 import { PlusIcon, EllipsisIcon, TrashIcon, EditIcon } from "~/images/icons";
+import { BOARD_LIMITS } from "~/config/board_limits";
 
 export default function Column({ column, noteColor }: { column: Column, noteColor: string }) {
   const { updateColumnTitle, updateColumnPrompt, deleteColumn, addNote, notesLocked, boardLocked, canFacilitate } = useBoard();
@@ -132,6 +133,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 ref={titleInputRef}
                 className="font-bold px-2 py-1 border rounded"
                 value={title}
+                maxLength={BOARD_LIMITS.columnTitle}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={saveTitle}
                 onKeyDown={(e) => e.key === "Enter" && saveTitle()}
@@ -195,6 +197,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 className="w-full px-2 py-1 border rounded text-sm resize-none"
                 rows={6}
                 value={prompt}
+                maxLength={BOARD_LIMITS.columnPrompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Enter additional prompt text..."
               />

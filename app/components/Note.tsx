@@ -7,6 +7,7 @@ import { useOptionalUser } from "~/context/userContext";
 import type { Note } from "~/server/board.types";
 import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, RobotIcon } from "~/images/icons";
 import Button from "./Button";
+import { BOARD_LIMITS } from "~/config/board_limits";
 
 export default function Note({
   note,
@@ -135,6 +136,7 @@ export default function Note({
           <textarea
             className="w-full resize-none p-2 rounded border border-gray-300 min-h-[90px]"
             value={text}
+            maxLength={BOARD_LIMITS.noteText}
             onChange={(e) => setText(e.target.value)}
             onBlur={saveNote}
             onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}

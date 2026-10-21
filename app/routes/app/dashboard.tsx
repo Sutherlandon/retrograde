@@ -1,3 +1,4 @@
+import { tooLong } from "~/config/board_limits";
 import { useState, useEffect } from "react";
 import { Form, Link, useLoaderData, useSearchParams, useFetcher, redirect, type ActionFunctionArgs, type MetaArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
@@ -68,6 +69,8 @@ export async function action({ request }: ActionFunctionArgs) {
   // user belongs to it, the board joins that crew. Otherwise it falls back to
   // the personal team (ADR-0003 — authenticated users' boards belong to a team).
   const title = formData.get("title")?.toString().trim() || "Untitled";
+  const titleTooLong = tooLong("boardTitle", title);
+  if (titleTooLong) throw new Response(titleTooLong, { status: 422 });
   const selectedTeam = formData.get("teamId")?.toString();
   const isRealCrew = selectedTeam && selectedTeam !== "all" && selectedTeam !== "unassigned";
 
