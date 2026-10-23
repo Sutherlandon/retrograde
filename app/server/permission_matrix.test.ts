@@ -39,7 +39,8 @@ import path from "path";
 // CREW-008, CREW-009, CREW-019, CREW-011, CREW-012, CREW-014, CREW-015,
 // CREW-016, CREW-017,
 // ADMIN-001, ADMIN-004, ADMIN-005,
-// API-003, API-004, API-005
+// API-003, API-004, API-005, API-008, API-009, API-010, API-011, API-012,
+// API-013, API-014, API-015, API-016, API-017
 
 // ---------------------------------------------------------------------------
 // Mocks — pool.query/connect delegate to whatever resolver is currently set;
@@ -100,7 +101,14 @@ vi.mock("~/server/board_model", async (importOriginal) => {
     addFacilitatorServer: sentinel, removeFacilitatorServer: sentinel,
     setOpenFacilitationServer: vi.fn(async () => true),
     getOpenFacilitationServer: vi.fn(async () => false),
+    getFacilitatorsServer: vi.fn(async () => ({ facilitators: [], openFacilitation: false })),
     bulkInsertNotesServer: vi.fn(async () => ({ id: "board-1" })),
+    // The JSON API's board writes (API-008 – API-017): the note and columns
+    // they name exist on the board, so a verdict is the guards' alone.
+    findNoteColumnOnBoard: vi.fn(async () => "col-1"),
+    columnIsOnBoard: vi.fn(async () => true),
+    updateNoteServer: sentinel, updateColumnServer: sentinel,
+    appendColumnServer: vi.fn(async () => ({ columnId: "col-new", board: { ok: true } })),
   };
 });
 
@@ -316,7 +324,8 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
   const notesLockedCases: [string, ActorId][] = [
     ["BRD-004", "board-owner"], ["BRD-005", "facilitator"], ["BRD-006", "board-owner"],
     ["BRD-007", "facilitator"], ["BRD-008", "board-owner"], ["BRD-011", "facilitator"],
-    ["API-004", "board-owner"],
+    ["API-004", "board-owner"], ["API-009", "board-owner"], ["API-010", "facilitator"],
+    ["API-012", "board-owner"],
   ];
   it.each(notesLockedCases)("%s denies %s when notes are locked, even though the role would otherwise allow it", async (id, actor) => {
     const verdict = await invoke(id, actorState(actor, notesLockedFixture), notesLockedFixture);
@@ -329,6 +338,9 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
     ["DECK-002", "facilitator"], ["DECK-003", "board-owner"], ["DECK-006", "facilitator"],
     ["DECK-023", "board-owner"], ["DECK-024", "facilitator"], ["DECK-025", "board-owner"],
     ["API-004", "facilitator"], ["API-005", "board-owner"],
+    ["API-008", "facilitator"], ["API-009", "facilitator"], ["API-010", "board-owner"],
+    ["API-011", "board-owner"], ["API-012", "facilitator"], ["API-013", "board-owner"],
+    ["API-014", "facilitator"], ["API-008", "crew-owner"],
   ];
   it.each(boardLockedCases)("%s denies %s when the board is locked, even though the role would otherwise allow it", async (id, actor) => {
     const verdict = await invoke(id, actorState(actor, boardLockedFixture), boardLockedFixture);
@@ -340,8 +352,46 @@ describe("lock enforcement (requireUnlocked) is not bypassed by role", () => {
     expect(verdict).toBe("allow");
   });
 
+  it("API-013 (column prompt) is NOT blocked by notes_locked, like BRD-012", async () => {
+    const verdict = await invoke("API-013", actorState("facilitator", notesLockedFixture), notesLockedFixture);
+    expect(verdict).toBe("allow");
+  });
+
+  it.each(["API-016", "API-017"])("%s (facilitator grants) is NOT blocked by board_locked, like DECK-020/021", async (id) => {
+    const verdict = await invoke(id, actorState("board-owner", boardLockedFixture), boardLockedFixture);
+    expect(verdict).toBe("allow");
+  });
+
   it("DECK-008 (settings) is NOT blocked by board_locked — settings are how a board unlocks", async () => {
     const verdict = await invoke("DECK-008", actorState("facilitator", boardLockedFixture), boardLockedFixture);
     expect(verdict).toBe("allow");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-0027: the owner of a board's crew has full authority over it — every
+// lifecycle action an owner has — whoever owns the board. The main matrix
+// computes these cells from the same rule; this block states the intent.
+// ---------------------------------------------------------------------------
+
+describe("crew owners have full authority over their crew's boards (ADR-0027)", () => {
+  const LIFECYCLE = ["DASH-006", "DASH-007", "DASH-008", "DASH-009", "DASH-010", "DASH-011", "DASH-012"];
+  const crewFixtures = [FIXTURE_DATA.personal, FIXTURE_DATA["members-only"]];
+
+  const allowCases = LIFECYCLE.flatMap((id) => crewFixtures.map((f) => [id, f.id, f] as const));
+  it.each(allowCases)("%s allows the crew owner on a %s board someone else owns", async (id, _name, fixture) => {
+    expect(await invoke(id, actorState("crew-owner", fixture), fixture)).toBe("allow");
+  });
+
+  it.each(LIFECYCLE)("%s gives nobody crew-owner rights on a crewless board", async (id) => {
+    const fixture = FIXTURE_DATA.anonymous;
+    expect(await invoke(id, actorState("crew-owner", fixture), fixture)).toBe("deny");
+  });
+
+  const denyActors: ActorId[] = ["crew-member", "facilitator", "registered-non-member"];
+  const denyCases = LIFECYCLE.flatMap((id) => denyActors.map((actor) => [id, actor] as const));
+  it.each(denyCases)("%s still denies %s on a members-only board", async (id, actor) => {
+    const fixture = FIXTURE_DATA["members-only"];
+    expect(await invoke(id, actorState(actor, fixture), fixture)).toBe("deny");
   });
 });

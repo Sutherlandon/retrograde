@@ -16,16 +16,21 @@ const teams: TeamSummary[] = [
 
 const boards: DashboardBoardRow[] = [
   {
-    id: "b1", title: "Owned Board", team_id: "t1", team_name: "Design Crew", role: "owner",
+    id: "b1", title: "Owned Board", team_id: "t1", team_name: "Design Crew", role: "owner", can_manage: true,
     open_action_items: 2, created_at: "2026-07-01", updated_at: "2026-07-10",
   },
   {
-    id: "b2", title: "Team Board", team_id: "t1", team_name: "Design Crew", role: "team",
+    id: "b2", title: "Team Board", team_id: "t1", team_name: "Design Crew", role: "team", can_manage: false,
     open_action_items: 0, created_at: "2026-07-02", updated_at: "2026-07-11",
   },
   {
-    id: "b3", title: "Drifting Board", team_id: null, team_name: null, role: "owner",
+    id: "b3", title: "Drifting Board", team_id: null, team_name: null, role: "owner", can_manage: true,
     open_action_items: 0, created_at: "2026-07-03", updated_at: "2026-07-12",
+  },
+  {
+    // ADR-0027: someone else owns it; the viewer owns the crew.
+    id: "b5", title: "Crew Board", team_id: "t1", team_name: "Design Crew", role: "team", can_manage: true,
+    open_action_items: 0, created_at: "2026-07-04", updated_at: "2026-07-13",
   },
 ];
 
@@ -54,10 +59,24 @@ describe("DashboardBoardsTable", () => {
     expect(screen.getByText("Unassigned")).toBeInTheDocument();
   });
 
-  it("only owned boards get an enabled selection checkbox", () => {
+  it("only boards the viewer may manage get an enabled selection checkbox", () => {
     setup();
     expect(screen.getByRole("checkbox", { name: "Select Owned Board" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Select Team Board" })).toBeDisabled();
+  });
+
+  it("a board the viewer may manage but does not own is selectable and has the full menu (ADR-0027)", () => {
+    setup();
+    expect(screen.getByRole("checkbox", { name: "Select Crew Board" })).toBeEnabled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Board actions" })[3]);
+    expect(screen.getByText("Delete Board")).toBeInTheDocument();
+    expect(screen.getByText("Move to Crew")).toBeInTheDocument();
+  });
+
+  it("a crew board the viewer may not manage has no Delete in its menu", () => {
+    setup();
+    fireEvent.click(screen.getAllByRole("button", { name: "Board actions" })[1]);
+    expect(screen.queryByText("Delete Board")).toBeNull();
   });
 
   it("toggling a row checkbox reports the board id", () => {
@@ -66,14 +85,14 @@ describe("DashboardBoardsTable", () => {
     expect(onToggle).toHaveBeenCalledWith("b1");
   });
 
-  it("select-all reports every owned board id", () => {
+  it("select-all reports every board id the viewer may manage", () => {
     const { onSelectAll } = setup();
     fireEvent.click(screen.getByRole("checkbox", { name: "Select all boards" }));
-    expect(onSelectAll).toHaveBeenCalledWith(["b1", "b3"]);
+    expect(onSelectAll).toHaveBeenCalledWith(["b1", "b3", "b5"]);
   });
 
-  it("select-all clears when everything ownable is already selected", () => {
-    const { onSelectAll } = setup(["b1", "b3"]);
+  it("select-all clears when everything manageable is already selected", () => {
+    const { onSelectAll } = setup(["b1", "b3", "b5"]);
     fireEvent.click(screen.getByRole("checkbox", { name: "Select all boards" }));
     expect(onSelectAll).toHaveBeenCalledWith([]);
   });
@@ -103,7 +122,7 @@ describe("DashboardBoardsTable — archived mode", () => {
 
   const archivedBoards = [
     {
-      id: "b4", title: "Old Retro", team_id: "t1", team_name: "Design Crew", role: "owner",
+      id: "b4", title: "Old Retro", team_id: "t1", team_name: "Design Crew", role: "owner", can_manage: true,
       open_action_items: 0, created_at: "2026-06-01", updated_at: "2026-06-15", archived_at: "2026-07-20",
     },
   ];

@@ -6,6 +6,7 @@
 
 export const meta = () => [{ title: "Crew – Retrograde" }];
 
+import { BOARD_LIMITS, tooLong } from "~/config/board_limits";
 import { useState, useEffect, useRef } from "react";
 import { Form, redirect, useLoaderData, useFetcher, type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { requireRegisteredUser } from "~/hooks/useAuth";
@@ -196,6 +197,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   // ----- any member -----
   if (intent === "createBoard") {
     const title = form.get("title")?.toString().trim() || "Untitled";
+    const titleTooLong = tooLong("boardTitle", title);
+    if (titleTooLong) return { error: titleTooLong };
     const boardId = await createBoard(title, user.id, teamId);
     return redirect(`/app/board/${boardId}`);
   }
@@ -487,6 +490,7 @@ function CrewBoards({ boards, teams, disabled }: { boards: DashboardBoardRow[]; 
           <input
             type="text"
             name="title"
+            maxLength={BOARD_LIMITS.boardTitle}
             placeholder="New board title"
             disabled={disabled}
             className="border rounded px-3 py-1.5 text-sm border-blue-400 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 disabled:opacity-50 disabled:cursor-not-allowed"

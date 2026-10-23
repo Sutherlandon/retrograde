@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-07-07)
+Accepted (2026-07-07) — §1 amended by [ADR-0027](0027-crew-owners-have-full-authority-over-crew-boards.md): the owner of a board's crew facilitates it and holds every lifecycle right its owner has (delete, archive, duplicate, move), whoever owns it. The owner still cannot be removed.
 
 ## Context
 

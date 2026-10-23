@@ -1,25 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Track session data across mock calls
-let sessionData: Record<string, string> = {};
-
-vi.mock("~/session.server", () => ({
-  getSession: vi.fn(async () => ({
-    get: (key: string) => sessionData[key],
-    set: (key: string, value: string) => { sessionData[key] = value; },
-    unset: (key: string) => { delete sessionData[key]; },
-  })),
-  commitSession: vi.fn(async () => "session-cookie-value"),
-}));
-
-const mockPoolQuery = vi.fn();
-vi.mock("~/server/db_config", () => ({
-  pool: {
-    query: (...args: unknown[]) => mockPoolQuery(...args),
-  },
-  oauthUsernameField: "preferred_username",
-  selfHosted: false,
-}));
+vi.mock("~/server/db_config", () => ({ pool: { query: vi.fn() } }));
 
 const mockRequireBoardAccess = vi.fn();
 const mockRequireUnlocked = vi.fn();
@@ -48,8 +29,6 @@ vi.mock("~/server/db_init", () => ({}));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  sessionData = {};
-  mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 });
   mockRequireBoardAccess.mockResolvedValue(null);
   mockRequireUnlocked.mockResolvedValue(undefined);
 });
@@ -70,11 +49,8 @@ describe("board.notes action", () => {
     it("allows anonymous user with session to vote", async () => {
       const { action } = await import("./board.notes");
 
-      sessionData["userId"] = "anon-user-1";
-      mockPoolQuery.mockResolvedValueOnce({
-        rows: [{ id: "anon-user-1", preferred_username: "Guest", is_anonymous: true }],
-        rowCount: 1,
-      });
+      // The caller requireBoardAccess resolves is the actor.
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "anon-user-1", username: "Guest", is_anonymous: true });
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
@@ -86,11 +62,8 @@ describe("board.notes action", () => {
     it("allows registered user to vote", async () => {
       const { action } = await import("./board.notes");
 
-      sessionData["userId"] = "user-1";
-      mockPoolQuery.mockResolvedValueOnce({
-        rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
-        rowCount: 1,
-      });
+      // The caller requireBoardAccess resolves is the actor.
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "user-1", username: "realuser", is_anonymous: false });
       mockVoteNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
@@ -118,11 +91,7 @@ describe("board.notes action", () => {
     it("creates note with anonymous user's id as created_by", async () => {
       const { action } = await import("./board.notes");
 
-      sessionData["userId"] = "anon-user-1";
-      mockPoolQuery.mockResolvedValueOnce({
-        rows: [{ id: "anon-user-1", preferred_username: "Guest" }],
-        rowCount: 1,
-      });
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "anon-user-1", username: "Guest", is_anonymous: true });
       mockUpsertNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", {
@@ -137,6 +106,31 @@ describe("board.notes action", () => {
       expect(mockUpsertNote).toHaveBeenCalledWith(
         "board-1", "note-1", "col-1", "My note", 0, "1234567890", "anon-user-1"
       );
+    });
+
+    // ADR-0002: an agent writing through this route is still the author.
+    it("records an API key's agent as the author", async () => {
+      const { action } = await import("./board.notes");
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "agent-1", username: "Timekeeper", teamId: "team-a" });
+      mockUpsertNote.mockResolvedValueOnce({ ok: true });
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1", columnId: "col-1", text: "From the agent", likes: "0", created: "1234567890",
+      });
+      await action({ request, params: { id: "board-1" }, context: {} } as never);
+      expect(mockUpsertNote).toHaveBeenCalledWith(
+        "board-1", "note-1", "col-1", "From the agent", 0, "1234567890", "agent-1"
+      );
+    });
+
+    it("refuses note text over the shared limit with 422", async () => {
+      const { action } = await import("./board.notes");
+      const request = makePatchRequest("board-1", {
+        noteId: "note-1", columnId: "col-1", text: "x".repeat(2001), likes: "0", created: "1234567890",
+      });
+      const res = await action({ request, params: { id: "board-1" }, context: {} } as never).catch((e) => e as Response);
+      expect((res as Response).status).toBe(422);
+      expect(await (res as Response).text()).toBe("Note text exceeds 2000 chars");
+      expect(mockUpsertNote).not.toHaveBeenCalled();
     });
 
     it("creates note without user id when no session", async () => {
@@ -163,11 +157,7 @@ describe("board.notes action", () => {
     it("tracks like with anonymous user id", async () => {
       const { action } = await import("./board.notes");
 
-      sessionData["userId"] = "anon-user-1";
-      mockPoolQuery.mockResolvedValueOnce({
-        rows: [{ id: "anon-user-1", preferred_username: "Guest" }],
-        rowCount: 1,
-      });
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "anon-user-1", username: "Guest", is_anonymous: true });
       mockLikeNote.mockResolvedValueOnce({ ok: true });
 
       const request = makePatchRequest("board-1", {
@@ -330,11 +320,8 @@ describe("board.notes action", () => {
 
     it("checks board: true (not notes) before a vote (BRD-010)", async () => {
       const { action } = await import("./board.notes");
-      sessionData["userId"] = "user-1";
-      mockPoolQuery.mockResolvedValueOnce({
-        rows: [{ id: "user-1", preferred_username: "realuser", is_anonymous: false }],
-        rowCount: 1,
-      });
+      // The caller requireBoardAccess resolves is the actor.
+      mockRequireBoardAccess.mockResolvedValueOnce({ id: "user-1", username: "realuser", is_anonymous: false });
       const request = makePatchRequest("board-1", { intent: "vote", noteId: "note-1", delta: "1" });
       await action({ request, params: { id: "board-1" }, context: {} } as never);
       expect(mockRequireUnlocked).toHaveBeenCalledWith("board-1", { board: true });

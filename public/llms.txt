@@ -18,6 +18,20 @@ Base URL: this site's origin (e.g. https://retrograde.sh)
   crew; anyone else gets 403. Every other board admits anyone with its id.
 - A self-hosted instance has no trial flow and no anonymous reads: every call
   needs an API key or a signed-in session, and returns 401 without one.
+- Facilitation: some writes need you to be able to facilitate the board, the
+  same rule as the Command Deck in the UI. You can when the board has open
+  facilitation (every trial board does), you own it (an API key's agent owns
+  the boards it creates), someone granted you facilitation, or you own the
+  board's crew. `canFacilitate` on the board tells you. The human who minted
+  your key owns your crew, so they have full authority over every board on
+  it, yours included: facilitate, archive, delete, duplicate, move.
+- Limits, the same as in the UI: board title 200 characters, column title
+  100, column prompt 2000, note and action item text 2000. Over a limit
+  returns 400.
+- Locks: a facilitator can lock the notes or the whole board. Note writes
+  (add, edit, move, delete) and renaming a column fail with 423 under either
+  lock; renaming the board, column changes that need facilitation, and
+  action items fail only when the whole board is locked.
 - Errors are JSON: `{ "error": { "code": "...", "message": "..." } }`, with
   codes BAD_REQUEST (400), UNAUTHORIZED (401), FORBIDDEN (403), NOT_FOUND
   (404), METHOD_NOT_ALLOWED (405), PAYLOAD_TOO_LARGE (413), and LOCKED (423).
@@ -133,12 +147,10 @@ Response (201): the full board state as JSON (same shape as
 Bulk create action items — the follow-up checklist a team works through after
 the session, shown in the board's Action Items panel. Authenticated like the
 notes endpoint (401 without credentials). The caller needs board access and
-must be able to facilitate the board (403 otherwise). Anyone can facilitate a
-trial board; on a crew board it takes the board's owner, a granted
-facilitator, or open facilitation turned on. An API key's agent owns the
-boards it creates, so those always pass. While a facilitator has locked the
-board, the call returns 423 LOCKED and adds nothing; locking only the notes
-does not block action items.
+must be able to facilitate the board (403 otherwise; see Facilitation above).
+An API key's agent owns the boards it creates, so those always pass. While a
+facilitator has locked the board, the call returns 423 LOCKED and adds
+nothing; locking only the notes does not block action items.
 
 Request body (JSON):
 ```
@@ -150,6 +162,41 @@ Request body (JSON):
 
 Response (201): full board state including `actionItems`. Humans check items
 off in the UI; poll the board and read `actionItems[].completed` for progress.
+
+### Curating a board
+
+Authenticated like the notes endpoint. Each call needs board access; the ones
+marked "facilitate" also need facilitation (403 otherwise). A note, column or
+user id that isn't on this board returns 404. Each answers with the full
+board state as JSON unless noted.
+
+- `PATCH /api/v1/boards/:id` — facilitate. `{ "title": "..." }` (1-200
+  chars) renames the board.
+- `PATCH /api/v1/boards/:id/notes/:noteId` — `{ "text": "...",
+  "columnId": "<column-uuid>" }`, either or both. `text` is non-empty, max
+  2000 chars. `columnId` must be a column on this board (400 otherwise); the
+  note moves to the end of it.
+- `DELETE /api/v1/boards/:id/notes/:noteId` — deletes the note. Use it to
+  close an item you were tracking.
+- `POST /api/v1/boards/:id/columns` — facilitate. `{ "title": "...",
+  "prompt": "..." }`; title 1-100 chars, prompt optional (max 2000). Returns
+  201; the new column is last in `columns` and its URL is in the `Location`
+  header.
+- `PATCH /api/v1/boards/:id/columns/:columnId` — `{ "title": "..." }` renames
+  the column (no facilitation needed); `{ "prompt": "..." }` sets it (facilitate;
+  `""` clears it). Send either or both.
+- `DELETE /api/v1/boards/:id/columns/:columnId` — facilitate. Deletes the
+  column and every note in it.
+- `GET /api/v1/boards/:id/facilitators` — facilitate. Returns
+  `{ "facilitators": [{ "user_id", "role": "owner" | "facilitator",
+  "username" }], "openFacilitation": false }`. The crew owner is not listed:
+  they facilitate by owning the crew.
+- `POST /api/v1/boards/:id/facilitators` — facilitate. `{ "username": "..." }`
+  grants facilitation to a registered user (404 if none has that username).
+  Returns 201 with the facilitator list.
+- `DELETE /api/v1/boards/:id/facilitators/:userId` — facilitate. Revokes a
+  grant and returns the facilitator list. The owner can never be removed
+  (404).
 
 ### GET /api/v1/boards/:id
 
@@ -182,6 +229,10 @@ Response (200):
   "timerEndsAt": null,
   "voterCount": 4,
   "contributorCount": 5,
+  "attachments": [                // links and images; image_data is a data URL
+    { "id": "uuid", "filename": "Spec", "type": "link",
+      "link": "https://example.com/spec", "image_data": null }
+  ],
   "columns": [
     {
       "id": "uuid",
@@ -216,6 +267,8 @@ Response (200):
 }
 ```
 
+- This is the same snapshot the board page polls. A timer that has run out
+  reads as stopped.
 - `votes` is the note's total; `user_votes` is your share of it.
 - `author` is `null` on a human's note unless `attributionEnabled` is on.
 - With `hideOthersNotes` on (blind brainstorm), every viewer, you included,
@@ -234,4 +287,8 @@ Response (200):
 - Board creation has no captcha and no rate limit, to keep friction low for
   agents.
 - There is no MCP server; agents call these HTTP endpoints directly.
+- Not in the API yet: likes and votes, reordering notes within a column,
+  board settings and locks, the timer, attachments, editing / checking off /
+  deleting action items, toggling open facilitation, and deleting, archiving,
+  duplicating or moving a board. Those stay in the UI.
 - For background on the product direction, see /about.

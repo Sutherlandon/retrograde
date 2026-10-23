@@ -9,6 +9,7 @@
 
 import { pool } from "./db_config";
 import { getBoardServer } from "./board_model";
+import { canFacilitateSql } from "./board_permissions_sql";
 import type { ActionItemDTO, BoardDTO } from "./board.types";
 
 // ---------------------------------------------------------------------------
@@ -202,7 +203,7 @@ export interface UserActionItemRow {
  *
  * `can_manage` mirrors the mutation rules: team items are managed by any
  * team member; board items follow board facilitation (owner, facilitator,
- * or open facilitation). Anyone who can see an item may toggle it.
+ * crew owner, or open facilitation). Anyone who can see an item may toggle it.
  */
 export async function listOpenActionItemsForUser(
   userId: string
@@ -214,11 +215,7 @@ export async function listOpenActionItemsForUser(
             bt.name AS board_team_name,
             CASE
               WHEN ai.team_id IS NOT NULL THEN TRUE
-              ELSE b.open_facilitation OR EXISTS (
-                SELECT 1 FROM board_members bmf
-                WHERE bmf.board_id = b.id AND bmf.user_id = $1
-                  AND bmf.role IN ('owner', 'facilitator')
-              )
+              ELSE ${canFacilitateSql("b", "$1::uuid")}
             END AS can_manage
      FROM action_items ai
      LEFT JOIN teams t ON t.id = ai.team_id
@@ -258,11 +255,7 @@ export async function listOpenActionItemsForTeam(
             bt.name AS board_team_name,
             CASE
               WHEN ai.team_id IS NOT NULL THEN TRUE
-              ELSE b.open_facilitation OR EXISTS (
-                SELECT 1 FROM board_members bmf
-                WHERE bmf.board_id = b.id AND bmf.user_id = $2
-                  AND bmf.role IN ('owner', 'facilitator')
-              )
+              ELSE ${canFacilitateSql("b", "$2::uuid")}
             END AS can_manage
      FROM action_items ai
      LEFT JOIN teams t ON t.id = ai.team_id

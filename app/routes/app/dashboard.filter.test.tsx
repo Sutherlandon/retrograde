@@ -67,6 +67,7 @@ function board(id: string, title: string): DashboardBoardRow {
     team_id: null,
     team_name: null,
     role: "owner",
+    can_manage: true,
     open_action_items: 0,
     created_at: "2024-01-01T00:00:00.000Z",
     updated_at: "2024-01-01T00:00:00.000Z",

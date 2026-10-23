@@ -16,6 +16,7 @@ const GATED_HELPERS = [
   "getOrCreateUser",
   "requireBoardAccess",
   "requireFacilitator",
+  "requireApiBoardAccess", // api_board_guard.ts, through getApiUser
 ];
 
 const PUBLIC_ROUTES: Record<string, string> = {

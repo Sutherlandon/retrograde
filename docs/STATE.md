@@ -1,6 +1,6 @@
 # Retrograde — Project State
 
-**Updated:** 2026-09-21 · **Version:** 2.0.0 · **Branch:** `staging`, live on `staging.retrograde.sh`, in review to merge to `main`
+**Updated:** 2026-10-17 · **Version:** 2.0.0 · **Branch:** `staging`, live on `staging.retrograde.sh`, in review to merge to `main`
 
 Where the project is right now. For *what* the product does, action by action, see [`docs/spec/0001-action-registry.md`](spec/0001-action-registry.md). For *why* the load-bearing decisions were made, see [`docs/adr/`](adr/README.md). For *where it runs* — providers, environments, and which secret lives where — see [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
@@ -13,7 +13,7 @@ Where the project is right now. For *what* the product does, action by action, s
 | Stack | React 19, React Router 7 (SSR), Tailwind 4, PostgreSQL via raw `pg` |
 | Hosting | Vercel (web) + Neon (Postgres); Auth0, Stripe, Porkbun — see [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 | Auth | OAuth 2.0 — Keycloak in Docker for local, external IDP in prod |
-| Tests | 3,378 passing across 89 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,448-cell permission matrix and a registry-linkage check |
+| Tests | 4,106 passing across 113 files (Vitest + RTL, jsdom, mocked `pg`) — includes a 2,808-cell permission matrix and a registry-linkage check |
 | Real-time | Polling, no WebSockets |
 | Schema | Idempotent DDL in `app/server/db_init.ts`, no migration tool — 33 numbered blocks |
 
@@ -37,13 +37,17 @@ Three tiers, named for what the account is entitled to: **1 Anonymous** (no acco
 
 Board access is a separate axis from the tier: a board is members-only only when its crew has `restrict_board_access = true`, which only a named crew can set. A tier-3 crew with it off is as open as a tier-1 board. The registry's header states the model; its guard column says which mechanism enforces each action.
 
-**Facilitator is the primitive.** Every board control is designed for the facilitator role; the owner is a facilitator who also holds lifecycle rights (delete, archive, duplicate, move) and cannot be demoted. `isOwner` is the right gate only for those lifecycle controls, which live on the dashboard. On a board page, reach for `canFacilitate`.
+**Facilitator is the primitive.** Every board control is designed for the facilitator role; the owner is a facilitator who also holds lifecycle rights (delete, archive, duplicate, move) and cannot be demoted. The owner of a board's crew has full authority over every board on it, whoever owns it: facilitation and every lifecycle right, by crew role with no `board_members` row (ADR-0027). Only the owner row itself stays unremovable. Both predicates live once in `board_permissions_sql.ts`. On the dashboard, the lifecycle controls and bulk selection gate on the row's `can_manage`. On a board page, reach for `canFacilitate`.
+
+**People and agents are held to one rule set** (ADR-0027 §3). Every board route resolves its caller with `getApiUser` (key, `agent_token` or session) for access, facilitation and authorship alike; every write checks board access before facilitation; every note and column write is scoped in SQL to the board in the URL; length limits come from `app/config/board_limits.ts` on both surfaces and as input `maxLength`; and the browser poll and API read share `getBoardSnapshot`.
+
+**Agents have the board's core writes over the JSON API** (ADR-0027, API-008 – API-017): renaming the board, editing, moving and deleting notes, column add/rename/prompt/delete, and facilitator list/grant/revoke, each under its browser counterpart's rule via `api_board_guard.ts`. Still UI-only: likes and votes, note reordering, settings and locks, the timer, attachments, action item edit/complete/delete, the open-facilitation toggle, and board lifecycle. A human can't grant facilitation to an agent, because agents aren't registered users.
 
 **Lapse behavior (ADR-0015).** Entitlement covers the whole crew surface, not just creation, and is checked against the **crew owner** rather than the acting user — members are often free accounts. A lapse returns 402, freezes all crew management and new work, and revokes the owner's named-crew API keys via the webhook. It deliberately does **not** relax `restrict_board_access`: a billing lapse must never widen access. Known sharp edge, accepted deliberately: a lapsed owner cannot remove a member or delete their own crew. Revisit first if it generates support load. The crew page (`crews.$id.tsx`) mirrors this in the UI: a lapsed named crew shows a read-only banner with a "Subscribe" CTA and disables every frozen control (rename, roster, AI crew, boards, settings, danger zone, and add/edit/delete on crew action items) — only checking an item off stays interactive, per CREW-015.
 
 **Self-hosted instances (ADR-0016).** `SELF_HOSTED=true` makes every account tier 3: the entitlement seam returns true without reading billing state, so every account can create named crews and lapse never applies. Billing and scheduled cleanup do not exist there — the Stripe variables and `CRON_SECRET` are refused at startup, the three billing routes and the cleanup endpoint return 404, the sidebar hides Billing, and crewless boards are never archived (ADR-0020). The personal crew's one-key cap still applies, as it does to a paying hosted account. The dashboard is also home: every marketing page redirects to it, the sitemap returns 404, robots.txt disallows everything, and the header drops About and Contact. Vercel Analytics does not load there (ADR-0017). There are no guests either: every page and API call needs a signed-in account or an API key, enforced in the identity helpers rather than per route, with a coverage test over `routes.ts` (ADR-0021).
 
-**The model is enforced.** Facilitator-only controls, locks on every write route (UI and JSON API), board access on both API write routes, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty. On the hosted service the paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
+**The model is enforced.** Facilitator-only controls, locks on every write route (UI and JSON API), board access on every API write route, ownership on duplicate, and the crewless-board invariant are all checked on the server (commits `21ab531`, `01cd18a`; ADR-0011). The registry's Gaps table is empty; GAP-009 (cross-board writes by id, #120) closed with ADR-0027. On the hosted service the paid tier is real: `accountCanCreateNamedCrew` reads `users.subscription_status`, which only the signature-verified Stripe webhook writes (ADR-0013).
 
 ## Known rough edges
 
@@ -74,7 +78,7 @@ Board access is a separate axis from the tier: a board is members-only only when
 
 ## Deferred by design
 
-Recorded so they aren't rediscovered as gaps: annual billing (a second Price on the same Product), MCP server, webhooks, per-key API scopes, account-level (non-crew) API keys, agent-name verification, JSON update/delete of notes, and pagination on board reads. Agent activity metering and the rate limiting that covers the unauthenticated trial path are tracked, not deferred — issue #105.
+Recorded so they aren't rediscovered as gaps: annual billing (a second Price on the same Product), MCP server, webhooks, per-key API scopes, account-level (non-crew) API keys, agent-name verification, and pagination on board reads. Agent activity metering and the rate limiting that covers the unauthenticated trial path are tracked, not deferred — issue #105.
 
 ## Operational reality
 

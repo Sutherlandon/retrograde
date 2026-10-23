@@ -5,6 +5,7 @@ import { useOptionalUser } from "~/context/userContext";
 import { FlagIcon } from "~/images/icons";
 import TimerDisplay from "./TimerDisplay";
 import { BoardStatusBar } from "./BoardStatusBar";
+import { BOARD_LIMITS } from "~/config/board_limits";
 
 // BRD-020: how long the post-claim confirmation stays up before it
 // auto-dismisses.
@@ -130,6 +131,7 @@ export default function BoardToolbar({ title }: { title: string }) {
           <input
             ref={inputRef}
             value={localTitle}
+            maxLength={BOARD_LIMITS.boardTitle}
             onChange={(e) => setLocalTitle(e.target.value)}
             onBlur={save}
             onKeyDown={handleKeyDown}

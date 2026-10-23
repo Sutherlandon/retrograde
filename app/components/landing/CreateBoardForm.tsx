@@ -5,6 +5,7 @@ import { Form, Link } from "react-router";
 import { RocketIcon } from "~/images/icons";
 import { CREATE_FORM_ID } from "./CreateBoardLink";
 import { INVITE_REF } from "~/config/growth_refs";
+import { BOARD_LIMITS } from "~/config/board_limits";
 
 export type CreateBoardErrors = { title?: string; no_jerks?: string };
 
@@ -47,6 +48,7 @@ export default function CreateBoardForm({
             type="text"
             id="title"
             name="title"
+            maxLength={BOARD_LIMITS.boardTitle}
             placeholder="Your stellar board title here..."
             aria-invalid={errors?.title ? true : undefined}
             className="w-full rounded-lg border border-night-600 bg-night-950/70 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-airglow-500 focus:ring-2 focus:ring-airglow-500/40"

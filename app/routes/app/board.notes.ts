@@ -4,8 +4,8 @@
 // DELETE → delete note
 
 import { type ActionFunctionArgs } from "react-router";
-import { getOptionalUser } from "~/hooks/useAuth";
 import { requireBoardAccess, requireUnlocked } from "~/server/board_permissions";
+import { tooLong } from "~/config/board_limits";
 import { logMetric } from "~/server/logger";
 import {
   upsertNoteServer,
@@ -20,7 +20,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  await requireBoardAccess(request, boardId);
+  // The caller requireBoardAccess resolves (API key, agent_token or session)
+  // is the actor for every write below, so an agent's note is attributed to
+  // its agent whichever surface it arrives on (ADR-0002).
+  const user = await requireBoardAccess(request, boardId);
 
   const data = await request.formData();
 
@@ -39,8 +42,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!noteId || !fromColumnId || !toColumnId) {
           throw new Response("Missing move fields", { status: 422 });
         }
-        const moveUser = await getOptionalUser(request);
-        return moveNoteServer(boardId, fromColumnId, toColumnId, noteId, moveUser?.id);
+        return moveNoteServer(boardId, fromColumnId, toColumnId, noteId, user?.id);
       }
 
       if (intent === "reorder") {
@@ -53,8 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           throw new Response("Missing reorder fields", { status: 422 });
         }
         const orderedNoteIds: string[] = JSON.parse(orderedNoteIdsJson);
-        const reorderUser = await getOptionalUser(request);
-        return reorderNotesServer(boardId, toColumnId, orderedNoteIds, reorderUser?.id);
+        return reorderNotesServer(boardId, toColumnId, orderedNoteIds, user?.id);
       }
 
       if (intent === "like") {
@@ -67,8 +68,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (!noteId || isNaN(delta)) {
           throw new Response("Missing like fields", { status: 422 });
         }
-        const likeUser = await getOptionalUser(request);
-        return likeNoteServer(boardId, noteId, delta, likeUser?.id);
+        return likeNoteServer(boardId, noteId, delta, user?.id);
       }
 
       if (intent === "vote") {
@@ -78,7 +78,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const noteId = data.get("noteId") as string;
         const delta = Number(data.get("delta"));
         if (!noteId || isNaN(delta) || delta === 0) throw new Response("Missing vote fields", { status: 422 });
-        const user = await getOptionalUser(request);
         if (!user) throw new Response("Unauthorized", { status: 401 });
         logMetric("Vote Note", { userId: user.id, boardId, noteId, delta });
         return voteNoteServer(boardId, noteId, user.id, delta);
@@ -95,8 +94,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (!noteId || !columnId || newText == null || isNaN(likes) || !created) {
         throw new Response("Missing note update fields", { status: 422 });
       }
-      const noteUser = await getOptionalUser(request);
-      return upsertNoteServer(boardId, noteId, columnId, newText, likes, created, noteUser?.id);
+      const over = tooLong("noteText", newText);
+      if (over) throw new Response(over, { status: 422 });
+      return upsertNoteServer(boardId, noteId, columnId, newText, likes, created, user?.id);
     }
 
     case "DELETE": {
@@ -106,9 +106,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const noteId = data.get("noteId") as string;
       const columnId = data.get("columnId") as string;
       if (!noteId || !columnId) throw new Response("Missing noteId or columnId", { status: 422 });
-      const deleteUser = await getOptionalUser(request);
-      logMetric("Delete Note", { userId: deleteUser?.id, boardId, noteId });
-      return deleteNoteServer(boardId, columnId, noteId, deleteUser?.id);
+      logMetric("Delete Note", { userId: user?.id, boardId, noteId });
+      return deleteNoteServer(boardId, columnId, noteId, user?.id);
     }
 
     default:

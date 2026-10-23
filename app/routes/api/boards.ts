@@ -9,6 +9,7 @@ import { createAgentUser, getApiUser } from "~/hooks/useAuth";
 import { getSession, commitSession } from "~/session.server";
 import { pool } from "~/server/db_config";
 import { getPersonalTeamForUser } from "~/server/team_model";
+import { tooLong } from "~/config/board_limits";
 
 type CreateBoardRequest = {
   title?: string;
@@ -65,9 +66,8 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!title || title.length < 1) {
     return bad("`title` is required");
   }
-  if (title.length > 200) {
-    return bad("`title` exceeds 200 chars");
-  }
+  const titleTooLong = tooLong("boardTitle", title);
+  if (titleTooLong) return bad(titleTooLong);
 
   const displayName = body.display_name?.trim() || "Agent";
   if (displayName.length > 100) {
@@ -85,9 +85,11 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!c || typeof c.title !== "string" || c.title.trim().length === 0) {
       return bad("Each column needs a non-empty `title`");
     }
-    if (c.title.length > 100) {
-      return bad("Column title exceeds 100 chars");
+    if (c.prompt !== undefined && typeof c.prompt !== "string") {
+      return bad("A column's `prompt` must be a string");
     }
+    const over = tooLong("columnTitle", c.title) ?? tooLong("columnPrompt", c.prompt);
+    if (over) return bad(over);
   }
 
   // If the caller is authenticated (real API key or logged-in browser), use

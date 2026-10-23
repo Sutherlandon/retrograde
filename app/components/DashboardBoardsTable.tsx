@@ -1,5 +1,6 @@
 // app/components/DashboardBoardsTable.tsx
-// The dashboard boards table: bulk-selectable rows (owners only), team chips
+// The dashboard boards table: bulk-selectable rows (boards the viewer may
+// manage — its owner or its crew's owner, ADR-0027), team chips
 // with an amber Unassigned state, open action item badges, and the per-row
 // actions menu (duplicate / move to team / archive / delete).
 
@@ -29,8 +30,8 @@ export function DashboardBoardsTable({
   boards, teams, selected = new Set(), onToggle, onSelectAll, showCrewColumn = true, archived = false,
 }: DashboardBoardsTableProps) {
   const navigate = useNavigate();
-  const ownedIds = boards.filter((b) => b.role === "owner").map((b) => b.id);
-  const allSelected = ownedIds.length > 0 && ownedIds.every((id) => selected.has(id));
+  const manageableIds = boards.filter((b) => b.can_manage).map((b) => b.id);
+  const allSelected = manageableIds.length > 0 && manageableIds.every((id) => selected.has(id));
 
   return (
     <div className="border rounded-lg w-full overflow-x-auto">
@@ -43,7 +44,7 @@ export function DashboardBoardsTable({
                   type="checkbox"
                   aria-label="Select all boards"
                   checked={allSelected}
-                  onChange={() => onSelectAll?.(allSelected ? [] : ownedIds)}
+                  onChange={() => onSelectAll?.(allSelected ? [] : manageableIds)}
                   className="cursor-pointer accent-blue-600"
                 />
               </th>
@@ -73,9 +74,9 @@ export function DashboardBoardsTable({
                     type="checkbox"
                     aria-label={`Select ${board.title}`}
                     checked={selected.has(board.id)}
-                    disabled={board.role !== "owner"}
+                    disabled={!board.can_manage}
                     onChange={() => onToggle?.(board.id)}
-                    title={board.role !== "owner" ? "Only board owners can move or delete boards" : undefined}
+                    title={board.can_manage ? undefined : "Only the board's owner or its crew's owner can move or delete it"}
                     className="cursor-pointer accent-blue-600 disabled:cursor-not-allowed disabled:opacity-30"
                   />
                 </td>
@@ -116,7 +117,7 @@ export function DashboardBoardsTable({
                 <BoardActionsMenu
                   boardId={board.id}
                   boardTitle={board.title}
-                  isOwner={board.role === "owner"}
+                  canManage={board.can_manage}
                   isArchived={archived}
                   teams={teams}
                   currentTeamId={board.team_id}

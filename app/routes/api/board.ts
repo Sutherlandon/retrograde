@@ -1,11 +1,19 @@
 // app/routes/api/board.ts
-// GET /api/v1/boards/:id — JSON board state. Public read (matches existing
-// world-readable behavior of /app/board/:id). No auth required.
+// GET   /api/v1/boards/:id — JSON board state, the same snapshot the browser's
+//       poll reads. Public read on unrestricted boards (matches
+//       /app/board/:id). No auth required.
+// PATCH /api/v1/boards/:id — rename the board (API-008). Same rule as BRD-003:
+//       facilitators only, blocked by a board lock.
 
-import type { LoaderFunctionArgs } from "react-router";
-import { getBoardServer } from "~/server/board_model";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { updateBoardTitleServer } from "~/server/board_model";
+import { getBoardSnapshot } from "~/server/board_snapshot";
 import { getApiUser } from "~/hooks/useAuth";
 import { getBoardAccess } from "~/server/board_permissions";
+import {
+  apiError, requireApiBoardAccess, requireApiFacilitator, requireApiUnlocked, readJsonObject,
+} from "~/server/api_board_guard";
+import { tooLong } from "~/config/board_limits";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const id = params.id;
@@ -36,7 +44,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const board = await getBoardServer(id, user?.id ?? null);
+  // The same snapshot the browser's poll reads (attachments, settled timer).
+  const board = await getBoardSnapshot(id, user?.id ?? null);
   if (!board) {
     return Response.json(
       { error: { code: "NOT_FOUND", message: "Board not found" } },
@@ -44,5 +53,25 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
+  return Response.json(board);
+}
+
+export async function action({ request, params }: ActionFunctionArgs) {
+  if (request.method !== "PATCH") return apiError("METHOD_NOT_ALLOWED", "Use PATCH", 405);
+  const boardId = params.id;
+  if (!boardId) return apiError("BAD_REQUEST", "Missing board id", 400);
+
+  const user = await requireApiBoardAccess(request, boardId);
+  await requireApiFacilitator(user, boardId);
+  await requireApiUnlocked(boardId, { board: true });
+
+  const body = await readJsonObject(request);
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  if (!title) return apiError("BAD_REQUEST", "`title` is required", 400);
+  const over = tooLong("boardTitle", title);
+  if (over) return apiError("BAD_REQUEST", over, 400);
+
+  const board = await updateBoardTitleServer(boardId, title, user.id);
+  if (!board) return apiError("NOT_FOUND", "Board not found", 404);
   return Response.json(board);
 }

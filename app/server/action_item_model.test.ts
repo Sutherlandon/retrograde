@@ -154,6 +154,9 @@ describe("listOpenActionItemsForUser", () => {
     expect(sql).toContain("team_members");
     expect(sql).toContain("board_members");
     expect(sql).toContain("can_manage");
+    // ADR-0027: board items follow the shared facilitation predicate.
+    const { canFacilitateSql } = await import("./board_permissions_sql");
+    expect(sql).toContain(`ELSE ${canFacilitateSql("b", "$1::uuid")}`);
     expect(sql).toContain("bt.name AS board_team_name");
     expect(sql).toContain("LEFT JOIN teams bt ON bt.id = b.team_id");
     expect(params).toEqual(["user-1"]);
@@ -179,8 +182,9 @@ describe("listOpenActionItemsForTeam", () => {
     const [sql, params] = mockPoolQuery.mock.calls[0];
     expect(sql).toContain("NOT ai.completed");
     expect(sql).toContain("ai.team_id = $1 OR b.team_id = $1");
-    expect(sql).not.toContain("team_members");                 // crew-scoped, not user-wide
-    expect(sql).toContain("bmf.user_id = $2");                  // can_manage uses the viewer
+    expect(sql).not.toContain("IN (SELECT team_id FROM team_members"); // crew-scoped, not user-wide
+    const { canFacilitateSql } = await import("./board_permissions_sql");
+    expect(sql).toContain(`ELSE ${canFacilitateSql("b", "$2::uuid")}`);     // can_manage uses the viewer
     expect(params).toEqual(["t1", "user-1"]);
     expect(rows).toHaveLength(2);
   });

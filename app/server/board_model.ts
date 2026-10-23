@@ -5,6 +5,7 @@
 import { pool } from "./db_config";
 import type { BoardDTO, DashboardBoardRow } from "./board.types";
 import { getPersonalTeamForUser } from "./team_model";
+import { canFacilitateSql, canManageBoardSql } from "./board_permissions_sql";
 
 // ---------------------------------------------------------------------------
 // READ
@@ -50,16 +51,8 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
       'actionItemsVisible', b.action_items_visible,
       'hideOthersNotes',  b.hide_others_notes,
       'openFacilitation', b.open_facilitation,
-      'canFacilitate',    CASE
-                            WHEN $2::uuid IS NOT NULL
-                            THEN b.open_facilitation OR EXISTS(
-                              SELECT 1 FROM board_members bm2
-                              WHERE bm2.board_id = b.id
-                                AND bm2.user_id = $2::uuid
-                                AND bm2.role IN ('owner', 'facilitator')
-                            )
-                            ELSE b.open_facilitation
-                          END,
+      -- ADR-0027: the predicate the mutation guards use, crew owner included.
+      'canFacilitate',    ${canFacilitateSql("b", "$2::uuid")},
       'actionItems', COALESCE(
         (SELECT json_agg(
            json_build_object(
@@ -165,6 +158,7 @@ export async function listVisibleBoards(
       SELECT DISTINCT ON (b.id)
         b.*,
         COALESCE(bm.role, 'team') AS role,
+        ${canManageBoardSql("b", "$1::uuid")} AS can_manage,
         t.name AS team_name,
         (SELECT COUNT(*)::int FROM action_items ai
           WHERE ai.board_id = b.id AND NOT ai.completed) AS open_action_items
@@ -374,13 +368,16 @@ export async function addColumnServer(
   return getBoardServer(boardId, viewerId);
 }
 
+// GAP-009: every note and column write below matches only rows on the board
+// in the URL — the board the caller's access was checked against.
+
 export async function updateColumnTitleServer(
   boardId: string,
   columnId: string,
   newTitle: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE columns SET title = $1 WHERE id = $2`, [newTitle, columnId]);
+  await pool.query(`UPDATE columns SET title = $1 WHERE id = $2 AND board_id = $3`, [newTitle, columnId, boardId]);
   return getBoardServer(boardId, viewerId);
 }
 
@@ -390,12 +387,89 @@ export async function updateColumnPromptServer(
   prompt: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2`, [prompt, columnId]);
+  await pool.query(`UPDATE columns SET prompt = $1 WHERE id = $2 AND board_id = $3`, [prompt, columnId, boardId]);
   return getBoardServer(boardId, viewerId);
 }
 
 export async function deleteColumnServer(boardId: string, columnId: string, viewerId?: string | null) {
-  await pool.query(`DELETE FROM columns WHERE id = $1`, [columnId]);
+  await pool.query(`DELETE FROM columns WHERE id = $1 AND board_id = $2`, [columnId, boardId]);
+  return getBoardServer(boardId, viewerId);
+}
+
+/**
+ * API-011: append a column after the board's last one. The id is generated
+ * here, unlike addColumnServer, whose browser caller picks id and order.
+ */
+export async function appendColumnServer(
+  boardId: string,
+  title: string,
+  prompt: string,
+  viewerId?: string | null
+): Promise<{ columnId: string; board: BoardDTO | null }> {
+  const columnId = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO columns (id, board_id, title, col_order, prompt)
+     VALUES ($1, $2, $3, COALESCE((SELECT MAX(col_order) + 1 FROM columns WHERE board_id = $2), 0), $4)`,
+    [columnId, boardId, title, prompt]
+  );
+  return { columnId, board: await getBoardServer(boardId, viewerId) };
+}
+
+/** API-012/API-013: rename a column and/or set its prompt; an omitted field is left alone. */
+export async function updateColumnServer(
+  boardId: string,
+  columnId: string,
+  changes: { title?: string; prompt?: string },
+  viewerId?: string | null
+) {
+  await pool.query(
+    `UPDATE columns SET title = COALESCE($3::text, title), prompt = COALESCE($4::text, prompt)
+     WHERE id = $1 AND board_id = $2`,
+    [columnId, boardId, changes.title ?? null, changes.prompt ?? null]
+  );
+  return getBoardServer(boardId, viewerId);
+}
+
+/** Whether the column belongs to the board. */
+export async function columnIsOnBoard(boardId: string, columnId: string): Promise<boolean> {
+  const res = await pool.query(`SELECT 1 FROM columns WHERE id = $1 AND board_id = $2`, [columnId, boardId]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** The column a note sits in, or null when the note isn't on this board. */
+export async function findNoteColumnOnBoard(boardId: string, noteId: string): Promise<string | null> {
+  const res = await pool.query<{ column_id: string }>(
+    `SELECT n.column_id FROM notes n
+     JOIN columns c ON c.id = n.column_id
+     WHERE n.id = $1 AND c.board_id = $2`,
+    [noteId, boardId]
+  );
+  return res.rows[0]?.column_id ?? null;
+}
+
+/**
+ * API-009: edit a note's text and/or move it to another column of the same
+ * board, landing at the end of that column. An omitted field is left alone.
+ */
+export async function updateNoteServer(
+  boardId: string,
+  noteId: string,
+  changes: { text?: string; columnId?: string },
+  viewerId?: string | null
+) {
+  await pool.query(
+    `UPDATE notes n SET
+       text = COALESCE($3::text, n.text),
+       column_id = COALESCE($4::text, n.column_id),
+       note_order = CASE
+         WHEN $4::text IS NULL OR $4 = n.column_id THEN n.note_order
+         ELSE COALESCE((SELECT MAX(o.note_order) + 1 FROM notes o WHERE o.column_id = $4), 0)
+       END
+     WHERE n.id = $1
+       AND n.column_id IN (SELECT id FROM columns WHERE board_id = $2)
+       AND ($4::text IS NULL OR $4 IN (SELECT id FROM columns WHERE board_id = $2))`,
+    [noteId, boardId, changes.text ?? null, changes.columnId ?? null]
+  );
   return getBoardServer(boardId, viewerId);
 }
 
@@ -408,10 +482,13 @@ export async function upsertNoteServer(
   created: string,
   userId?: string | null
 ) {
+  // Inserts only into a column of this board; updates only a note already on it.
   await pool.query(
     `
     INSERT INTO notes (id, column_id, text, likes, is_new, created, note_order, created_by)
-    VALUES ($1, $2, $3, $4, false, $5, COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0), $6)
+    SELECT $1::text, $2::text, $3::text, $4::int, false, $5::text,
+           COALESCE((SELECT MAX(note_order) + 1 FROM notes WHERE column_id = $2), 0), $6::uuid
+    WHERE EXISTS (SELECT 1 FROM columns WHERE id = $2 AND board_id = $7)
     ON CONFLICT (id) DO UPDATE
     SET
       text   = EXCLUDED.text,
@@ -420,8 +497,9 @@ export async function upsertNoteServer(
                  WHEN notes.likes > EXCLUDED.likes THEN notes.likes + 1
                  ELSE EXCLUDED.likes
                END
+    WHERE notes.column_id IN (SELECT id FROM columns WHERE board_id = $7)
     `,
-    [noteId, columnId, newText, likes, created, userId ?? null]
+    [noteId, columnId, newText, likes, created, userId ?? null, boardId]
   );
   // The author is the viewer here, so this response is correctly scoped in
   // blind mode (they only ever see their own notes anyway).
@@ -429,27 +507,36 @@ export async function upsertNoteServer(
 }
 
 export async function likeNoteServer(boardId: string, noteId: string, delta: number, userId?: string | null) {
-  await pool.query(`UPDATE notes SET likes = likes + $1 WHERE id = $2`, [delta, noteId]);
-  if (userId && delta > 0) {
+  const liked = await pool.query(
+    `UPDATE notes SET likes = likes + $1
+     WHERE id = $2 AND column_id IN (SELECT id FROM columns WHERE board_id = $3)`,
+    [delta, noteId, boardId]
+  );
+  if (userId && delta > 0 && (liked.rowCount ?? 0) > 0) {
     await pool.query(`INSERT INTO note_likes (note_id, user_id) VALUES ($1, $2)`, [noteId, userId]);
   }
   return getBoardServer(boardId, userId);
 }
+
+const NOTE_ON_BOARD = (note: string, board: string) =>
+  `EXISTS (SELECT 1 FROM notes sn JOIN columns sc ON sc.id = sn.column_id WHERE sn.id = ${note} AND sc.board_id = ${board})`;
 
 export async function voteNoteServer(boardId: string, noteId: string, userId: string, delta: number) {
   if (delta > 0) {
     // Upsert: insert or increment count
     await pool.query(
       `INSERT INTO note_votes (note_id, user_id, count)
-       VALUES ($1, $2, $3)
+       SELECT $1::text, $2::uuid, $3::int
+       WHERE ${NOTE_ON_BOARD("$1", "$4")}
        ON CONFLICT (note_id, user_id) DO UPDATE SET count = note_votes.count + $3`,
-      [noteId, userId, delta]
+      [noteId, userId, delta, boardId]
     );
   } else if (delta < 0) {
     // Decrement count, then delete row if count reached 0
     await pool.query(
-      `UPDATE note_votes SET count = count + $3 WHERE note_id = $1 AND user_id = $2`,
-      [noteId, userId, delta]
+      `UPDATE note_votes SET count = count + $3::int
+       WHERE note_id = $1 AND user_id = $2 AND ${NOTE_ON_BOARD("$1", "$4")}`,
+      [noteId, userId, delta, boardId]
     );
     await pool.query(
       `DELETE FROM note_votes WHERE note_id = $1 AND user_id = $2 AND count <= 0`,
@@ -501,7 +588,10 @@ export async function clearBoardVotesServer(boardId: string) {
 }
 
 export async function deleteNoteServer(boardId: string, columnId: string, noteId: string, viewerId?: string | null) {
-  await pool.query(`DELETE FROM notes WHERE id = $1`, [noteId]);
+  await pool.query(
+    `DELETE FROM notes WHERE id = $1 AND column_id IN (SELECT id FROM columns WHERE board_id = $2)`,
+    [noteId, boardId]
+  );
   return getBoardServer(boardId, viewerId);
 }
 
@@ -512,7 +602,13 @@ export async function moveNoteServer(
   noteId: string,
   viewerId?: string | null
 ) {
-  await pool.query(`UPDATE notes SET column_id = $1 WHERE id = $2`, [toColumnId, noteId]);
+  await pool.query(
+    `UPDATE notes SET column_id = $1
+     WHERE id = $2
+       AND column_id IN (SELECT id FROM columns WHERE board_id = $3)
+       AND $1 IN (SELECT id FROM columns WHERE board_id = $3)`,
+    [toColumnId, noteId, boardId]
+  );
   return getBoardServer(boardId, viewerId);
 }
 
@@ -527,8 +623,11 @@ export async function reorderNotesServer(
     await client.query("BEGIN");
     for (let i = 0; i < orderedNoteIds.length; i++) {
       await client.query(
-        `UPDATE notes SET column_id = $1, note_order = $2 WHERE id = $3`,
-        [toColumnId, i, orderedNoteIds[i]]
+        `UPDATE notes SET column_id = $1, note_order = $2
+         WHERE id = $3
+           AND column_id IN (SELECT id FROM columns WHERE board_id = $4)
+           AND $1 IN (SELECT id FROM columns WHERE board_id = $4)`,
+        [toColumnId, i, orderedNoteIds[i], boardId]
       );
     }
     await client.query("COMMIT");
@@ -584,19 +683,30 @@ export async function stopTimerServer(boardId: string): Promise<void> {
   );
 }
 
+// DASH-006–009: board lifecycle belongs to the board's owner (ADR-0006) and
+// to the owner of its crew (ADR-0027). Moves and bulk deletes embed the same
+// predicate in their own statements.
+const CAN_MANAGE_BOARD_SQL =
+  `SELECT ${canManageBoardSql("b", "$2::uuid")} AS can_manage FROM boards b WHERE b.id = $1`;
+
+async function canManageBoard(
+  db: Pick<typeof pool, "query">,
+  boardId: string,
+  userId: string
+): Promise<boolean> {
+  const res = await db.query<{ can_manage: boolean }>(CAN_MANAGE_BOARD_SQL, [boardId, userId]);
+  return res.rows[0]?.can_manage === true;
+}
+
 export async function duplicateBoardServer(
   boardId: string,
   userId: string
 ): Promise<string> {
-  // DASH-006: board lifecycle is owner-only (ADR-0006), mirroring
-  // deleteBoardServer / archiveBoardServer. Checked before opening the
-  // transaction, same as those two.
-  const memberRes = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, userId]
-  );
-  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
-    throw new Error("Only the board owner can duplicate a board");
+  // DASH-006: board lifecycle belongs to the owner and the crew's owner
+  // (ADR-0006, ADR-0027), as in deleteBoardServer / archiveBoardServer.
+  // Checked before opening the transaction.
+  if (!(await canManageBoard(pool, boardId, userId))) {
+    throw new Error("Only the board's owner or its crew's owner can duplicate a board");
   }
 
   // ADR-0011 / DASH-006: a duplicate is never crewless — a crewless board
@@ -681,13 +791,15 @@ export async function duplicateBoardServer(
 
 /**
  * Move one or more boards to a team (or to no team with teamId = null).
- * Permission is enforced in SQL: the caller must own each board, and when
- * moving TO a team, must be a member of that team. Boards that fail either
- * guard are silently skipped; the returned ids are the boards actually moved.
+ * Permission is enforced in SQL: the caller must own each board or its crew
+ * (ADR-0027), and when moving TO a team, must be a member of that team.
+ * Boards that fail either guard are silently skipped; the returned ids are
+ * the boards actually moved.
  *
- * A move never changes open_facilitation (ADR-0022). Only an owner can move
- * a board, so every moved board is owned, and on an owned board opening the
- * Command Deck is the facilitator's choice, crew or no crew.
+ * A move never changes open_facilitation (ADR-0022). Every board a caller can
+ * move has an owner row — crew boards always do, and a crewless one can only
+ * be moved by its owner — and on an owned board opening the Command Deck is
+ * the facilitator's choice, crew or no crew.
  */
 export async function moveBoardsToTeamServer(
   boardIds: string[],
@@ -699,10 +811,7 @@ export async function moveBoardsToTeamServer(
   const res = await pool.query<{ id: string }>(
     `UPDATE boards b SET team_id = $2
      WHERE b.id = ANY($1)
-       AND EXISTS (
-         SELECT 1 FROM board_members bm
-         WHERE bm.board_id = b.id AND bm.user_id = $3 AND bm.role = 'owner'
-       )
+       AND ${canManageBoardSql("b", "$3::uuid")}
        AND ($2::uuid IS NULL OR EXISTS (
          SELECT 1 FROM team_members tm
          WHERE tm.team_id = $2 AND tm.user_id = $3
@@ -730,8 +839,8 @@ export async function countUnassignedBoardsForUser(userId: string): Promise<numb
 
 /**
  * Delete multiple boards in a single transaction. Only boards the caller
- * owns are deleted; others in the list are silently skipped. Returns the
- * ids that were actually deleted.
+ * owns, or whose crew the caller owns (ADR-0027), are deleted; others in the
+ * list are silently skipped. Returns the ids that were actually deleted.
  */
 export async function bulkDeleteBoardsServer(
   boardIds: string[],
@@ -744,9 +853,7 @@ export async function bulkDeleteBoardsServer(
     await client.query("BEGIN");
 
     const owned = await client.query<{ id: string }>(
-      `SELECT b.id FROM boards b
-       JOIN board_members bm ON bm.board_id = b.id
-       WHERE b.id = ANY($1) AND bm.user_id = $2 AND bm.role = 'owner'`,
+      `SELECT b.id FROM boards b WHERE b.id = ANY($1) AND ${canManageBoardSql("b", "$2::uuid")}`,
       [boardIds, userId]
     );
     const ownedIds = owned.rows.map((r) => r.id);
@@ -780,13 +887,8 @@ export async function deleteBoardServer(
   try {
     await client.query("BEGIN");
 
-    // Verify the user is the owner
-    const memberRes = await client.query(
-      `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-      [boardId, userId]
-    );
-    if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
-      throw new Error("Only the board owner can delete a board");
+    if (!(await canManageBoard(client, boardId, userId))) {
+      throw new Error("Only the board's owner or its crew's owner can delete a board");
     }
 
     // Delete notes for all columns in this board
@@ -841,13 +943,15 @@ export async function addFacilitatorServer(boardId: string, userId: string) {
   );
 }
 
-export async function removeFacilitatorServer(boardId: string, userId: string) {
+/** Whether a facilitator row was removed. */
+export async function removeFacilitatorServer(boardId: string, userId: string): Promise<boolean> {
   // role guard means the owner can never be removed through this path
-  await pool.query(
+  const res = await pool.query(
     `DELETE FROM board_members
      WHERE board_id = $1 AND user_id = $2 AND role = 'facilitator'`,
     [boardId, userId]
   );
+  return (res.rowCount ?? 0) > 0;
 }
 
 /**
@@ -870,6 +974,15 @@ export async function setOpenFacilitationServer(boardId: string, open: boolean):
   return (res.rowCount ?? 0) > 0;
 }
 
+/** The board's owner and facilitators, plus whether facilitation is open to everyone. */
+export async function getFacilitatorsServer(boardId: string) {
+  const [facilitators, openFacilitation] = await Promise.all([
+    listFacilitatorsServer(boardId),
+    getOpenFacilitationServer(boardId),
+  ]);
+  return { facilitators, openFacilitation: openFacilitation === true };
+}
+
 export async function getOpenFacilitationServer(boardId: string): Promise<boolean | null> {
   const res = await pool.query<{ open_facilitation: boolean }>(
     `SELECT open_facilitation FROM boards WHERE id = $1`,
@@ -879,29 +992,21 @@ export async function getOpenFacilitationServer(boardId: string): Promise<boolea
   return res.rows[0].open_facilitation;
 }
 
-export async function updateBoardTitleServer(boardId: string, newTitle: string) {
+export async function updateBoardTitleServer(boardId: string, newTitle: string, viewerId?: string | null) {
   await pool.query(`UPDATE boards SET title = $1 WHERE id = $2`, [newTitle, boardId]);
-  return getBoardServer(boardId);
+  return getBoardServer(boardId, viewerId);
 }
 
 export async function archiveBoardServer(boardId: string, userId: string): Promise<void> {
-  const memberRes = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, userId]
-  );
-  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
-    throw new Error("Only the board owner can archive a board");
+  if (!(await canManageBoard(pool, boardId, userId))) {
+    throw new Error("Only the board's owner or its crew's owner can archive a board");
   }
   await pool.query(`UPDATE boards SET archived_at = NOW() WHERE id = $1`, [boardId]);
 }
 
 export async function unarchiveBoardServer(boardId: string, userId: string): Promise<void> {
-  const memberRes = await pool.query(
-    `SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2`,
-    [boardId, userId]
-  );
-  if (memberRes.rowCount === 0 || memberRes.rows[0].role !== "owner") {
-    throw new Error("Only the board owner can unarchive a board");
+  if (!(await canManageBoard(pool, boardId, userId))) {
+    throw new Error("Only the board's owner or its crew's owner can unarchive a board");
   }
   await pool.query(`UPDATE boards SET archived_at = NULL WHERE id = $1`, [boardId]);
 }

@@ -41,7 +41,17 @@ describe("board.title action", () => {
     } as never);
 
     expect(mockRequireBoardAccess).toHaveBeenCalledWith(expect.any(Request), "board-1");
-    expect(mockUpdateBoardTitle).toHaveBeenCalledWith("board-1", "New Title");
+    // Scoped to the caller, so blind-brainstorm mode returns their notes.
+    expect(mockUpdateBoardTitle).toHaveBeenCalledWith("board-1", "New Title", "user-1");
+  });
+
+  it("refuses a title over the shared limit with 422", async () => {
+    const { action } = await import("./board.title");
+    const res = await action({
+      request: patchRequest({ title: "x".repeat(201) }), params: { id: "board-1" }, context: {},
+    } as never).catch((e) => e as Response);
+    expect((res as Response).status).toBe(422);
+    expect(mockUpdateBoardTitle).not.toHaveBeenCalled();
   });
 
   it("requires facilitator status before updating the title (BRD-003)", async () => {

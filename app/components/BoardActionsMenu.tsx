@@ -18,14 +18,16 @@ interface MenuPosition {
 interface BoardActionsMenuProps {
   boardId: string;
   boardTitle: string;
-  isOwner: boolean;
+  /** May move, archive, unarchive and delete: the board's owner, or the owner
+   *  of its crew (ADR-0027). */
+  canManage: boolean;
   isArchived: boolean;
-  /** When provided (dashboard), owners get a "Move to Team" submenu. */
+  /** When provided (dashboard), managers get a "Move to Team" submenu. */
   teams?: TeamSummary[];
   currentTeamId?: string | null;
 }
 
-export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, teams, currentTeamId }: BoardActionsMenuProps) {
+export function BoardActionsMenu({ boardId, boardTitle, canManage, isArchived, teams, currentTeamId }: BoardActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showTeamList, setShowTeamList] = useState(false);
@@ -197,7 +199,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, tea
             <span className="text-gray-500 dark:text-gray-400"><CopyIcon size="sm" /></span>
             Duplicate Board
           </button>
-          {isOwner && teams && !isArchived && (
+          {canManage && teams && !isArchived && (
             <button
               type="button"
               onClick={(e) => {
@@ -210,7 +212,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, tea
               Move to Crew
             </button>
           )}
-          {isOwner && (
+          {canManage && (
             <button
               type="button"
               onClick={handleArchive}
@@ -220,7 +222,7 @@ export function BoardActionsMenu({ boardId, boardTitle, isOwner, isArchived, tea
               {isArchived ? "Unarchive Board" : "Archive Board"}
             </button>
           )}
-          {isOwner && !isArchived && (
+          {canManage && !isArchived && (
             <>
             <hr className="border-gray-200 dark:border-gray-700" />
             <button

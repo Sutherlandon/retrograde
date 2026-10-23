@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockRequireFacilitator = vi.fn();
+const mockRequireBoardAccess = vi.fn();
 vi.mock("~/server/board_permissions", () => ({
   requireFacilitator: (...args: unknown[]) => mockRequireFacilitator(...args),
+  requireBoardAccess: (...args: unknown[]) => mockRequireBoardAccess(...args),
 }));
 
 const mockList = vi.fn();
@@ -26,6 +28,7 @@ vi.mock("~/server/admin_model", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireFacilitator.mockResolvedValue({ id: "owner-1", username: "landon" });
+  mockRequireBoardAccess.mockResolvedValue({ id: "owner-1", username: "landon" });
   mockList.mockResolvedValue([{ user_id: "owner-1", role: "owner", username: "landon" }]);
   mockGetOpen.mockResolvedValue(false);
 });
@@ -135,5 +138,35 @@ describe("board.facilitators action", () => {
     } catch (response: unknown) {
       expect((response as Response).status).toBe(403);
     }
+  });
+});
+
+// GAP-008's rule, as on the JSON API (DECK-020–022).
+describe("board.facilitators — board access first", () => {
+  const outsider = () => mockRequireBoardAccess.mockRejectedValueOnce(new Response("restricted", { status: 403 }));
+
+  it("the loader is refused by board access before facilitation is asked", async () => {
+    const { loader } = await import("./board.facilitators");
+    outsider();
+    const res = await loader({ request: new Request("http://localhost:3000/app/board/board-1/facilitators"), params: { id: "board-1" }, context: {} } as never)
+      .catch((e) => e as Response);
+    expect((res as Response).status).toBe(403);
+    expect(mockRequireFacilitator).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["POST", { username: "target" }],
+    ["DELETE", { userId: "u-2" }],
+    ["PATCH", { openFacilitation: "true" }],
+  ])("%s is refused by board access before facilitation is asked", async (method, fields) => {
+    const { action } = await import("./board.facilitators");
+    outsider();
+    const res = await action({ request: formRequest(method, fields), params: { id: "board-1" }, context: {} } as never)
+      .catch((e) => e as Response);
+    expect((res as Response).status).toBe(403);
+    expect(mockRequireFacilitator).not.toHaveBeenCalled();
+    expect(mockAdd).not.toHaveBeenCalled();
+    expect(mockRemove).not.toHaveBeenCalled();
+    expect(mockSetOpen).not.toHaveBeenCalled();
   });
 });

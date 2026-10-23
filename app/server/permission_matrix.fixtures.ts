@@ -171,26 +171,23 @@ export function isRegisteredHuman(actor: ActorState): boolean {
   return actor.hasSessionCookie && !actor.isAnonymousUser;
 }
 
-/** getOptionalUser resolving to a non-null user (session cookie only). */
-export function hasSession(actor: ActorState): boolean {
-  return actor.hasSessionCookie;
+/** Owner of the board's crew — a facilitator of every board on it (ADR-0027). */
+export function ownsBoardCrew(actor: ActorState, fixture: FixtureState): boolean {
+  return fixture.teamId !== null && actor.teamRole === "owner";
 }
 
 /** userCanFacilitate, given whatever userId the caller resolved to. */
 export function canFacilitateDirect(actor: ActorState, fixture: FixtureState): boolean {
   if (fixture.openFacilitation) return true;
-  return actor.boardRole === "owner" || actor.boardRole === "facilitator";
+  return actor.boardRole === "owner" || actor.boardRole === "facilitator" || ownsBoardCrew(actor, fixture);
 }
 
 /**
- * requireFacilitator specifically: it resolves the caller via getOptionalUser
- * (session cookie only — NOT getApiUser), so an API-key actor is only ever
- * admitted through open_facilitation, never through a board_members role.
+ * The model's lifecycle check (delete, archive, unarchive, duplicate, move):
+ * the board's owner, or the owner of its crew, whoever owns the board (ADR-0027).
  */
-export function canFacilitateViaSession(actor: ActorState, fixture: FixtureState): boolean {
-  if (fixture.openFacilitation) return true;
-  if (!actor.hasSessionCookie) return false;
-  return actor.boardRole === "owner" || actor.boardRole === "facilitator";
+export function canManageBoard(actor: ActorState, fixture: FixtureState): boolean {
+  return actor.boardRole === "owner" || ownsBoardCrew(actor, fixture);
 }
 
 /** getApiUser resolves to a non-null caller (bearer key OR session cookie). */
@@ -277,12 +274,15 @@ function resolveBoardGuardQueries(
     };
   }
   // userCanFacilitate (board_permissions.ts)
-  if (s.includes("open_facilitation") && s.includes("AS can")) {
-    const userIdParam = params[1];
-    const can =
-      fixture.openFacilitation ||
-      (userIdParam === actor.userId && (actor.boardRole === "owner" || actor.boardRole === "facilitator"));
+  if (s.includes("open_facilitation") && s.includes("AS can FROM boards b")) {
+    const can = fixture.openFacilitation || (params[1] === actor.userId && canFacilitateDirect(actor, fixture));
     return { rowCount: 1, rows: [{ can }] };
+  }
+  // board_model's lifecycle check — duplicateBoardServer / deleteBoardServer /
+  // archiveBoardServer / unarchiveBoardServer (DASH-006–009)
+  if (s.includes("AS can_manage FROM boards b")) {
+    const can_manage = params[1] === actor.userId && canManageBoard(actor, fixture);
+    return { rowCount: 1, rows: [{ can_manage }] };
   }
   // requireUnlocked (board_permissions.ts)
   if (s.startsWith("SELECT notes_locked, board_locked")) {
@@ -294,11 +294,6 @@ function resolveBoardGuardQueries(
 function resolveMembershipQueries(
   s: string, params: unknown[], fixture: FixtureState, actor: ActorState
 ): QueryResult | undefined {
-  // board_members role lookup — duplicateBoardServer / deleteBoardServer /
-  // archiveBoardServer / unarchiveBoardServer all issue this exact text.
-  if (s === "SELECT role FROM board_members WHERE board_id = $1 AND user_id = $2") {
-    return actor.boardRole ? { rowCount: 1, rows: [{ role: actor.boardRole }] } : { rowCount: 0, rows: [] };
-  }
   // duplicateBoardServer: the ORIGINAL board's team_id
   if (s === "SELECT team_id FROM boards WHERE id = $1") {
     return { rowCount: 1, rows: [{ team_id: fixture.teamId }] };
@@ -358,29 +353,29 @@ function resolveMembershipQueries(
 }
 
 // DASH-010/011/012: moveBoardsToTeamServer and bulkDeleteBoardsServer embed
-// their owner/membership checks INSIDE a single UPDATE/SELECT ... RETURNING
-// statement (no separate guard query to intercept), so the resolver has to
-// evaluate those conditions itself rather than deferring to a generic
-// fallback — otherwise it would silently return zero rows for everyone,
-// including an actual owner, and the matrix could never see "allow".
+// their lifecycle/membership checks INSIDE a single UPDATE/SELECT statement
+// (no separate guard query to intercept), so the resolver has to evaluate
+// those conditions itself rather than deferring to a generic fallback —
+// otherwise it would silently return zero rows for everyone, including an
+// actual owner, and the matrix could never see "allow".
 function resolveDashboardLifecycleQueries(
-  s: string, params: unknown[], actor: ActorState
+  s: string, params: unknown[], fixture: FixtureState, actor: ActorState
 ): QueryResult | undefined {
-  const isOwner = actor.boardRole === "owner";
+  const canManage = canManageBoard(actor, fixture);
   const isTeamMember = actor.teamRole !== null; // destination team is abstract — see actorState's doc comment
 
-  // moveBoardsToTeamServer (DASH-010/011): UPDATE ... WHERE EXISTS(owner) AND (teamId IS NULL OR EXISTS(team_members))
+  // moveBoardsToTeamServer (DASH-010/011): UPDATE ... WHERE canManage AND (teamId IS NULL OR EXISTS(team_members))
   if (s.includes("UPDATE boards b SET team_id = $2")) {
     const boardIds = (params[0] as string[]) ?? [];
     const teamId = params[1] as string | null;
-    const ok = isOwner && (teamId === null || isTeamMember);
+    const ok = canManage && (teamId === null || isTeamMember);
     return ok ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
   }
 
-  // bulkDeleteBoardsServer (DASH-012): SELECT ids the caller owns, out of a given set.
-  if (s.includes("JOIN board_members bm") && s.includes("bm.role = 'owner'") && s.includes("ANY($1)")) {
+  // bulkDeleteBoardsServer (DASH-012): SELECT the ids the caller may manage, out of a given set.
+  if (s.startsWith("SELECT b.id FROM boards b WHERE b.id = ANY($1)")) {
     const boardIds = (params[0] as string[]) ?? [];
-    return isOwner ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
+    return canManage ? { rowCount: boardIds.length, rows: boardIds.map((id) => ({ id })) } : { rowCount: 0, rows: [] };
   }
 
   return undefined;
@@ -397,7 +392,7 @@ export function makeResolver(actor: ActorState, fixture: FixtureState) {
       resolveIdentityQueries(s, params, actor) ??
       resolveBoardGuardQueries(s, params, fixture, actor) ??
       resolveMembershipQueries(s, params, fixture, actor) ??
-      resolveDashboardLifecycleQueries(s, params, actor) ??
+      resolveDashboardLifecycleQueries(s, params, fixture, actor) ??
       { rows: [], rowCount: 0 } // generic INSERT/UPDATE/DELETE — result unused by the guards under test
     );
   };
@@ -454,21 +449,17 @@ export const RULES = {
   boardAccessOnly: (actor: ActorState, fixture: FixtureState): Verdict =>
     hasBoardAccess(actor, fixture) ? "allow" : "deny",
 
-  // BRD-010 (vote): requireBoardAccess, then 401 if no session — via
-  // getOptionalUser, so an API-key actor (no session cookie) is denied even
-  // after passing board access.
-  boardAccessThenSession: (actor: ActorState, fixture: FixtureState): Verdict =>
-    hasBoardAccess(actor, fixture) && hasSession(actor) ? "allow" : "deny",
+  // BRD-010 (vote), BRD-014 (check off an item): board access, then 401
+  // without a caller. The caller is whoever requireBoardAccess resolved — API
+  // key, agent_token or session — so an agent can vote and check off too.
+  boardAccessThenIdentity: (actor: ActorState, fixture: FixtureState): Verdict =>
+    hasBoardAccess(actor, fixture) && hasApiIdentity(actor) ? "allow" : "deny",
 
-  facilitatorOnly: (actor: ActorState, fixture: FixtureState): Verdict =>
-    canFacilitateViaSession(actor, fixture) ? "allow" : "deny",
-
+  // Every facilitator control in the browser and the API: board access first
+  // (GAP-008's rule), then facilitation, resolved for the same caller — so an
+  // agent that facilitates a board can use the browser controls too.
   boardAccessThenFacilitator: (actor: ActorState, fixture: FixtureState): Verdict =>
-    hasBoardAccess(actor, fixture) && canFacilitateViaSession(actor, fixture) ? "allow" : "deny",
-
-  // BRD-014: board.action-items.ts's `complete` intent checks only for a
-  // session — it never calls requireBoardAccess. Documented, not assumed.
-  sessionOnly: (actor: ActorState): Verdict => (hasSession(actor) ? "allow" : "deny"),
+    hasBoardAccess(actor, fixture) && canFacilitateDirect(actor, fixture) ? "allow" : "deny",
 
   registeredOnly: (actor: ActorState): Verdict => (isRegisteredHuman(actor) ? "allow" : "deny"),
 
@@ -492,14 +483,16 @@ export const RULES = {
     return "allow";
   },
 
-  dashboardOwner: (actor: ActorState): Verdict => {
+  // DASH-006–009, DASH-012: the board's owner or its crew's owner (ADR-0027).
+  dashboardLifecycle: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!isRegisteredHuman(actor)) return "deny";
-    return actor.boardRole === "owner" ? "allow" : "deny";
+    return canManageBoard(actor, fixture) ? "allow" : "deny";
   },
 
-  dashboardMove: (actor: ActorState): Verdict => {
+  // DASH-010/011: the same, plus membership of the destination crew.
+  dashboardMove: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!isRegisteredHuman(actor)) return "deny";
-    return actor.boardRole === "owner" && actor.teamRole !== null ? "allow" : "deny";
+    return canManageBoard(actor, fixture) && actor.teamRole !== null ? "allow" : "deny";
   },
 
   siteAdmin: (actor: ActorState): Verdict => {
@@ -515,7 +508,8 @@ export const RULES = {
   apiBoardAccess: (actor: ActorState, fixture: FixtureState): Verdict =>
     hasBoardAccess(actor, fixture) ? "allow" : "deny",
 
-  apiBulkNotes: (actor: ActorState, fixture: FixtureState): Verdict => {
+  // API-004, API-009, API-010, API-012: any credentialed caller with board access.
+  apiParticipant: (actor: ActorState, fixture: FixtureState): Verdict => {
     if (!hasApiIdentity(actor)) return "deny";
     return hasBoardAccess(actor, fixture) ? "allow" : "deny";
   },
@@ -638,7 +632,7 @@ const BRD_SPECS: ActionSpec[] = [
   boardActionSpec("BRD-009", () => import("~/routes/app/board.notes"), "/notes", "PATCH",
     { intent: "like", noteId: "note-1", delta: "1" }, RULES.boardAccessOnly),
   boardActionSpec("BRD-010", () => import("~/routes/app/board.notes"), "/notes", "PATCH",
-    { intent: "vote", noteId: "note-1", delta: "1" }, RULES.boardAccessThenSession),
+    { intent: "vote", noteId: "note-1", delta: "1" }, RULES.boardAccessThenIdentity),
   boardActionSpec("BRD-011", () => import("~/routes/app/board.columns"), "/columns", "PATCH",
     { columnId: "col-1", title: "New Title" }, RULES.boardAccessOnly),
   boardActionSpec("BRD-012", () => import("~/routes/app/board.columns"), "/columns", "PATCH",
@@ -646,7 +640,7 @@ const BRD_SPECS: ActionSpec[] = [
   boardActionSpec("BRD-013", () => import("~/routes/app/board.columns"), "/columns", "DELETE",
     { columnId: "col-1" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("BRD-014", () => import("~/routes/app/board.action-items"), "/action-items", "PATCH",
-    { itemId: "item-1", intent: "complete", completed: "true" }, RULES.sessionOnly),
+    { itemId: "item-1", intent: "complete", completed: "true" }, RULES.boardAccessThenIdentity),
   boardLoaderSpec("BRD-019", () => import("~/routes/app/board.attachments"), "/attachments"),
 ];
 
@@ -659,41 +653,41 @@ const DECK_SPECS: ActionSpec[] = [
   boardActionSpec("DECK-006", () => import("~/routes/app/board.columns"), "/columns", "POST",
     { id: "col-new", title: "New Column", col_order: "2" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-008", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-009", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-010", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-011", () => import("~/routes/app/board.settings"), "/settings", "POST",
-    {}, RULES.facilitatorOnly),
+    {}, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-012", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-013", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-014", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-015", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-016", () => import("~/routes/app/board.settings"), "/settings", "PATCH",
-    SETTINGS_FIELDS, RULES.facilitatorOnly),
+    SETTINGS_FIELDS, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-017", () => import("~/routes/app/board.attachments"), "/attachments", "POST",
-    { type: "link", filename: "a link", link: "https://example.com" }, RULES.facilitatorOnly),
+    { type: "link", filename: "a link", link: "https://example.com" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-018", () => import("~/routes/app/board.attachments"), "/attachments", "POST",
-    { type: "image", filename: "a.png", imageData: "data:image/png;base64,AAAA" }, RULES.facilitatorOnly),
+    { type: "image", filename: "a.png", imageData: "data:image/png;base64,AAAA" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-019", () => import("~/routes/app/board.attachments"), "/attachments", "DELETE",
-    { attachmentId: "att-1" }, RULES.facilitatorOnly),
+    { attachmentId: "att-1" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-020", () => import("~/routes/app/board.facilitators"), "/facilitators", "POST",
-    { username: "target" }, RULES.facilitatorOnly),
+    { username: "target" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-021", () => import("~/routes/app/board.facilitators"), "/facilitators", "DELETE",
-    { userId: "user-x" }, RULES.facilitatorOnly),
+    { userId: "user-x" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-022", () => import("~/routes/app/board.facilitators"), "/facilitators", "PATCH",
-    { openFacilitation: "true" }, RULES.facilitatorOnly),
+    { openFacilitation: "true" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-023", () => import("~/routes/app/board.action-items"), "/action-items", "POST",
-    { text: "Do the thing" }, RULES.facilitatorOnly),
+    { text: "Do the thing" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-024", () => import("~/routes/app/board.action-items"), "/action-items", "PATCH",
-    { itemId: "item-1", intent: "text", text: "Updated" }, RULES.facilitatorOnly),
+    { itemId: "item-1", intent: "text", text: "Updated" }, RULES.boardAccessThenFacilitator),
   boardActionSpec("DECK-025", () => import("~/routes/app/board.action-items"), "/action-items", "DELETE",
-    { itemId: "item-1" }, RULES.facilitatorOnly),
+    { itemId: "item-1" }, RULES.boardAccessThenFacilitator),
 ];
 
 // DASH rows
@@ -703,15 +697,15 @@ const DASH_SPECS: ActionSpec[] = [
     build: (actor) => ({ request: getRequest("http://localhost:3000/app/dashboard", actor), params: {} }),
   },
   dashActionSpec("DASH-003", "", () => ({}), RULES.registeredOnly), // no intent -> falls through to create-board
-  dashActionSpec("DASH-006", "duplicate", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-007", "delete", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-008", "archive", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
-  dashActionSpec("DASH-009", "unarchive", (f) => ({ boardId: f.boardId }), RULES.dashboardOwner, { denyOnPlainError: true }),
+  dashActionSpec("DASH-006", "duplicate", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
+  dashActionSpec("DASH-007", "delete", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
+  dashActionSpec("DASH-008", "archive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
+  dashActionSpec("DASH-009", "unarchive", (f) => ({ boardId: f.boardId }), RULES.dashboardLifecycle, { denyOnPlainError: true }),
   dashActionSpec("DASH-010", "moveBoard", (f) => ({ boardId: f.boardId, teamId: "team-move-target" }), RULES.dashboardMove,
     { denyWhenResult: (r) => (r as { moved?: number })?.moved === 0 }),
   dashActionSpec("DASH-011", "bulkMove", (f) => ({ boardIds: f.boardId, teamId: "team-move-target" }), RULES.dashboardMove,
     { denyWhenResult: (r) => (r as { moved?: number })?.moved === 0 }),
-  dashActionSpec("DASH-012", "bulkDelete", (f) => ({ boardIds: f.boardId }), RULES.dashboardOwner,
+  dashActionSpec("DASH-012", "bulkDelete", (f) => ({ boardIds: f.boardId }), RULES.dashboardLifecycle,
     { denyWhenResult: (r) => (r as { deleted?: number })?.deleted === 0 }),
   {
     id: "DASH-016", kind: "action", module: () => import("~/routes/app/board.claim"), rule: RULES.registeredOnly,
@@ -778,6 +772,50 @@ const ADMIN_SPECS: ActionSpec[] = [
   },
 ];
 
+/** A JSON API call on the fixture's board; `params` adds item ids to `{ id }`. */
+function apiSpec(
+  id: string, kind: ActionSpec["kind"], module: () => Promise<Record<string, unknown>>,
+  method: string, path: string, params: Record<string, string>, body: unknown,
+  rule: (actor: ActorState, fixture: FixtureState) => Verdict
+): ActionSpec {
+  return {
+    id, kind, module, rule,
+    build: (actor, fixture) => ({
+      request: body === undefined
+        ? new Request(`http://localhost:3000/api/v1/boards/${fixture.boardId}${path}`, { method, headers: actorHeaders(actor) })
+        : jsonRequest(`http://localhost:3000/api/v1/boards/${fixture.boardId}${path}`, method, actor, body),
+      params: { id: fixture.boardId, ...params },
+    }),
+  };
+}
+
+// A users.id for API-017's path — the route 404s anything that isn't a UUID.
+const FACILITATOR_USER_ID = "00000000-0000-4000-8000-000000000017";
+
+// API-008 – API-017: the agent API's board writes (ADR-0027).
+const API_WRITE_SPECS: ActionSpec[] = [
+  apiSpec("API-008", "action", () => import("~/routes/api/board"), "PATCH", "", {},
+    { title: "Renamed" }, RULES.apiFacilitate),
+  apiSpec("API-009", "action", () => import("~/routes/api/board.notes.$noteId"), "PATCH", "/notes/note-1",
+    { noteId: "note-1" }, { text: "edited", columnId: "col-2" }, RULES.apiParticipant),
+  apiSpec("API-010", "action", () => import("~/routes/api/board.notes.$noteId"), "DELETE", "/notes/note-1",
+    { noteId: "note-1" }, undefined, RULES.apiParticipant),
+  apiSpec("API-011", "action", () => import("~/routes/api/board.columns"), "POST", "/columns", {},
+    { title: "New Column" }, RULES.apiFacilitate),
+  apiSpec("API-012", "action", () => import("~/routes/api/board.columns.$columnId"), "PATCH", "/columns/col-1",
+    { columnId: "col-1" }, { title: "Renamed" }, RULES.apiParticipant),
+  apiSpec("API-013", "action", () => import("~/routes/api/board.columns.$columnId"), "PATCH", "/columns/col-1",
+    { columnId: "col-1" }, { prompt: "Think about it" }, RULES.apiFacilitate),
+  apiSpec("API-014", "action", () => import("~/routes/api/board.columns.$columnId"), "DELETE", "/columns/col-1",
+    { columnId: "col-1" }, undefined, RULES.apiFacilitate),
+  apiSpec("API-015", "loader", () => import("~/routes/api/board.facilitators"), "GET", "/facilitators", {},
+    undefined, RULES.apiFacilitate),
+  apiSpec("API-016", "action", () => import("~/routes/api/board.facilitators"), "POST", "/facilitators", {},
+    { username: "target" }, RULES.apiFacilitate),
+  apiSpec("API-017", "action", () => import("~/routes/api/board.facilitators.$userId"), "DELETE",
+    `/facilitators/${FACILITATOR_USER_ID}`, { userId: FACILITATOR_USER_ID }, undefined, RULES.apiFacilitate),
+];
+
 // API rows
 const API_SPECS: ActionSpec[] = [
   {
@@ -788,7 +826,7 @@ const API_SPECS: ActionSpec[] = [
     }),
   },
   {
-    id: "API-004", kind: "action", module: () => import("~/routes/api/board.notes"), rule: RULES.apiBulkNotes,
+    id: "API-004", kind: "action", module: () => import("~/routes/api/board.notes"), rule: RULES.apiParticipant,
     build: (actor, fixture) => ({
       request: jsonRequest(`http://localhost:3000/api/v1/boards/${fixture.boardId}/notes`, "POST", actor, {
         notes: [{ columnId: "col-1", text: "hello" }],
@@ -808,5 +846,5 @@ const API_SPECS: ActionSpec[] = [
 ];
 
 export const ACTION_CATALOG: ActionSpec[] = [
-  ...BRD_SPECS, ...DECK_SPECS, ...DASH_SPECS, ...CREW_SPECS, ...ADMIN_SPECS, ...API_SPECS,
+  ...BRD_SPECS, ...DECK_SPECS, ...DASH_SPECS, ...CREW_SPECS, ...ADMIN_SPECS, ...API_SPECS, ...API_WRITE_SPECS,
 ];

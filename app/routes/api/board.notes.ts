@@ -6,9 +6,9 @@ import type { ActionFunctionArgs } from "react-router";
 import { bulkInsertNotesServer } from "~/server/board_model";
 import { getApiUser } from "~/hooks/useAuth";
 import { getBoardAccess, lockReason } from "~/server/board_permissions";
+import { tooLong } from "~/config/board_limits";
 
 const MAX_NOTES_PER_REQUEST = 200;
-const MAX_NOTE_LENGTH = 2000;
 
 type BulkNotesRequest = {
   notes?: { columnId: string; text: string }[];
@@ -82,9 +82,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (n.text.trim().length === 0) {
       return err("BAD_REQUEST", "Note `text` cannot be empty", 400);
     }
-    if (n.text.length > MAX_NOTE_LENGTH) {
-      return err("BAD_REQUEST", `Note text exceeds ${MAX_NOTE_LENGTH} chars`, 400);
-    }
+    const over = tooLong("noteText", n.text);
+    if (over) return err("BAD_REQUEST", over, 400);
   }
 
   try {

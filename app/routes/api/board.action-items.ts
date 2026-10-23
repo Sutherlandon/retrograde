@@ -9,9 +9,9 @@ import type { ActionFunctionArgs } from "react-router";
 import { bulkCreateBoardActionItems } from "~/server/action_item_model";
 import { userCanFacilitate, getBoardAccess, lockReason } from "~/server/board_permissions";
 import { getApiUser } from "~/hooks/useAuth";
+import { tooLong } from "~/config/board_limits";
 
 const MAX_ITEMS_PER_REQUEST = 100;
-const MAX_TEXT_LENGTH = 2000;
 
 type BulkActionItemsRequest = {
   items?: { text: string }[];
@@ -72,9 +72,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!item || typeof item.text !== "string" || item.text.trim().length === 0) {
       return err("BAD_REQUEST", "Each item needs non-empty `text`", 400);
     }
-    if (item.text.length > MAX_TEXT_LENGTH) {
-      return err("BAD_REQUEST", `Item text exceeds ${MAX_TEXT_LENGTH} chars`, 400);
-    }
+    const over = tooLong("actionItemText", item.text);
+    if (over) return err("BAD_REQUEST", over, 400);
   }
 
   const board = await bulkCreateBoardActionItems(

@@ -5,8 +5,8 @@
 // DELETE → delete column
 
 import { type ActionFunctionArgs } from "react-router";
-import { getOptionalUser } from "~/hooks/useAuth";
 import { requireBoardAccess, requireFacilitator, requireUnlocked } from "~/server/board_permissions";
+import { tooLong } from "~/config/board_limits";
 import { logMetric } from "~/server/logger";
 import {
   addColumnServer,
@@ -19,11 +19,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { id: boardId } = params;
   if (!boardId) throw new Response("Board ID Missing", { status: 400 });
 
-  await requireBoardAccess(request, boardId);
+  // The acting caller's id scopes the returned board in blind-brainstorm mode.
+  const viewerId = (await requireBoardAccess(request, boardId))?.id;
 
   const data = await request.formData();
-  // The acting user's id scopes the returned board in blind-brainstorm mode.
-  const viewerId = (await getOptionalUser(request))?.id;
 
   switch (request.method.toUpperCase()) {
     case "POST": {
@@ -37,6 +36,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (!id || !title || isNaN(colOrder)) {
         throw new Response("Missing column fields", { status: 422 });
       }
+      const titleTooLong = tooLong("columnTitle", title);
+      if (titleTooLong) throw new Response(titleTooLong, { status: 422 });
       return addColumnServer(boardId, id, title, colOrder, viewerId);
     }
 
@@ -51,6 +52,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         await requireUnlocked(boardId, { board: true });
 
         const prompt = data.get("prompt") as string ?? "";
+        const promptTooLong = tooLong("columnPrompt", prompt);
+        if (promptTooLong) throw new Response(promptTooLong, { status: 422 });
         return updateColumnPromptServer(boardId, columnId, prompt, viewerId);
       }
 
@@ -59,6 +62,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       const newTitle = data.get("title") as string;
       if (!newTitle) throw new Response("Missing title", { status: 422 });
+      const titleTooLong = tooLong("columnTitle", newTitle);
+      if (titleTooLong) throw new Response(titleTooLong, { status: 422 });
       return updateColumnTitleServer(boardId, columnId, newTitle, viewerId);
     }
 
