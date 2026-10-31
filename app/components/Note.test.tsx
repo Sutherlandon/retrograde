@@ -224,6 +224,17 @@ describe("Note hotkeys", () => {
     expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c2");
   });
 
+  it("deletes a saved note that is saved empty", () => {
+    render(<Note note={makeNote({ text: "Delete me" })} columnId="c1" noteColor="bg-yellow-200" />);
+    fireEvent.doubleClick(screen.getByText("Delete me"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "  " } });
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(board.deleteNote).toHaveBeenCalledExactlyOnceWith("c1", "n1");
+    expect(board.updateNote).not.toHaveBeenCalled();
+  });
+
   it("drops a new note on Esc, even with text typed into it", () => {
     fireEvent.keyDown(editNote("c1", "Half a thought"), { key: "Escape" });
     expect(board.deleteNote).toHaveBeenCalledExactlyOnceWith("c1", "n1");

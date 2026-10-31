@@ -198,7 +198,7 @@ export default function Note({
             <div className="flex gap-2 w-full">
               <Button
                 color="danger"
-                onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
+                onClick={() => { deleteNote(columnId, note.id); setDeleteMode(false); }}
                 text="Delete"
                 size="sm"
                 className="w-full"

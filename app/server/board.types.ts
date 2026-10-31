@@ -221,7 +221,7 @@ export interface BoardActions {
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
   updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }) => void;
-  deleteNote: (columnId: string, noteId: string, text?: string) => void;
+  deleteNote: (columnId: string, noteId: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
   moveNoteLocally: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;

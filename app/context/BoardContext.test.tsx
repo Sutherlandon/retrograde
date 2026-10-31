@@ -261,9 +261,10 @@ describe("BoardContext draft notes across mutation responses (#123)", () => {
 });
 
 function BurstConsumer() {
-  const { columns, updateNote, updateColumnTitle, addActionItem, updateActionItem, actionItems } = useBoard();
+  const { columns, updateNote, deleteNote, updateColumnTitle, addActionItem, updateActionItem, actionItems } = useBoard();
   return (
     <div>
+      <button onClick={() => deleteNote("c1", "first")}>delete note</button>
       <button
         onClick={() => {
           addActionItem("first item");
@@ -364,6 +365,29 @@ describe("BoardContext back-to-back saves", () => {
     ]);
   });
 
+  it("deletes a saved note on the server, so the poll can't bring it back", () => {
+    mockLoaderData.mockReturnValue(twoColumns([note("first", { text: "saved" })]));
+    const { fetchMock } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+
+    fireEvent.click(screen.getByText("delete note"));
+
+    expect(items()).not.toContain("saved");
+    expect(requests(fetchMock)).toEqual([
+      ["/app/board/board-1/notes", "DELETE", { noteId: "first", columnId: "c1" }],
+    ]);
+  });
+
+  it("writes nothing when dropping a new note, which has no row on the server", () => {
+    mockLoaderData.mockReturnValue(twoColumns([note("first", { text: "", is_new: true })]));
+    const { fetchMock } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+
+    fireEvent.click(screen.getByText("delete note"));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   const savedItems = (...texts: string[]) => ({
     ok: true,
     json: async () => ({
@@ -461,6 +485,18 @@ describe("BoardContext back-to-back saves", () => {
       await act(async () => responses[2]({ ok: true, json: async () => twoColumns([]) }));
 
       expect(items()).toContain("one");
+    });
+
+    it("doesn't bring back a note that was just deleted", async () => {
+      mockLoaderData.mockReturnValue(twoColumns([note("first", { text: "saved" })]));
+      const { responses } = deferredFetch();
+      render(<BoardProvider><BurstConsumer /></BoardProvider>);
+      fireEvent.click(screen.getByText("delete note"));
+
+      await poll();
+      await act(async () => responses[1]({ ok: true, json: async () => twoColumns([note("first", { text: "saved" })]) }));
+
+      expect(items()).not.toContain("saved");
     });
 
     it("is the only poll skipped, so the next one still brings the board up to date", async () => {

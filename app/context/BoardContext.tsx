@@ -192,9 +192,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     if (noteFetcher.data) applySaveResponse(noteFetcher.data as BoardDTO);
   }, [noteFetcher.data]);
 
-  // Note, column-title and action item text saves are plain fetches: a fetcher
-  // cancels its in-flight request when it submits again, and Tab saves one thing
-  // after another, so an earlier save could die before reaching the server. Only
+  // Note saves and deletes, column-title saves and action item text saves are
+  // plain fetches: a fetcher cancels its in-flight request when it submits again,
+  // and Tab saves one thing after another, so an earlier save could die before
+  // reaching the server. Only
   // the last response of a burst is applied, because an earlier one predates the
   // later saves and would undo their optimistic state. A failed save is left for
   // the poll to reconcile. Pass `after` to hold a save until an earlier one lands;
@@ -206,7 +207,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const saveToServer = async (
     resource: "notes" | "columns" | "action-items",
     fields: Record<string, string>,
-    method: "PATCH" | "POST" = "PATCH",
+    method: "PATCH" | "POST" | "DELETE" = "PATCH",
     after?: Promise<void>
   ) => {
     pendingSaves.current += 1;
@@ -454,21 +455,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const deleteNote = (columnId: string, noteId: string, text?: string) => {
+  const deleteNote = (columnId: string, noteId: string) => {
     if (isReadOnly || notesLocked || boardLocked) return;
+    const note = columns.find((c) => c.id === columnId)?.notes.find((n) => n.id === noteId);
     setColumns((prev) =>
       prev.map((c) =>
         c.id === columnId ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) } : c
       )
     );
-    // Only hit the server if the note was ever saved (has text).
-    // Empty is_new notes are local-only and have no DB row to delete.
-    if (text) {
-      noteFetcher.submit(
-        { noteId, columnId },
-        { method: "DELETE", action: `/app/board/${boardId}/notes` }
-      );
-    }
+    // is_new notes are local-only until first saved, so they have no DB row to delete.
+    if (note && !note.is_new) saveToServer("notes", { noteId, columnId }, "DELETE");
   };
 
   const moveNote = (fromColumnId: string, toColumnId: string, noteId: string) => {
