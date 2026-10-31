@@ -145,7 +145,10 @@ export interface ApiKeyDTO {
 
 export interface Note extends NoteDTO { }   // identical for now, alias for clarity
 export interface Attachment extends AttachmentDTO { }
-export interface ActionItem extends ActionItemDTO { }
+export interface ActionItem extends ActionItemDTO {
+  /** On screen under a local id, waiting for the server to answer. */
+  is_new?: boolean;
+}
 
 export interface Column extends ColumnDTO {
   notes: Note[];
@@ -166,6 +169,8 @@ export interface BoardClientState {
   openFacilitation: boolean;
   // Action items (issue #88)
   actionItems: ActionItem[];
+  canAddActionItems: boolean;
+  addingActionItem: boolean;
   columns: Column[];
   // Derived on client from columns — NOT from the server
   nextColOrder: number;
@@ -216,7 +221,7 @@ export interface BoardActions {
   likeNote: (noteId: string, delta: number) => void;
   voteNote: (noteId: string, delta: number) => void;
   updateBoardSettings: (settings: { votingEnabled: boolean; votingAllowed: number; votingScope: VotingScope; notesLocked: boolean; boardLocked: boolean; attributionEnabled: boolean; actionItemsVisible: boolean; hideOthersNotes: boolean }) => void;
-  deleteNote: (columnId: string, noteId: string, text?: string) => void;
+  deleteNote: (columnId: string, noteId: string) => void;
   moveNote: (fromColumnId: string, toColumnId: string, noteId: string) => void;
   reorderNote: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
   moveNoteLocally: (fromColumnId: string, toColumnId: string, noteId: string, newIndex: number) => void;
@@ -227,6 +232,7 @@ export interface BoardActions {
   deleteAttachment: (attachmentId: string) => void;
   sortNotesByScore: () => void;
   clearParticipantCounts: () => void;
+  setAddingActionItem: (adding: boolean) => void;
   addActionItem: (text: string) => void;
   updateActionItem: (itemId: string, text: string) => void;
   toggleActionItem: (itemId: string, completed: boolean) => void;

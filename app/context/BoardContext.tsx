@@ -108,6 +108,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [canFacilitate, setCanFacilitate] = useState(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
   const [openFacilitation, setOpenFacilitation] = useState(loaderData.openFacilitation ?? false);
   const [actionItems, setActionItems] = useState<ActionItem[]>((loaderData.actionItems as ActionItem[]) ?? []);
+  // Lives here because a note's Shift+Tab opens it, as well as the panel's "+".
+  const [addingActionItem, setAddingActionItem] = useState(false);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
     loaderData.boardLocked ? new Date() : null
   );
@@ -173,17 +175,59 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (columnFetcher.data) setColumns((columnFetcher.data as BoardDTO).columns as Column[]);
+    if (columnFetcher.data) {
+      const data = columnFetcher.data as BoardDTO;
+      setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+    }
   }, [columnFetcher.data]);
 
+  const applySaveResponse = (data: BoardDTO) => {
+    setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+    if (data.voterCount !== undefined) setVoterCount(data.voterCount);
+    if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
+    if (data.actionItems) setActionItems(data.actionItems as ActionItem[]);
+  };
+
   useEffect(() => {
-    if (noteFetcher.data) {
-      const data = noteFetcher.data as BoardDTO;
-      setColumns(data.columns as Column[]);
-      if (data.voterCount !== undefined) setVoterCount(data.voterCount);
-      if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
-    }
+    if (noteFetcher.data) applySaveResponse(noteFetcher.data as BoardDTO);
   }, [noteFetcher.data]);
+
+  // Note saves and deletes, column-title saves and action item text saves are
+  // plain fetches: a fetcher cancels its in-flight request when it submits again,
+  // and Tab saves one thing after another, so an earlier save could die before
+  // reaching the server. Only
+  // the last response of a burst is applied, because an earlier one predates the
+  // later saves and would undo their optimistic state. A failed save is left for
+  // the poll to reconcile. Pass `after` to hold a save until an earlier one lands;
+  // it counts as pending from the moment it is asked for.
+  const pendingSaves = useRef(0);
+  // Bumped when a save starts and when it ends, so a poll can tell one overlapped it.
+  const saveActivity = useRef(0);
+
+  const saveToServer = async (
+    resource: "notes" | "columns" | "action-items",
+    fields: Record<string, string>,
+    method: "PATCH" | "POST" | "DELETE" = "PATCH",
+    after?: Promise<void>
+  ) => {
+    pendingSaves.current += 1;
+    saveActivity.current += 1;
+    if (after) await after;
+    let data: BoardDTO | null = null;
+    try {
+      const res = await fetch(`/app/board/${boardId}/${resource}`, {
+        method,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fields),
+      });
+      if (res.ok) data = await res.json();
+    } catch {
+      // Offline: the poll reports it.
+    }
+    pendingSaves.current -= 1;
+    saveActivity.current += 1;
+    if (data && pendingSaves.current === 0) applySaveResponse(data);
+  };
 
   useEffect(() => {
     if (attachmentFetcher.data) {
@@ -225,6 +269,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(async () => {
       if (isFetching.current) return;
       isFetching.current = true;
+      const activityAtStart = saveActivity.current;
 
       try {
         const res = await fetch(`/app/board/${boardId}/poll`, {
@@ -235,6 +280,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
         const data: BoardDTO = await res.json();
         setOffline(false);
+        // A save that overlapped this poll may be missing from it, and applying
+        // it would take that save off the screen until the next one.
+        if (saveActivity.current !== activityAtStart || pendingSaves.current > 0) return;
+
         setColumns((prev) => mergeColumns(data.columns as Column[], prev));
         setTitle(data.title);
         setVotingEnabled(data.votingEnabled ?? false);
@@ -330,10 +379,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const updateColumnTitle = (id: string, newTitle: string) => {
     if (isReadOnly || notesLocked || boardLocked) return;
     setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
-    columnFetcher.submit(
-      { columnId: id, title: newTitle },
-      { method: "PATCH", action: `/app/board/${boardId}/columns` }
-    );
+    saveToServer("columns", { columnId: id, title: newTitle });
   };
 
   const updateColumnPrompt = (id: string, prompt: string) => {
@@ -398,10 +444,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       )
     );
     // Upsert — creates the row if it doesn't exist (first save), updates if it does.
-    noteFetcher.submit(
-      { noteId, columnId, text: newText, likes, created },
-      { method: "PATCH", action: `/app/board/${boardId}/notes` }
-    );
+    saveToServer("notes", { noteId, columnId, text: newText, likes: String(likes), created });
   };
 
   const likeNote = (noteId: string, delta: number) => {
@@ -412,21 +455,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const deleteNote = (columnId: string, noteId: string, text?: string) => {
+  const deleteNote = (columnId: string, noteId: string) => {
     if (isReadOnly || notesLocked || boardLocked) return;
+    const note = columns.find((c) => c.id === columnId)?.notes.find((n) => n.id === noteId);
     setColumns((prev) =>
       prev.map((c) =>
         c.id === columnId ? { ...c, notes: c.notes.filter((n) => n.id !== noteId) } : c
       )
     );
-    // Only hit the server if the note was ever saved (has text).
-    // Empty is_new notes are local-only and have no DB row to delete.
-    if (text) {
-      noteFetcher.submit(
-        { noteId, columnId },
-        { method: "DELETE", action: `/app/board/${boardId}/notes` }
-      );
-    }
+    // is_new notes are local-only until first saved, so they have no DB row to delete.
+    if (note && !note.is_new) saveToServer("notes", { noteId, columnId }, "DELETE");
   };
 
   const moveNote = (fromColumnId: string, toColumnId: string, noteId: string) => {
@@ -597,21 +635,26 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // Action item actions (issue #88)
   // ---------------------------------------------------------------------------
 
+  const canAddActionItems = canFacilitate && !boardLocked && actionItemsVisible;
+
+  // Adds go one at a time because the server numbers an item when it arrives,
+  // so overlapping adds from Tab could land out of order or share a number.
+  const actionItemAdds = useRef<Promise<void>>(Promise.resolve());
+
   const addActionItem = (text: string) => {
     if (isReadOnly || boardLocked) return;
-    actionItemFetcher.submit(
-      { text },
-      { method: "POST", action: `/app/board/${boardId}/action-items` }
-    );
+    // Shown under a local id until the save's response replaces the list.
+    setActionItems((prev) => [
+      ...prev,
+      { id: nanoid(), text, completed: false, item_order: prev.length, created_at: new Date().toISOString(), is_new: true },
+    ]);
+    actionItemAdds.current = saveToServer("action-items", { text }, "POST", actionItemAdds.current);
   };
 
   const updateActionItem = (itemId: string, text: string) => {
     if (isReadOnly || boardLocked) return;
     setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, text } : i)));
-    actionItemFetcher.submit(
-      { intent: "text", itemId, text },
-      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
-    );
+    saveToServer("action-items", { intent: "text", itemId, text });
   };
 
   const toggleActionItem = (itemId: string, completed: boolean) => {
@@ -745,6 +788,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     canFacilitate,
     openFacilitation,
     actionItems,
+    canAddActionItems,
+    addingActionItem,
+    setAddingActionItem,
     addActionItem,
     updateActionItem,
     toggleActionItem,

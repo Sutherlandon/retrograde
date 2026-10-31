@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { MoonIcon, SunIcon, UserIcon, ComputerIcon } from '~/images/icons';
+import { useCallback, useState, useRef, useEffect } from 'react';
+import { MoonIcon, SunIcon, UserIcon, ComputerIcon, KeyboardIcon, LogoutIcon } from '~/images/icons';
 import { useTheme } from '~/hooks/useTheme';
 import Button from './Button';
+import { HotkeysModal } from './HotkeysModal';
 
 interface AccountHubProps {
   user?: {
@@ -18,6 +19,7 @@ interface AccountHubProps {
 
 export default function AccountHub({ user, closeMenu, hideLogout, buttonClassName }: AccountHubProps) {
   const [open, setOpen] = useState(false);
+  const [hotkeysOpen, setHotkeysOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -42,7 +44,7 @@ export default function AccountHub({ user, closeMenu, hideLogout, buttonClassNam
   // Close on ESC
   useEffect(() => {
     function handleEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
+      if (open && e.key === 'Escape') {
         setOpen(false);
         closeMenu?.();
         buttonRef.current?.focus();
@@ -51,10 +53,21 @@ export default function AccountHub({ user, closeMenu, hideLogout, buttonClassNam
 
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
+  }, [open]);
+
+  function openHotkeys() {
+    setOpen(false);
+    closeMenu?.();
+    setHotkeysOpen(true);
+  }
+
+  const closeHotkeys = useCallback(() => {
+    setHotkeysOpen(false);
+    buttonRef.current?.focus();
   }, []);
 
   return (
-    <div className="relative z-30" ref={containerRef}>
+    <div className={`relative ${open ? 'z-60' : 'z-30'}`} ref={containerRef}>
       {user ? (
         <Button
           ref={buttonRef}
@@ -111,6 +124,14 @@ export default function AccountHub({ user, closeMenu, hideLogout, buttonClassNam
             />
           </div>
 
+          <Button
+            onClick={openHotkeys}
+            variant="text"
+            text="Hotkeys"
+            icon={<KeyboardIcon size="sm" />}
+            className="w-full justify-start"
+          />
+
           {/* Log Out */}
           {!hideLogout &&
             <>
@@ -121,12 +142,15 @@ export default function AccountHub({ user, closeMenu, hideLogout, buttonClassNam
                 variant="text"
                 color="danger"
                 text="Logout"
+                icon={<LogoutIcon size="sm" />}
                 className="w-full justify-start"
               />
             </>
           }
         </div>
       </div>
+
+      <HotkeysModal isOpen={hotkeysOpen} onClose={closeHotkeys} />
     </div>
   );
 }

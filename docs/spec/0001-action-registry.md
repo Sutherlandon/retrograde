@@ -1,6 +1,6 @@
 # Action Registry
 
-**Updated:** 2026-10-17 · **Branch:** `staging` (2.0.0)
+**Updated:** 2026-10-31 · **Branch:** `staging` (2.1.0)
 
 Every action a user or agent can take in Retrograde, who may take it, what enforces that, and whether a test proves it. This is the canonical inventory — if an action exists in the product, it has a row here.
 
@@ -98,6 +98,7 @@ On the dashboard, the lifecycle controls (`BoardActionsMenu`, bulk selection; DA
 | SITE-006 | Set light / dark / system theme        | Anyone | `hooks/useTheme.ts`      | client-only, `localStorage` | Verified |
 | SITE-007 | View the link-preview card (`/og-card`) | Anyone | `routes/og-card.tsx`    | none needed; read-only, `noindex`, not in the sitemap; its loader redirects to `/app/dashboard` when `SELF_HOSTED=true` (ADR-0017) | Verified |
 | SITE-008 | robots.txt                             | Anyone | `routes/robots.ts`       | none needed; read-only. On `retrograde.sh` it closes `/app/` (except the example board), `/board/`, `/api/` and `/auth/` and names the sitemap; on any other host — staging, previews, a self-hosted instance — it disallows everything | Verified |
+| SITE-009 | View the hotkeys list                   | Signed in or guest | `AccountHub` → `HotkeysModal`, generated from `config/hotkeys.ts` | client-only, read-only | Verified |
 
 Boards created via SITE-003 are tier 1 and crewless, so they are subject to the 30-day TTL (ADR-0005). A line under the board tells whoever can keep it (the guest who started it, a signed-in user while it is unclaimed, or its owner) the date it is kept until and how to keep it: log in and claim it (BRD-020), claim it, or move it to a crew.
 

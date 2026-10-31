@@ -53,7 +53,7 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
   // Close on ESC
   useEffect(() => {
     function handleEsc(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (mobileOpen && event.key === 'Escape') {
         setMobileOpen(false);
         buttonRef.current?.focus();
       }
@@ -61,7 +61,7 @@ export default function Header({ user, isAdmin, teams, unassignedCount, isSubscr
 
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, []);
+  }, [mobileOpen]);
 
   // Lock body scroll when menu open
   useEffect(() => {

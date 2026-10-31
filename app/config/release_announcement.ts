@@ -6,42 +6,37 @@
 import type { WelcomeMessage } from "~/components/WelcomeBanner";
 
 export const RELEASE_ANNOUNCEMENT: Required<Pick<WelcomeMessage, "message" | "highlights" | "link">> = {
-  message: "Retrograde 2.0 is our biggest release yet. Here's what's new:",
+  message: "Retrograde 2.1 makes the board faster and steadier to work on. Here's what's new:",
   highlights: [
     {
-      title: "Crews",
+      title: "Hotkeys",
       description:
-        "Organize your boards into crews. Everyone gets a personal crew, and named crews bring in teammates and can keep their boards members-only.",
+        "Tab saves and starts your next note or action item, and Shift+Tab moves on to the next column. Find them all under Hotkeys in your account menu.",
     },
     {
-      title: "Board facilitators",
+      title: "Action items work like notes",
       description:
-        "Share the Command Deck without handing over the board. Open Crew Access from the Command Deck to make someone a facilitator by username, or open the deck to everyone in the room.",
+        "Return saves and closes, Tab starts another, and saving an item empty deletes it.",
     },
     {
-      title: "Hide Others' Notes",
+      title: "Notes that stay put",
       description:
-        "Brainstorm without groupthink. While it's on, everyone sees only their own notes. Turn it off to reveal the whole board.",
+        "Adding a note while you're editing another no longer loses it, fast saves no longer cancel each other, and new items appear the moment you press a key.",
     },
     {
-      title: "Note attribution",
+      title: "Crew owners run their boards",
       description:
-        "Turn on User Attribution to show who wrote each note. Notes written by AI agents are always labeled.",
+        "The owner of a crew can now facilitate and manage every board on it, including boards made by crewmates and AI crewmates.",
     },
     {
-      title: "Action items",
+      title: "More for AI crewmates",
       description:
-        "Capture follow-ups in their own column on the board, and see every open item across your boards right here on the dashboard.",
+        "Agents can now rename boards, edit, move and delete notes, manage columns, and grant facilitators, under the same rules as people.",
     },
     {
-      title: "AI crewmates",
+      title: "Guest board reminders",
       description:
-        "Give an agent an API key from your crew page, and it can create boards and add notes alongside your crew.",
-    },
-    {
-      title: "Your existing boards",
-      description:
-        "Boards from before 2.0 are waiting in Unassigned. Move them into a crew whenever you're ready.",
+        "Guest boards now show how long they're kept and how to keep them for good.",
     },
   ],
   link: "https://github.com/Sutherlandon/retrograde/releases",

@@ -18,7 +18,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled } = useBoard();
+  const { addNote, updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled, canAddActionItems, setAddingActionItem } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -102,6 +102,39 @@ export default function Note({
     setIsEditing(false);
   };
 
+  // A new note has nothing to go back to, and no row on the server to delete.
+  const cancelEdit = () => {
+    if (note.is_new) {
+      deleteNote(columnId, note.id);
+    } else {
+      setText(note.text);
+      setIsEditing(false);
+    }
+  };
+
+  // Action Items is the board's last column, so it follows the last note column.
+  // Anyone who can't add action items wraps straight to the first column.
+  const startInNextColumn = () => {
+    const next = columns[columns.findIndex((c) => c.id === columnId) + 1];
+    if (next) addNote(next.id);
+    else if (canAddActionItems) setAddingActionItem(true);
+    else addNote(columns[0].id);
+  };
+
+  // Hotkeys are listed in config/hotkeys.ts; keep the two in step.
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      saveNote();
+    } else if (e.key === "Escape") {
+      cancelEdit();
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      saveNote();
+      if (e.shiftKey) startInNextColumn();
+      else addNote(columnId);
+    }
+  };
+
   if (isDragging) {
     return (
       <div
@@ -139,7 +172,7 @@ export default function Note({
             maxLength={BOARD_LIMITS.noteText}
             onChange={(e) => setText(e.target.value)}
             onBlur={saveNote}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
+            onKeyDown={handleEditKeyDown}
             autoFocus
           />
         </div>
@@ -165,7 +198,7 @@ export default function Note({
             <div className="flex gap-2 w-full">
               <Button
                 color="danger"
-                onClick={() => { deleteNote(columnId, note.id, note.text); setDeleteMode(false); }}
+                onClick={() => { deleteNote(columnId, note.id); setDeleteMode(false); }}
                 text="Delete"
                 size="sm"
                 className="w-full"

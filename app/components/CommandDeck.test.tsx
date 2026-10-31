@@ -63,6 +63,19 @@ describe("CommandDeck", () => {
     expect(screen.getByText("Mission Clock")).toBeInTheDocument();
   });
 
+  it("collapses on Esc", () => {
+    render(<CommandDeck />);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByText("Mission Clock")).toBeNull();
+  });
+
+  it("stays open when Esc is cancelling an edit in a text field", () => {
+    render(<><textarea aria-label="A note" /><input aria-label="A title" /><CommandDeck /></>);
+    fireEvent.keyDown(screen.getByLabelText("A note"), { key: "Escape" });
+    fireEvent.keyDown(screen.getByLabelText("A title"), { key: "Escape" });
+    expect(screen.getByText("Mission Clock")).toBeInTheDocument();
+  });
+
   it("collapses to pill when minimize button clicked (DECK-029)", () => {
     render(<CommandDeck />);
     fireEvent.click(screen.getByTitle("Minimize"));

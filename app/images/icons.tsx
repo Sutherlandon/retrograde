@@ -819,6 +819,23 @@ export function FlagIcon({ size = 'md', className = '' }: IconProps) {
   );
 }
 
+export function KeyboardIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <rect x="2.25" y="5.25" width="19.5" height="13.5" rx="2.25" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8.25 15.25h7.5" />
+    </svg>
+  );
+}
+
+export function LogoutIcon({ size = 'md', className = '' }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`${sizeMap[size]} ${className}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+    </svg>
+  );
+}
+
 export function RobotIcon({ size = 'md', className = '' }: IconProps) {
   return (
     <svg

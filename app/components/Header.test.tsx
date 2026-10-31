@@ -5,7 +5,7 @@
 // deployment can brand the header with its own logo, and an SSO deployment
 // can hide logout.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import type { HostingConfig } from "~/server/db_config";
 
@@ -89,5 +89,41 @@ describe("Header — night-sky marketing pages", () => {
     const [desktop] = screen.getAllByRole("link", { name: /Log In/i });
     expect(desktop.className).toMatch(/bg-green/);
     expect(desktop.className).not.toMatch(/airglow/);
+  });
+});
+
+describe("Header — Esc", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  function menuButton() {
+    return screen.getByRole("button", { name: "Toggle navigation menu" });
+  }
+
+  it("closes the mobile menu and returns focus to its button", () => {
+    renderHeader(hosted);
+    fireEvent.click(menuButton());
+    expect(menuButton()).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.keyDown(document.body, { key: "Escape" });
+
+    expect(menuButton()).toHaveAttribute("aria-expanded", "false");
+    expect(menuButton()).toHaveFocus();
+  });
+
+  // Esc also cancels an edit on the board, which must not lose the user's place.
+  it("leaves focus alone while the mobile menu is closed", () => {
+    render(
+      <MemoryRouter>
+        <input aria-label="Elsewhere" />
+        <Header hosting={hosted} night={false} />
+      </MemoryRouter>
+    );
+    screen.getByLabelText("Elsewhere").focus();
+
+    fireEvent.keyDown(screen.getByLabelText("Elsewhere"), { key: "Escape" });
+
+    expect(screen.getByLabelText("Elsewhere")).toHaveFocus();
   });
 });
