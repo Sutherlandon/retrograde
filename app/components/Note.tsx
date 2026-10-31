@@ -9,12 +9,6 @@ import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, RobotIco
 import Button from "./Button";
 import { BOARD_LIMITS } from "~/config/board_limits";
 
-// The column after this one, wrapping from the last column to the first.
-function nextColumnId(columns: { id: string }[], columnId: string) {
-  const index = columns.findIndex((c) => c.id === columnId);
-  return columns[(index + 1) % columns.length].id;
-}
-
 export default function Note({
   note,
   columnId,
@@ -24,7 +18,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { addNote, updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled } = useBoard();
+  const { addNote, updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled, canAddActionItems, setAddingActionItem } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -118,6 +112,15 @@ export default function Note({
     }
   };
 
+  // Action Items is the board's last column, so it follows the last note column.
+  // Anyone who can't add action items wraps straight to the first column.
+  const startInNextColumn = () => {
+    const next = columns[columns.findIndex((c) => c.id === columnId) + 1];
+    if (next) addNote(next.id);
+    else if (canAddActionItems) setAddingActionItem(true);
+    else addNote(columns[0].id);
+  };
+
   // Hotkeys are listed in config/hotkeys.ts; keep the two in step.
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -127,7 +130,8 @@ export default function Note({
     } else if (e.key === "Tab") {
       e.preventDefault();
       saveNote();
-      addNote(e.shiftKey ? nextColumnId(columns, columnId) : columnId);
+      if (e.shiftKey) startInNextColumn();
+      else addNote(columnId);
     }
   };
 

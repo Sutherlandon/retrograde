@@ -166,6 +166,8 @@ export interface BoardClientState {
   openFacilitation: boolean;
   // Action items (issue #88)
   actionItems: ActionItem[];
+  canAddActionItems: boolean;
+  addingActionItem: boolean;
   columns: Column[];
   // Derived on client from columns — NOT from the server
   nextColOrder: number;
@@ -227,6 +229,7 @@ export interface BoardActions {
   deleteAttachment: (attachmentId: string) => void;
   sortNotesByScore: () => void;
   clearParticipantCounts: () => void;
+  setAddingActionItem: (adding: boolean) => void;
   addActionItem: (text: string) => void;
   updateActionItem: (itemId: string, text: string) => void;
   toggleActionItem: (itemId: string, completed: boolean) => void;

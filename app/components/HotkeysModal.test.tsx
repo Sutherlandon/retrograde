@@ -43,9 +43,14 @@ describe("HotkeysModal", () => {
     }
   });
 
-  it("documents the note hotkeys", () => {
-    const notes = HOTKEY_GROUPS.find((g) => g.title === "Notes")!.hotkeys.map((h) => h.keys.join("+"));
-    expect(notes).toEqual(expect.arrayContaining(["Shift+Return", "Tab", "Shift+Tab"]));
+  it("documents notes and action items as one group, since their keys are the same", () => {
+    const group = HOTKEY_GROUPS.find((g) => g.title === "Notes and action items")!;
+    expect(group.hotkeys.map((h) => h.keys.join("+"))).toEqual(["Return", "Shift+Return", "Tab", "Shift+Tab", "Esc"]);
+
+    const titles = HOTKEY_GROUPS.map((g) => g.title);
+    expect(titles).not.toContain("Notes");
+    expect(titles).not.toContain("Action items");
+    expect(titles).not.toContain("Editing");
   });
 
   it("documents Esc once, for every edit", () => {
@@ -55,7 +60,7 @@ describe("HotkeysModal", () => {
 
   it("names the keys away from a Mac", () => {
     render(<HotkeysModal isOpen onClose={vi.fn()} />);
-    const keys = keysOnRow("New line in the note").map((k) => k.textContent);
+    const keys = keysOnRow("New line").map((k) => k.textContent);
     expect(keys).toEqual(["Shift", "Return"]);
   });
 
@@ -63,10 +68,10 @@ describe("HotkeysModal", () => {
     setPlatform("MacIntel");
     render(<HotkeysModal isOpen onClose={vi.fn()} />);
 
-    const [shift, tab] = keysOnRow("Save the note and start a new one in the next column");
+    const [shift, tab] = keysOnRow("Save and start a new one in the next column");
     expect(shift).toHaveTextContent("⇧Shift");
     expect(tab).toHaveTextContent("⇥Tab");
-    expect(keysOnRow("New line in the note")[1]).toHaveTextContent(/↩.*Return/);
+    expect(keysOnRow("New line")[1]).toHaveTextContent(/↩.*Return/);
     expect(keysOnRow("Cancel the current edit")[0]).toHaveTextContent("⎋Esc");
   });
 

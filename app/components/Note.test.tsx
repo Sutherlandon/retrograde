@@ -200,6 +200,23 @@ describe("Note hotkeys", () => {
     expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c1");
   });
 
+  it("moves Shift+Tab from the last column to Action Items, the column after it", () => {
+    const setAddingActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({ ...board, canAddActionItems: true, setAddingActionItem });
+    fireEvent.keyDown(editNote("c3"), { key: "Tab", shiftKey: true });
+    expect(board.updateNote).toHaveBeenCalledOnce();
+    expect(setAddingActionItem).toHaveBeenCalledExactlyOnceWith(true);
+    expect(board.addNote).not.toHaveBeenCalled();
+  });
+
+  it("stays in the note columns before the last one, with Action Items available", () => {
+    const setAddingActionItem = vi.fn();
+    mockUseBoard.mockReturnValue({ ...board, canAddActionItems: true, setAddingActionItem });
+    fireEvent.keyDown(editNote("c1"), { key: "Tab", shiftKey: true });
+    expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c2");
+    expect(setAddingActionItem).not.toHaveBeenCalled();
+  });
+
   it("discards an empty draft and still moves on, so Shift+Tab can skip a column", () => {
     fireEvent.keyDown(editNote("c1", ""), { key: "Tab", shiftKey: true });
     expect(board.deleteNote).toHaveBeenCalledWith("c1", "n1");

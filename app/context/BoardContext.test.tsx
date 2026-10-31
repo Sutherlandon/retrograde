@@ -261,9 +261,26 @@ describe("BoardContext draft notes across mutation responses (#123)", () => {
 });
 
 function BurstConsumer() {
-  const { columns, updateNote, updateColumnTitle } = useBoard();
+  const { columns, updateNote, updateColumnTitle, addActionItem, updateActionItem, actionItems } = useBoard();
   return (
     <div>
+      <button
+        onClick={() => {
+          addActionItem("first item");
+          addActionItem("second item");
+        }}
+      >
+        add items
+      </button>
+      <button
+        onClick={() => {
+          updateActionItem("a1", "edited");
+          addActionItem("third item");
+        }}
+      >
+        edit item
+      </button>
+      <output data-testid="action-items">{actionItems.map((i) => i.text).join(", ")}</output>
       <button
         onClick={() => {
           updateNote("c1", "first", "one", 0, "t");
@@ -345,6 +362,58 @@ describe("BoardContext back-to-back saves", () => {
     ]);
   });
 
+  const savedItems = (...texts: string[]) => ({
+    ok: true,
+    json: async () => ({
+      ...twoColumns([]),
+      actionItems: texts.map((text, i) => ({ id: `a${i}`, text, completed: false, item_order: i, created_at: "t" })),
+    }),
+  });
+
+  // The server numbers an item when it arrives, so overlapping adds could land
+  // out of order or share a number.
+  it("adds action items one at a time, in the order they were typed", async () => {
+    const { fetchMock, responses } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+
+    fireEvent.click(screen.getByText("add items"));
+    await act(async () => {});
+    expect(requests(fetchMock)).toEqual([
+      ["/app/board/board-1/action-items", "POST", { text: "first item" }],
+    ]);
+
+    await act(async () => responses[0](savedItems("first item")));
+    expect(screen.getByTestId("action-items")).toHaveTextContent("first item");
+    expect(requests(fetchMock)[1]).toEqual(["/app/board/board-1/action-items", "POST", { text: "second item" }]);
+
+    await act(async () => responses[1](savedItems("first item", "second item")));
+    expect(screen.getByTestId("action-items")).toHaveTextContent("first item, second item");
+  });
+
+  it("sends an action item edit straight away, alongside an add", async () => {
+    const { fetchMock } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+
+    fireEvent.click(screen.getByText("edit item"));
+    await act(async () => {});
+
+    expect(requests(fetchMock)).toEqual([
+      ["/app/board/board-1/action-items", "PATCH", { intent: "text", itemId: "a1", text: "edited" }],
+      ["/app/board/board-1/action-items", "POST", { text: "third item" }],
+    ]);
+  });
+
+  it("carries on with the next add when one fails", async () => {
+    const { fetchMock, responses } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+    fireEvent.click(screen.getByText("add items"));
+    await act(async () => {});
+
+    await act(async () => responses[0]({ ok: false }));
+
+    expect(requests(fetchMock)[1]).toEqual(["/app/board/board-1/action-items", "POST", { text: "second item" }]);
+  });
+
   it("applies only the last response of a burst, which reflects every save", async () => {
     const { responses } = deferredFetch();
     render(<BoardProvider><BurstConsumer /></BoardProvider>);
@@ -370,5 +439,40 @@ describe("BoardContext back-to-back saves", () => {
     await act(async () => responses[1]({ ok: false }));
 
     expect(items()).toEqual(["Renamed", "Also renamed"]);
+  });
+});
+
+function ActionItemDraftConsumer() {
+  const { canAddActionItems, addingActionItem, setAddingActionItem } = useBoard();
+  return (
+    <button onClick={() => setAddingActionItem(true)}>
+      {`can add: ${canAddActionItems}, adding: ${addingActionItem}`}
+    </button>
+  );
+}
+
+describe("BoardContext action item draft", () => {
+  const renderWith = (overrides: Partial<BoardDTO>) => {
+    nextFetcher = 0;
+    fetcherData.clear();
+    mockLoaderData.mockReturnValue({ ...baseLoaderData([]), canFacilitate: true, ...overrides });
+    render(<BoardProvider><ActionItemDraftConsumer /></BoardProvider>);
+  };
+
+  afterEach(() => cleanup());
+
+  it("lets a note open the draft, shared through the context", () => {
+    renderWith({});
+    fireEvent.click(screen.getByText("can add: true, adding: false"));
+    expect(screen.getByText("can add: true, adding: true")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["a participant", { canFacilitate: false }],
+    ["a locked board", { boardLocked: true }],
+    ["a hidden panel", { actionItemsVisible: false }],
+  ])("is unavailable to %s, so Shift+Tab skips Action Items", (_, overrides) => {
+    renderWith(overrides);
+    expect(screen.getByRole("button")).toHaveTextContent("can add: false");
   });
 });

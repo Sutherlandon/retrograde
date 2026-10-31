@@ -108,6 +108,8 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const [canFacilitate, setCanFacilitate] = useState(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
   const [openFacilitation, setOpenFacilitation] = useState(loaderData.openFacilitation ?? false);
   const [actionItems, setActionItems] = useState<ActionItem[]>((loaderData.actionItems as ActionItem[]) ?? []);
+  // Lives here because a note's Shift+Tab opens it, as well as the panel's "+".
+  const [addingActionItem, setAddingActionItem] = useState(false);
   const [boardLockedAt, setBoardLockedAt] = useState<Date | null>(
     loaderData.boardLocked ? new Date() : null
   );
@@ -179,30 +181,35 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [columnFetcher.data]);
 
-  const applyNoteResponse = (data: BoardDTO) => {
+  const applySaveResponse = (data: BoardDTO) => {
     setColumns((prev) => mergeColumns(data.columns as Column[], prev));
     if (data.voterCount !== undefined) setVoterCount(data.voterCount);
     if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
+    if (data.actionItems) setActionItems(data.actionItems as ActionItem[]);
   };
 
   useEffect(() => {
-    if (noteFetcher.data) applyNoteResponse(noteFetcher.data as BoardDTO);
+    if (noteFetcher.data) applySaveResponse(noteFetcher.data as BoardDTO);
   }, [noteFetcher.data]);
 
-  // Note and column-title saves are plain fetches: a fetcher cancels its
-  // in-flight request when it submits again, and Tab saves one thing after
-  // another, so an earlier save could die before reaching the server. Only the
-  // last response of a burst is applied, because an earlier one predates the
-  // later saves and would undo their optimistic state. A failed save is left
-  // for the poll to reconcile.
+  // Note, column-title and action item text saves are plain fetches: a fetcher
+  // cancels its in-flight request when it submits again, and Tab saves one thing
+  // after another, so an earlier save could die before reaching the server. Only
+  // the last response of a burst is applied, because an earlier one predates the
+  // later saves and would undo their optimistic state. A failed save is left for
+  // the poll to reconcile.
   const pendingSaves = useRef(0);
 
-  const saveToServer = async (resource: "notes" | "columns", fields: Record<string, string>) => {
+  const saveToServer = async (
+    resource: "notes" | "columns" | "action-items",
+    fields: Record<string, string>,
+    method: "PATCH" | "POST" = "PATCH"
+  ) => {
     pendingSaves.current += 1;
     let data: BoardDTO | null = null;
     try {
       const res = await fetch(`/app/board/${boardId}/${resource}`, {
-        method: "PATCH",
+        method,
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams(fields),
       });
@@ -211,7 +218,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       // Offline: the poll reports it.
     }
     pendingSaves.current -= 1;
-    if (data && pendingSaves.current === 0) applyNoteResponse(data);
+    if (data && pendingSaves.current === 0) applySaveResponse(data);
   };
 
   useEffect(() => {
@@ -620,21 +627,21 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // Action item actions (issue #88)
   // ---------------------------------------------------------------------------
 
+  const canAddActionItems = canFacilitate && !boardLocked && actionItemsVisible;
+
+  // Adds go one at a time because the server numbers an item when it arrives,
+  // so overlapping adds from Tab could land out of order or share a number.
+  const actionItemAdds = useRef<Promise<void>>(Promise.resolve());
+
   const addActionItem = (text: string) => {
     if (isReadOnly || boardLocked) return;
-    actionItemFetcher.submit(
-      { text },
-      { method: "POST", action: `/app/board/${boardId}/action-items` }
-    );
+    actionItemAdds.current = actionItemAdds.current.then(() => saveToServer("action-items", { text }, "POST"));
   };
 
   const updateActionItem = (itemId: string, text: string) => {
     if (isReadOnly || boardLocked) return;
     setActionItems((prev) => prev.map((i) => (i.id === itemId ? { ...i, text } : i)));
-    actionItemFetcher.submit(
-      { intent: "text", itemId, text },
-      { method: "PATCH", action: `/app/board/${boardId}/action-items` }
-    );
+    saveToServer("action-items", { intent: "text", itemId, text });
   };
 
   const toggleActionItem = (itemId: string, completed: boolean) => {
@@ -768,6 +775,9 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     canFacilitate,
     openFacilitation,
     actionItems,
+    canAddActionItems,
+    addingActionItem,
+    setAddingActionItem,
     addActionItem,
     updateActionItem,
     toggleActionItem,

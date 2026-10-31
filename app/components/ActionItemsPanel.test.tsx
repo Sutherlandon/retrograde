@@ -17,6 +17,11 @@ const baseBoard = {
   deleteActionItem: vi.fn(),
   canFacilitate: true,
   boardLocked: false,
+  canAddActionItems: true,
+  addingActionItem: false,
+  setAddingActionItem: vi.fn(),
+  columns: [{ id: "c1" }, { id: "c2" }],
+  addNote: vi.fn(),
 };
 
 function item(id: string, text: string, completed = false) {
@@ -95,58 +100,111 @@ describe("ActionItemsPanel", () => {
     expect(toggleActionItem).toHaveBeenCalledWith("1", true);
   });
 
-  it("reveals a draft row with a check circle and text field when the add button is clicked", () => {
+  it("opens the draft from the add button", () => {
     render(<ActionItemsPanel />);
-    // No draft input until the plus is clicked
     expect(screen.queryByTestId("objective-input")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
-    const input = screen.getByTestId("objective-input");
-    expect(input).toBeInTheDocument();
-    // The draft row carries an (unchecked) check circle like a real item
-    expect(screen.getByTestId("objective-draft-row")).toBeInTheDocument();
+    expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(true);
   });
 
-  it("adds an objective from the draft row on Enter and stays open for rapid entry", () => {
-    const addActionItem = vi.fn();
-    mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
-    render(<ActionItemsPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
-    const input = screen.getByTestId("objective-input");
-    fireEvent.change(input, { target: { value: "New follow-up" } });
-    fireEvent.keyDown(input, { key: "Enter" });
-    expect(addActionItem).toHaveBeenCalledWith("New follow-up");
-    // Draft row stays open (cleared) so another item can be added
-    expect(screen.getByTestId("objective-input")).toHaveValue("");
+  describe("draft row", () => {
+    function typeDraft(text: string) {
+      mockUseBoard.mockReturnValue({ ...baseBoard, addingActionItem: true });
+      render(<ActionItemsPanel />);
+      const input = screen.getByTestId("objective-input");
+      fireEvent.change(input, { target: { value: text } });
+      return input;
+    }
+
+    it("carries an unchecked check circle like a real item", () => {
+      typeDraft("");
+      expect(screen.getByTestId("objective-draft-row")).toBeInTheDocument();
+    });
+
+    it("saves and closes on Return, like a note", () => {
+      fireEvent.keyDown(typeDraft("New follow-up"), { key: "Enter" });
+      expect(baseBoard.addActionItem).toHaveBeenCalledExactlyOnceWith("New follow-up");
+      expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(false);
+    });
+
+    it("adds a new line on Shift+Return", () => {
+      const input = typeDraft("Line one");
+      expect(fireEvent.keyDown(input, { key: "Enter", shiftKey: true })).toBe(true);
+      expect(baseBoard.addActionItem).not.toHaveBeenCalled();
+    });
+
+    it("saves on Tab and stays open for the next item", () => {
+      const input = typeDraft("New follow-up");
+      expect(fireEvent.keyDown(input, { key: "Tab" })).toBe(false);
+      expect(baseBoard.addActionItem).toHaveBeenCalledExactlyOnceWith("New follow-up");
+      expect(baseBoard.setAddingActionItem).not.toHaveBeenCalledWith(false);
+      expect(input).toHaveValue("");
+    });
+
+    it("saves on Shift+Tab and wraps to a new note in the first column", () => {
+      const input = typeDraft("Last one");
+      expect(fireEvent.keyDown(input, { key: "Tab", shiftKey: true })).toBe(false);
+      expect(baseBoard.addActionItem).toHaveBeenCalledExactlyOnceWith("Last one");
+      expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(false);
+      expect(baseBoard.addNote).toHaveBeenCalledExactlyOnceWith("c1");
+    });
+
+    it("skips an empty draft on Shift+Tab", () => {
+      fireEvent.keyDown(typeDraft(""), { key: "Tab", shiftKey: true });
+      expect(baseBoard.addActionItem).not.toHaveBeenCalled();
+      expect(baseBoard.addNote).toHaveBeenCalledExactlyOnceWith("c1");
+    });
+
+    it("commits a pending draft on blur", () => {
+      fireEvent.blur(typeDraft("Wrap up"));
+      expect(baseBoard.addActionItem).toHaveBeenCalledWith("Wrap up");
+      expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(false);
+    });
+
+    it("cancels on Escape without adding", () => {
+      fireEvent.keyDown(typeDraft("Never mind"), { key: "Escape" });
+      expect(baseBoard.addActionItem).not.toHaveBeenCalled();
+      expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(false);
+    });
   });
 
-  it("commits a pending draft on blur", () => {
-    const addActionItem = vi.fn();
-    mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
-    render(<ActionItemsPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
-    const input = screen.getByTestId("objective-input");
-    fireEvent.change(input, { target: { value: "Wrap up" } });
-    fireEvent.blur(input);
-    expect(addActionItem).toHaveBeenCalledWith("Wrap up");
-    expect(screen.queryByTestId("objective-input")).toBeNull();
-  });
+  describe("editing a saved item", () => {
+    function editItem(text: string) {
+      mockUseBoard.mockReturnValue({ ...baseBoard, actionItems: [item("1", "Ship it")] });
+      render(<ActionItemsPanel />);
+      fireEvent.click(screen.getByTitle("Edit action item"));
+      const input = screen.getByRole("textbox");
+      fireEvent.change(input, { target: { value: text } });
+      return input;
+    }
 
-  it("cancels the draft on Escape without adding", () => {
-    const addActionItem = vi.fn();
-    mockUseBoard.mockReturnValue({ ...baseBoard, addActionItem });
-    render(<ActionItemsPanel />);
-    fireEvent.click(screen.getByRole("button", { name: "Add action item" }));
-    const input = screen.getByTestId("objective-input");
-    fireEvent.change(input, { target: { value: "Never mind" } });
-    fireEvent.keyDown(input, { key: "Escape" });
-    expect(addActionItem).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("objective-input")).toBeNull();
+    it("saves on Tab and opens the draft for a new item", () => {
+      const input = editItem("Ship it today");
+      expect(fireEvent.keyDown(input, { key: "Tab" })).toBe(false);
+      expect(baseBoard.updateActionItem).toHaveBeenCalledExactlyOnceWith("1", "Ship it today");
+      expect(baseBoard.setAddingActionItem).toHaveBeenCalledWith(true);
+    });
+
+    it("saves on Shift+Tab and wraps to a new note in the first column", () => {
+      const input = editItem("Ship it today");
+      expect(fireEvent.keyDown(input, { key: "Tab", shiftKey: true })).toBe(false);
+      expect(baseBoard.updateActionItem).toHaveBeenCalledExactlyOnceWith("1", "Ship it today");
+      expect(baseBoard.addNote).toHaveBeenCalledExactlyOnceWith("c1");
+    });
+
+    it("deletes an item saved empty, like a note", () => {
+      fireEvent.keyDown(editItem("   "), { key: "Enter" });
+      expect(baseBoard.deleteActionItem).toHaveBeenCalledExactlyOnceWith("1");
+      expect(baseBoard.updateActionItem).not.toHaveBeenCalled();
+    });
   });
 
   it("hides the add button and draft from non-facilitators", () => {
     mockUseBoard.mockReturnValue({
       ...baseBoard,
       canFacilitate: false,
+      canAddActionItems: false,
+      addingActionItem: true,
       actionItems: [item("1", "Ship it")],
     });
     render(<ActionItemsPanel />);
@@ -158,6 +216,7 @@ describe("ActionItemsPanel", () => {
     mockUseBoard.mockReturnValue({
       ...baseBoard,
       boardLocked: true,
+      canAddActionItems: false,
       actionItems: [item("1", "Ship it")],
     });
     render(<ActionItemsPanel />);

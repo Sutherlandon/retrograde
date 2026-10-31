@@ -26,18 +26,13 @@ export const MAC_KEY_SYMBOLS: Record<HotkeyKey, string> = {
 
 export const HOTKEY_GROUPS: HotkeyGroup[] = [
   {
-    title: "Editing",
+    title: "Notes and action items",
     hotkeys: [
+      { keys: ["Return"], description: "Save" },
+      { keys: ["Shift", "Return"], description: "New line" },
+      { keys: ["Tab"], description: "Save and start a new one" },
+      { keys: ["Shift", "Tab"], description: "Save and start a new one in the next column" },
       { keys: ["Esc"], description: "Cancel the current edit" },
-    ],
-  },
-  {
-    title: "Notes",
-    hotkeys: [
-      { keys: ["Return"], description: "Save the note" },
-      { keys: ["Shift", "Return"], description: "New line in the note" },
-      { keys: ["Tab"], description: "Save the note and start a new one" },
-      { keys: ["Shift", "Tab"], description: "Save the note and start a new one in the next column" },
     ],
   },
   {
@@ -46,13 +41,6 @@ export const HOTKEY_GROUPS: HotkeyGroup[] = [
       { keys: ["Return"], description: "Save the title" },
       { keys: ["Tab"], description: "Save the title and rename the next column" },
       { keys: ["Shift", "Tab"], description: "Save the title and rename the previous column" },
-    ],
-  },
-  {
-    title: "Action items",
-    hotkeys: [
-      { keys: ["Return"], description: "Save the item" },
-      { keys: ["Shift", "Return"], description: "New line in the item" },
     ],
   },
   {

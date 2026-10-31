@@ -40,14 +40,32 @@ function AutoGrowTextarea({
   );
 }
 
+// Tab starts another item. Shift+Tab leaves for the next column: this is the
+// board's last, so it wraps to the first. Hotkeys are listed in config/hotkeys.ts;
+// keep the two in step.
+function useMoveOn() {
+  const { columns, addNote, setAddingActionItem } = useBoard();
+
+  return (e: React.KeyboardEvent) => {
+    if (!e.shiftKey) {
+      setAddingActionItem(true);
+      return;
+    }
+    setAddingActionItem(false);
+    if (columns[0]) addNote(columns[0].id);
+  };
+}
+
 function ObjectiveRow({ item }: { item: ActionItem }) {
   const { toggleActionItem, updateActionItem, deleteActionItem, canFacilitate, boardLocked } = useBoard();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.text);
+  const moveOn = useMoveOn();
 
   const save = () => {
     const trimmed = text.trim();
-    if (trimmed && trimmed !== item.text) updateActionItem(item.id, trimmed);
+    if (!trimmed) deleteActionItem(item.id);
+    else if (trimmed !== item.text) updateActionItem(item.id, trimmed);
     setEditing(false);
   };
 
@@ -76,6 +94,7 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); }
             if (e.key === "Escape") { setText(item.text); setEditing(false); }
+            if (e.key === "Tab") { e.preventDefault(); save(); moveOn(e); }
           }}
           autoFocus
           className="flex-1 border rounded px-2 py-0.5 text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
@@ -114,10 +133,11 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
 }
 
 // A blank row shown after clicking the header "+": an unchecked circle and a
-// focused text field, mirroring the edit affordance. Enter adds and clears for
-// rapid entry; blur commits a pending draft; Escape cancels.
+// focused text field, mirroring the edit affordance. Enter saves and closes, Tab
+// saves and clears for the next item, blur commits a pending draft, Escape cancels.
 function DraftRow({ onAdd, onClose }: { onAdd: (text: string) => void; onClose: () => void }) {
   const [text, setText] = useState("");
+  const moveOn = useMoveOn();
 
   const commit = () => {
     const trimmed = text.trim();
@@ -133,8 +153,9 @@ function DraftRow({ onAdd, onClose }: { onAdd: (text: string) => void; onClose: 
         onChange={(e) => setText(e.target.value)}
         onBlur={() => { commit(); onClose(); }}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); }
+          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); commit(); onClose(); }
           if (e.key === "Escape") { setText(""); onClose(); }
+          if (e.key === "Tab") { e.preventDefault(); commit(); moveOn(e); }
         }}
         autoFocus
         placeholder="Add a follow-up item…"
@@ -146,13 +167,11 @@ function DraftRow({ onAdd, onClose }: { onAdd: (text: string) => void; onClose: 
 }
 
 export function ActionItemsPanel() {
-  const { actionItems, addActionItem, canFacilitate, boardLocked, actionItemsVisible } = useBoard();
-  const [adding, setAdding] = useState(false);
+  const { actionItems, addActionItem, canFacilitate, actionItemsVisible, canAddActionItems, addingActionItem, setAddingActionItem } = useBoard();
 
   const total = actionItems.length;
   const done = actionItems.filter((i) => i.completed).length;
   const allDone = total > 0 && done === total;
-  const canAdd = canFacilitate && !boardLocked;
 
   // Facilitators can hide the column entirely from the Command Deck.
   if (actionItemsVisible === false) return null;
@@ -180,10 +199,10 @@ export function ActionItemsPanel() {
             {done}/{total} complete
           </span>
         )}
-        {canAdd && (
+        {canAddActionItems && (
           <Button
             icon={<PlusIcon />}
-            onClick={() => setAdding(true)}
+            onClick={() => setAddingActionItem(true)}
             aria-label="Add action item"
             title="Add action item"
             className={`${total > 0 ? "ml-1" : "ml-auto"} hover:bg-green-300 dark:hover:bg-slate-900 dark:hover:text-green-500`}
@@ -202,7 +221,7 @@ export function ActionItemsPanel() {
         />
       </div>
 
-      {total === 0 && !adding ? (
+      {total === 0 && !addingActionItem ? (
         <p className="text-sm text-gray-400 dark:text-gray-600 mb-2">
           No action items yet. Capture the follow-ups your crew commits to.
         </p>
@@ -211,8 +230,8 @@ export function ActionItemsPanel() {
           {actionItems.map((item) => (
             <ObjectiveRow key={item.id} item={item} />
           ))}
-          {adding && canAdd && (
-            <DraftRow onAdd={addActionItem} onClose={() => setAdding(false)} />
+          {addingActionItem && canAddActionItems && (
+            <DraftRow onAdd={addActionItem} onClose={() => setAddingActionItem(false)} />
           )}
         </ul>
       )}
