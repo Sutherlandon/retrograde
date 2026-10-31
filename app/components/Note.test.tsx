@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import type { Note as NoteType } from "~/server/board.types";
 
 const mockUseBoard = vi.fn();
@@ -31,6 +31,7 @@ vi.mock("@dnd-kit/utilities", () => ({
 import Note from "./Note";
 
 const baseBoard = {
+  addNote: vi.fn(),
   updateNote: vi.fn(),
   deleteNote: vi.fn(),
   likeNote: vi.fn(),
@@ -144,5 +145,88 @@ describe("Note author preview while composing", () => {
     userState.current = null;
     render(<Note note={makeNote({ is_new: true })} columnId="c1" noteColor="bg-yellow-200" />);
     expect(screen.queryByTestId("note-author-preview")).toBeNull();
+  });
+});
+
+describe("Note hotkeys", () => {
+  const columns = [{ id: "c1", notes: [] }, { id: "c2", notes: [] }, { id: "c3", notes: [] }];
+  const board = { ...baseBoard, columns };
+
+  function editNote(columnId: string, text = "An idea") {
+    render(<Note note={makeNote({ is_new: true, text })} columnId={columnId} noteColor="bg-yellow-200" />);
+    return screen.getByRole("textbox");
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    userState.current = null;
+    mockUseBoard.mockReturnValue(board);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("saves on Return without starting another note", () => {
+    fireEvent.keyDown(editNote("c1"), { key: "Enter" });
+    expect(board.updateNote).toHaveBeenCalledWith("c1", "n1", "An idea", 0, "1000");
+    expect(board.addNote).not.toHaveBeenCalled();
+  });
+
+  it("leaves Shift+Return to the textarea so it adds a new line", () => {
+    const textarea = editNote("c1");
+    const notPrevented = fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+    expect(notPrevented).toBe(true);
+    expect(board.updateNote).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox")).toBe(textarea);
+  });
+
+  it("saves on Tab and starts a new note in the same column", () => {
+    const notPrevented = fireEvent.keyDown(editNote("c2"), { key: "Tab" });
+    expect(notPrevented).toBe(false);
+    expect(board.updateNote).toHaveBeenCalledWith("c2", "n1", "An idea", 0, "1000");
+    expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c2");
+  });
+
+  it("saves on Shift+Tab and starts a new note in the next column", () => {
+    const notPrevented = fireEvent.keyDown(editNote("c1"), { key: "Tab", shiftKey: true });
+    expect(notPrevented).toBe(false);
+    expect(board.updateNote).toHaveBeenCalledWith("c1", "n1", "An idea", 0, "1000");
+    expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c2");
+  });
+
+  it("wraps Shift+Tab from the last column back to the first", () => {
+    fireEvent.keyDown(editNote("c3"), { key: "Tab", shiftKey: true });
+    expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c1");
+  });
+
+  it("discards an empty draft and still moves on, so Shift+Tab can skip a column", () => {
+    fireEvent.keyDown(editNote("c1", ""), { key: "Tab", shiftKey: true });
+    expect(board.deleteNote).toHaveBeenCalledWith("c1", "n1");
+    expect(board.updateNote).not.toHaveBeenCalled();
+    expect(board.addNote).toHaveBeenCalledExactlyOnceWith("c2");
+  });
+
+  it("drops a new note on Esc, even with text typed into it", () => {
+    fireEvent.keyDown(editNote("c1", "Half a thought"), { key: "Escape" });
+    expect(board.deleteNote).toHaveBeenCalledExactlyOnceWith("c1", "n1");
+    expect(board.updateNote).not.toHaveBeenCalled();
+    expect(board.addNote).not.toHaveBeenCalled();
+  });
+
+  it("puts a saved note back as it was on Esc, writing nothing", () => {
+    render(<Note note={makeNote({ text: "Keep me" })} columnId="c1" noteColor="bg-yellow-200" />);
+    fireEvent.doubleClick(screen.getByText("Keep me"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Changed my mind" } });
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Escape" });
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByText("Keep me")).toBeInTheDocument();
+    expect(board.updateNote).not.toHaveBeenCalled();
+    expect(board.deleteNote).not.toHaveBeenCalled();
+
+    fireEvent.doubleClick(screen.getByText("Keep me"));
+    expect(screen.getByRole("textbox")).toHaveValue("Keep me");
   });
 });

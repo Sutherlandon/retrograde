@@ -59,12 +59,38 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
   }, [menuOpen]);
 
   const saveTitle = () => {
-    updateColumnTitle(column.id, title.trim() || "Untitled");
+    const newTitle = title.trim() || "Untitled";
+    if (newTitle !== column.title) updateColumnTitle(column.id, newTitle);
     setEditingTitle(false);
+  };
+
+  const cancelTitle = () => {
+    setTitle(column.title);
+    setEditingTitle(false);
+  };
+
+  // Tab hops straight to the neighbouring column's title, past the buttons and
+  // notes between them. Moving focus blurs this input, which saves it. At either
+  // end Tab falls through to the browser, so focus can leave the titles.
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") saveTitle();
+    if (e.key === "Escape") cancelTitle();
+    if (e.key !== "Tab") return;
+    const titles = Array.from(document.querySelectorAll<HTMLElement>("[data-column-title]"));
+    const neighbour = titles[titles.indexOf(e.currentTarget) + (e.shiftKey ? -1 : 1)];
+    if (neighbour) {
+      e.preventDefault();
+      neighbour.focus();
+    }
   };
 
   const savePrompt = () => {
     updateColumnPrompt(column.id, prompt);
+    setEditingPrompt(false);
+  };
+
+  const cancelPrompt = () => {
+    setPrompt(column.prompt ?? "");
     setEditingPrompt(false);
   };
 
@@ -76,6 +102,8 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
       setWarningMode(true);
     }
   };
+
+  const canEditTitle = !notesLocked && !boardLocked;
 
   const handleAddPrompt = () => {
     setMenuOpen(false);
@@ -131,18 +159,23 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
               <input
                 type="text"
                 ref={titleInputRef}
+                data-column-title
+                aria-label="Column title"
                 className="font-bold px-2 py-1 border rounded"
                 value={title}
                 maxLength={BOARD_LIMITS.columnTitle}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={saveTitle}
-                onKeyDown={(e) => e.key === "Enter" && saveTitle()}
+                onKeyDown={handleTitleKeyDown}
                 autoFocus
               />
             ) : (
               <span
-                className={`font-bold p-1 rounded ${notesLocked || boardLocked ? "" : "cursor-text hover:bg-slate-200 dark:hover:bg-slate-950"}`}
-                onClick={() => { if (!notesLocked && !boardLocked) setEditingTitle(true); }}
+                data-column-title
+                tabIndex={canEditTitle ? 0 : undefined}
+                className={`font-bold p-1 rounded ${canEditTitle ? "cursor-text hover:bg-slate-200 dark:hover:bg-slate-950" : ""}`}
+                onClick={() => { if (canEditTitle) setEditingTitle(true); }}
+                onFocus={() => { if (canEditTitle) setEditingTitle(true); }}
               >
                 {column.title}
               </span>
@@ -199,6 +232,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                 value={prompt}
                 maxLength={BOARD_LIMITS.columnPrompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") cancelPrompt(); }}
                 placeholder="Enter additional prompt text..."
               />
               <div className="flex gap-2">
@@ -210,7 +244,7 @@ export default function Column({ column, noteColor }: { column: Column, noteColo
                   text="Save Prompt"
                 />
                 <Button
-                  onClick={() => setEditingPrompt(false)}
+                  onClick={cancelPrompt}
                   color="muted"
                   variant="outline"
                   className="mt-1 mr-2"

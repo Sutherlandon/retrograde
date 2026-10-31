@@ -56,10 +56,13 @@ export function CommandDeck() {
     setLocalHideOthersNotes(hideOthersNotes ?? false);
   }, [votingEnabled, votingAllowed, votingScope, notesLocked, boardLocked, attributionEnabled, actionItemsVisible, hideOthersNotes]);
 
-  // Close on Escape
+  // Close on Escape, unless it is cancelling an edit in a text field
   useEffect(() => {
     if (!expanded) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    const handler = (e: KeyboardEvent) => {
+      const editing = (e.target as HTMLElement).matches("textarea, input:not([type]), input[type=text]");
+      if (e.key === "Escape" && !editing) setExpanded(false);
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [expanded]);

@@ -9,6 +9,12 @@ import { EditIcon, ThumbsUpIcon, TrashIcon, ArrowUpIcon, ArrowDownIcon, RobotIco
 import Button from "./Button";
 import { BOARD_LIMITS } from "~/config/board_limits";
 
+// The column after this one, wrapping from the last column to the first.
+function nextColumnId(columns: { id: string }[], columnId: string) {
+  const index = columns.findIndex((c) => c.id === columnId);
+  return columns[(index + 1) % columns.length].id;
+}
+
 export default function Note({
   note,
   columnId,
@@ -18,7 +24,7 @@ export default function Note({
   columnId: string,
   noteColor: string
 }) {
-  const { updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled } = useBoard();
+  const { addNote, updateNote, deleteNote, likeNote, voteNote, votingEnabled, votingAllowed, votingScope, columns, notesLocked, boardLocked, attributionEnabled } = useBoard();
   const user = useOptionalUser();
   const [isEditing, setIsEditing] = useState(note.is_new);
   const [text, setText] = useState(note.text);
@@ -102,6 +108,29 @@ export default function Note({
     setIsEditing(false);
   };
 
+  // A new note has nothing to go back to, and no row on the server to delete.
+  const cancelEdit = () => {
+    if (note.is_new) {
+      deleteNote(columnId, note.id);
+    } else {
+      setText(note.text);
+      setIsEditing(false);
+    }
+  };
+
+  // Hotkeys are listed in config/hotkeys.ts; keep the two in step.
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      saveNote();
+    } else if (e.key === "Escape") {
+      cancelEdit();
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      saveNote();
+      addNote(e.shiftKey ? nextColumnId(columns, columnId) : columnId);
+    }
+  };
+
   if (isDragging) {
     return (
       <div
@@ -139,7 +168,7 @@ export default function Note({
             maxLength={BOARD_LIMITS.noteText}
             onChange={(e) => setText(e.target.value)}
             onBlur={saveNote}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && saveNote()}
+            onKeyDown={handleEditKeyDown}
             autoFocus
           />
         </div>

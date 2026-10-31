@@ -173,17 +173,46 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    if (columnFetcher.data) setColumns((columnFetcher.data as BoardDTO).columns as Column[]);
+    if (columnFetcher.data) {
+      const data = columnFetcher.data as BoardDTO;
+      setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+    }
   }, [columnFetcher.data]);
 
+  const applyNoteResponse = (data: BoardDTO) => {
+    setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+    if (data.voterCount !== undefined) setVoterCount(data.voterCount);
+    if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
+  };
+
   useEffect(() => {
-    if (noteFetcher.data) {
-      const data = noteFetcher.data as BoardDTO;
-      setColumns(data.columns as Column[]);
-      if (data.voterCount !== undefined) setVoterCount(data.voterCount);
-      if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
-    }
+    if (noteFetcher.data) applyNoteResponse(noteFetcher.data as BoardDTO);
   }, [noteFetcher.data]);
+
+  // Note and column-title saves are plain fetches: a fetcher cancels its
+  // in-flight request when it submits again, and Tab saves one thing after
+  // another, so an earlier save could die before reaching the server. Only the
+  // last response of a burst is applied, because an earlier one predates the
+  // later saves and would undo their optimistic state. A failed save is left
+  // for the poll to reconcile.
+  const pendingSaves = useRef(0);
+
+  const saveToServer = async (resource: "notes" | "columns", fields: Record<string, string>) => {
+    pendingSaves.current += 1;
+    let data: BoardDTO | null = null;
+    try {
+      const res = await fetch(`/app/board/${boardId}/${resource}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fields),
+      });
+      if (res.ok) data = await res.json();
+    } catch {
+      // Offline: the poll reports it.
+    }
+    pendingSaves.current -= 1;
+    if (data && pendingSaves.current === 0) applyNoteResponse(data);
+  };
 
   useEffect(() => {
     if (attachmentFetcher.data) {
@@ -330,10 +359,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   const updateColumnTitle = (id: string, newTitle: string) => {
     if (isReadOnly || notesLocked || boardLocked) return;
     setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)));
-    columnFetcher.submit(
-      { columnId: id, title: newTitle },
-      { method: "PATCH", action: `/app/board/${boardId}/columns` }
-    );
+    saveToServer("columns", { columnId: id, title: newTitle });
   };
 
   const updateColumnPrompt = (id: string, prompt: string) => {
@@ -398,10 +424,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       )
     );
     // Upsert — creates the row if it doesn't exist (first save), updates if it does.
-    noteFetcher.submit(
-      { noteId, columnId, text: newText, likes, created },
-      { method: "PATCH", action: `/app/board/${boardId}/notes` }
-    );
+    saveToServer("notes", { noteId, columnId, text: newText, likes: String(likes), created });
   };
 
   const likeNote = (noteId: string, delta: number) => {
