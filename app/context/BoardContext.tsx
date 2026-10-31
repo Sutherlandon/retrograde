@@ -197,15 +197,21 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // after another, so an earlier save could die before reaching the server. Only
   // the last response of a burst is applied, because an earlier one predates the
   // later saves and would undo their optimistic state. A failed save is left for
-  // the poll to reconcile.
+  // the poll to reconcile. Pass `after` to hold a save until an earlier one lands;
+  // it counts as pending from the moment it is asked for.
   const pendingSaves = useRef(0);
+  // Bumped when a save starts and when it ends, so a poll can tell one overlapped it.
+  const saveActivity = useRef(0);
 
   const saveToServer = async (
     resource: "notes" | "columns" | "action-items",
     fields: Record<string, string>,
-    method: "PATCH" | "POST" = "PATCH"
+    method: "PATCH" | "POST" = "PATCH",
+    after?: Promise<void>
   ) => {
     pendingSaves.current += 1;
+    saveActivity.current += 1;
+    if (after) await after;
     let data: BoardDTO | null = null;
     try {
       const res = await fetch(`/app/board/${boardId}/${resource}`, {
@@ -218,6 +224,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       // Offline: the poll reports it.
     }
     pendingSaves.current -= 1;
+    saveActivity.current += 1;
     if (data && pendingSaves.current === 0) applySaveResponse(data);
   };
 
@@ -261,6 +268,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(async () => {
       if (isFetching.current) return;
       isFetching.current = true;
+      const activityAtStart = saveActivity.current;
 
       try {
         const res = await fetch(`/app/board/${boardId}/poll`, {
@@ -271,6 +279,10 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
         const data: BoardDTO = await res.json();
         setOffline(false);
+        // A save that overlapped this poll may be missing from it, and applying
+        // it would take that save off the screen until the next one.
+        if (saveActivity.current !== activityAtStart || pendingSaves.current > 0) return;
+
         setColumns((prev) => mergeColumns(data.columns as Column[], prev));
         setTitle(data.title);
         setVotingEnabled(data.votingEnabled ?? false);
@@ -635,7 +647,12 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   const addActionItem = (text: string) => {
     if (isReadOnly || boardLocked) return;
-    actionItemAdds.current = actionItemAdds.current.then(() => saveToServer("action-items", { text }, "POST"));
+    // Shown under a local id until the save's response replaces the list.
+    setActionItems((prev) => [
+      ...prev,
+      { id: nanoid(), text, completed: false, item_order: prev.length, created_at: new Date().toISOString(), is_new: true },
+    ]);
+    actionItemAdds.current = saveToServer("action-items", { text }, "POST", actionItemAdds.current);
   };
 
   const updateActionItem = (itemId: string, text: string) => {

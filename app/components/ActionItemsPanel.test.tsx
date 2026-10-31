@@ -48,6 +48,22 @@ describe("ActionItemsPanel", () => {
     expect(screen.getAllByTestId("objective-row")).toHaveLength(2);
   });
 
+  // Until the server answers, the item's id is local and would mean nothing there.
+  it("can't be changed while it is still saving", () => {
+    mockUseBoard.mockReturnValue({
+      ...baseBoard,
+      actionItems: [{ ...item("local", "Ship it"), is_new: true }],
+    });
+    render(<ActionItemsPanel />);
+
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Edit action item" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Delete action item" })).toBeDisabled();
+
+    fireEvent.doubleClick(screen.getByText("Ship it"));
+    expect(screen.queryByDisplayValue("Ship it")).toBeNull();
+  });
+
   it("edits an objective via the hover edit button", () => {
     const updateActionItem = vi.fn();
     mockUseBoard.mockReturnValue({

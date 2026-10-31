@@ -145,7 +145,10 @@ export interface ApiKeyDTO {
 
 export interface Note extends NoteDTO { }   // identical for now, alias for clarity
 export interface Attachment extends AttachmentDTO { }
-export interface ActionItem extends ActionItemDTO { }
+export interface ActionItem extends ActionItemDTO {
+  /** On screen under a local id, waiting for the server to answer. */
+  is_new?: boolean;
+}
 
 export interface Column extends ColumnDTO {
   notes: Note[];

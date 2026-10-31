@@ -75,7 +75,7 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
         type="button"
         role="checkbox"
         aria-checked={item.completed}
-        disabled={boardLocked}
+        disabled={boardLocked || item.is_new}
         onClick={() => toggleActionItem(item.id, !item.completed)}
         className={`w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors
           ${boardLocked ? "cursor-default opacity-60" : "cursor-pointer"}
@@ -101,17 +101,19 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
         />
       ) : (
         <span
-          onDoubleClick={() => { if (canFacilitate && !boardLocked) setEditing(true); }}
+          onDoubleClick={() => { if (canFacilitate && !boardLocked && !item.is_new) setEditing(true); }}
           className={`flex-1 text-sm ${item.completed ? "line-through text-gray-400 dark:text-gray-600" : ""} ${canFacilitate && !boardLocked ? "cursor-text" : ""}`}
         >
           {item.text}
         </span>
       )}
 
+      {/* Disabled rather than hidden while saving, so the text doesn't reflow when they arrive. */}
       {canFacilitate && !boardLocked && !editing && (
         <>
           <button
             type="button"
+            disabled={item.is_new}
             onClick={() => setEditing(true)}
             title="Edit action item"
             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 transition-opacity cursor-pointer"
@@ -120,6 +122,7 @@ function ObjectiveRow({ item }: { item: ActionItem }) {
           </button>
           <button
             type="button"
+            disabled={item.is_new}
             onClick={() => deleteActionItem(item.id)}
             title="Delete action item"
             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity cursor-pointer"

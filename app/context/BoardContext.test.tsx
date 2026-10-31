@@ -280,7 +280,9 @@ function BurstConsumer() {
       >
         edit item
       </button>
+      <button onClick={() => addActionItem("one item")}>add one item</button>
       <output data-testid="action-items">{actionItems.map((i) => i.text).join(", ")}</output>
+      <output data-testid="unsaved-items">{actionItems.filter((i) => i.is_new).map((i) => i.text).join(", ")}</output>
       <button
         onClick={() => {
           updateNote("c1", "first", "one", 0, "t");
@@ -388,6 +390,93 @@ describe("BoardContext back-to-back saves", () => {
 
     await act(async () => responses[1](savedItems("first item", "second item")));
     expect(screen.getByTestId("action-items")).toHaveTextContent("first item, second item");
+  });
+
+  it("shows a new action item straight away, marked unsaved until the server answers", async () => {
+    const { responses } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+
+    fireEvent.click(screen.getByText("add one item"));
+    expect(screen.getByTestId("action-items")).toHaveTextContent("one item");
+    expect(screen.getByTestId("unsaved-items")).toHaveTextContent("one item");
+
+    await act(async () => {});
+    await act(async () => responses[0](savedItems("one item")));
+
+    expect(screen.getByTestId("action-items").textContent).toBe("one item");
+    expect(screen.getByTestId("unsaved-items").textContent).toBe("");
+  });
+
+  it("keeps a queued action item on screen when the add before it answers", async () => {
+    const { responses } = deferredFetch();
+    render(<BoardProvider><BurstConsumer /></BoardProvider>);
+    fireEvent.click(screen.getByText("add items"));
+    await act(async () => {});
+
+    await act(async () => responses[0](savedItems("first item")));
+
+    expect(screen.getByTestId("action-items").textContent).toBe("first item, second item");
+  });
+
+  // The poll runs every 3 seconds, so on a slow server it often overlaps a save
+  // and comes back without what was just saved.
+  describe("a poll that overlaps a save", () => {
+    const poll = () => act(async () => { vi.advanceTimersByTime(3000); });
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("leaves a new action item alone when it answers during the save", async () => {
+      const { responses } = deferredFetch();
+      render(<BoardProvider><BurstConsumer /></BoardProvider>);
+      fireEvent.click(screen.getByText("add one item"));
+      await act(async () => {});
+
+      await poll();
+      await act(async () => responses[1](savedItems()));
+
+      expect(screen.getByTestId("action-items").textContent).toBe("one item");
+    });
+
+    it("leaves a saved action item alone when it answers after the save", async () => {
+      const { responses } = deferredFetch();
+      render(<BoardProvider><BurstConsumer /></BoardProvider>);
+      await poll();
+      fireEvent.click(screen.getByText("add one item"));
+      await act(async () => {});
+
+      await act(async () => responses[1](savedItems("one item")));
+      await act(async () => responses[0](savedItems()));
+
+      expect(screen.getByTestId("action-items").textContent).toBe("one item");
+    });
+
+    it("leaves a just-saved note alone", async () => {
+      mockLoaderData.mockReturnValue(twoColumns([note("first", { text: "draft" })]));
+      const { responses } = deferredFetch();
+      render(<BoardProvider><BurstConsumer /></BoardProvider>);
+      fireEvent.click(screen.getByText("save notes"));
+
+      await poll();
+      await act(async () => responses[2]({ ok: true, json: async () => twoColumns([]) }));
+
+      expect(items()).toContain("one");
+    });
+
+    it("is the only poll skipped, so the next one still brings the board up to date", async () => {
+      const { responses } = deferredFetch();
+      render(<BoardProvider><BurstConsumer /></BoardProvider>);
+      fireEvent.click(screen.getByText("add one item"));
+      await act(async () => {});
+      await poll();
+      await act(async () => responses[1](savedItems()));
+      await act(async () => responses[0](savedItems("one item")));
+
+      await poll();
+      await act(async () => responses[2](savedItems("one item", "from someone else")));
+
+      expect(screen.getByTestId("action-items").textContent).toBe("one item, from someone else");
+    });
   });
 
   it("sends an action item edit straight away, alongside an add", async () => {
