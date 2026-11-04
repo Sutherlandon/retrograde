@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-21) — refines how [ADR-0018](0018-every-setting-validated-and-database-tls.md) §3's startup database check runs. The check itself is unchanged.
+Accepted (2026-09-21) — refines how [ADR-0018](0018-every-setting-validated-and-database-tls.md) §3's startup database check runs. The check itself is unchanged. Amended by [ADR-0028](0028-an-unreachable-database-fails-requests-not-the-instance.md): a build that fails because the database is unreachable rejects, fails the queries waiting on it, and is retried by the next query.
 
 ## Context
 

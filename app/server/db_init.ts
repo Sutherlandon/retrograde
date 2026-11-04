@@ -4,23 +4,33 @@ import { schemaPool } from "./db_config.js";
 // A connection dropped in transit — typically Neon waking a suspended compute
 // while a cold serverless instance opens its first connection — succeeds on a
 // retry. A bad host, bad credentials or a certificate failure never does, so
-// those are not retried and still exit at once (ADR-0018).
+// those are not retried and still exit at once (ADR-0018). pg reports its own
+// connect timeout (connectionTimeoutMillis on the pool) as "Connection
+// terminated due to connection timeout", and pg-pool's as "timeout exceeded".
 const TRANSIENT_CONNECT_CODES = new Set(["ECONNRESET", "ETIMEDOUT", "EPIPE", "EAI_AGAIN"]);
-const CONNECT_RETRY_DELAYS_MS = [250, 1000, 2500];
+const CONNECT_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000];
+// Wall-clock cap on all attempts together, so a request that waits on the
+// build is not held for six full connect timeouts.
+const CONNECT_BUDGET_MS = 15_000;
 
 function isTransientConnectError(error: unknown): boolean {
   const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
   if (typeof code === "string" && TRANSIENT_CONNECT_CODES.has(code)) return true;
-  return typeof message === "string" && message.startsWith("Connection terminated");
+  if (typeof message !== "string") return false;
+  return message.startsWith("Connection terminated") || message.startsWith("timeout exceeded when trying to connect");
 }
 
 async function connectWithRetry(): Promise<PoolClient> {
+  const started = Date.now();
   for (let attempt = 1; ; attempt++) {
     try {
       return await schemaPool.connect();
     } catch (error) {
+      if (!isTransientConnectError(error)) throw error;
       const delay = CONNECT_RETRY_DELAYS_MS[attempt - 1];
-      if (delay === undefined || !isTransientConnectError(error)) throw error;
+      if (delay === undefined || Date.now() - started + delay > CONNECT_BUDGET_MS) {
+        throw new DatabaseUnavailable(attempt, error);
+      }
       const reason = (error as { code?: string }).code ?? (error as Error).message;
       console.warn(`[db] connect attempt ${attempt} failed (${reason}), retrying in ${delay}ms`);
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -28,25 +38,73 @@ async function connectWithRetry(): Promise<PoolClient> {
   }
 }
 
+// The database is configured correctly but did not answer in time.
+class DatabaseUnavailable {
+  constructor(
+    readonly attempts: number,
+    readonly cause: unknown
+  ) {}
+}
+
+async function rollbackQuietly(client: PoolClient): Promise<void> {
+  try {
+    await client.query("ROLLBACK");
+  } catch {
+    // The connection is already gone; the transaction died with it.
+  }
+}
+
 /**
- * Creates and upgrades the schema, idempotently, every time the server starts.
- * Any failure — including failing to connect after the transient retries —
- * exits the process. db_config.ts runs it once and holds every query until it
- * has committed (ADR-0024); it has no import-time side effect of its own.
+ * Creates and upgrades the schema, idempotently, once per server instance.
+ * db_config.ts runs it and holds every query until it has committed
+ * (ADR-0024); it has no import-time side effect of its own.
+ *
+ * Misconfiguration exits the process: bad credentials, an unknown host, a TLS
+ * failure, or a schema statement that fails on a healthy connection (ADR-0018).
+ * A database that is merely unreachable — the connection kept dropping, or
+ * dropped mid-build — rejects instead, and the next query tries again
+ * (ADR-0028). On Vercel an exit is a 500 for every request on the instance,
+ * pages that never query included.
  */
 export async function initializeDatabase() {
   let client: PoolClient;
   try {
     client = await connectWithRetry();
   } catch (error) {
-    // A bad host, bad credentials, a TLS failure, or a connection that kept
-    // dropping: stop here rather than run a server that fails on every request.
+    if (error instanceof DatabaseUnavailable) {
+      console.error(
+        `[db] database unavailable after ${error.attempts} attempts; failing the queries waiting on it, the next query retries:`,
+        error.cause
+      );
+      throw error.cause;
+    }
+    // A bad host, bad credentials or a TLS failure: stop here rather than run a
+    // server that fails on every request.
     console.error("FATAL: could not connect to the database:", error);
     process.exit(1);
     return;
   }
 
   try {
+    await createSchema(client);
+    client.release();
+  } catch (error) {
+    await rollbackQuietly(client);
+    if (isTransientConnectError(error)) {
+      // Destroy the broken client rather than return it to the pool.
+      client.release(error as Error);
+      console.error("[db] connection dropped during the schema build; the next query retries:", error);
+      throw error;
+    }
+    client.release();
+    console.error("Error during database initialization:", error);
+    process.exit(1);
+  }
+}
+
+// Every statement runs in one transaction, so an interrupted build leaves
+// nothing half-applied.
+async function createSchema(client: PoolClient): Promise<void> {
     // Begin transaction
     await client.query("BEGIN");
 
@@ -555,14 +613,4 @@ export async function initializeDatabase() {
 
     console.log("Done");
     console.log("Database initialized successfully!");
-
-  } catch (error) {
-    // Rollbak in case of error
-    await client.query("ROLLBACK");
-    console.error("Error during database initialization:", error);
-    process.exit(1);
-  } finally {
-    // Release client back to pool
-    client.release();
-  }
 }
