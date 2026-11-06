@@ -113,10 +113,13 @@ console.log(
 );
 
 // The schema build's own connection. Only db_init.ts uses it: everything else
-// goes through `pool`, which waits for that build.
+// goes through `pool`, which waits for that build. pg has no connect timeout by
+// default, so one attempt against a waking Neon compute could hang until the
+// function times out; bounded, db_init.ts retries it instead (ADR-0028).
 export const schemaPool = new Pool({
   connectionString,
   ssl: databaseTlsRequired ? { rejectUnauthorized: true } : false,
+  connectionTimeoutMillis: 5000,
 });
 
 // pg emits "error" on the pool when a connection sitting idle in it dies: Neon
@@ -134,14 +137,25 @@ schemaPool.on("error", (error) => {
 // function once it responds, so a build left running in the background could
 // stay uncommitted while requests queried tables that did not exist yet.
 // db_init.ts is imported lazily because it imports this module.
+//
+// A build that rejects — the database was unreachable, not misconfigured — is
+// forgotten, so the queries waiting on it fail and the next query starts a new
+// one (ADR-0028). db_init.ts has already logged why.
 let schemaReady: Promise<void> | undefined;
 
 function ensureSchema(): Promise<void> {
-  schemaReady ??= import("./db_init.js").then(({ initializeDatabase }) => initializeDatabase());
+  schemaReady ??= import("./db_init.js")
+    .then(({ initializeDatabase }) => initializeDatabase())
+    .catch((error: unknown) => {
+      schemaReady = undefined;
+      throw error;
+    });
   return schemaReady;
 }
 
-void ensureSchema();
+// Nothing awaits the build started at load. Its rejection is handled here so
+// Node does not exit on it; any query that waits on it still sees it.
+ensureSchema().catch(() => {});
 
 export const pool: Pick<Pool, "query" | "connect"> = {
   query: (async (...args: unknown[]) => {

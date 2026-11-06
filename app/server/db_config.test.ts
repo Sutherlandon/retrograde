@@ -26,14 +26,17 @@ vi.mock("pg", async () => {
 });
 
 // The schema build is replaced by a promise each test settles itself.
+// `failures` makes that many builds reject, one each, before `ready` is used.
 const schema = vi.hoisted(() => ({
   calls: 0,
   resolve: () => {},
   ready: Promise.resolve(),
+  failures: [] as unknown[],
 }));
 vi.mock("./db_init", () => ({
   initializeDatabase: () => {
     schema.calls += 1;
+    if (schema.failures.length > 0) return Promise.reject(schema.failures.shift());
     return schema.ready;
   },
 }));
@@ -49,6 +52,7 @@ beforeEach(() => {
   rawCalls.length = 0;
   schema.calls = 0;
   schema.ready = Promise.resolve();
+  schema.failures = [];
   process.env = { ...originalEnv };
   process.env.NODE_ENV = "test";
   process.env.DATABASE_URL = "postgresql://user:pass@host/db";
@@ -488,7 +492,7 @@ describe("database connection", () => {
     process.env.NODE_ENV = "production";
     await import("./db_config");
     expect(poolConfigs).toEqual([
-      { connectionString: "postgresql://user:pass@host/db", ssl: { rejectUnauthorized: true } },
+      { connectionString: "postgresql://user:pass@host/db", ssl: { rejectUnauthorized: true }, connectionTimeoutMillis: 5000 },
     ]);
   });
 
@@ -501,7 +505,7 @@ describe("database connection", () => {
   it("does not force TLS in local development", async () => {
     process.env.NODE_ENV = "development";
     await import("./db_config");
-    expect(poolConfigs).toEqual([{ connectionString: "postgresql://user:pass@host/db", ssl: false }]);
+    expect(poolConfigs).toEqual([{ connectionString: "postgresql://user:pass@host/db", ssl: false, connectionTimeoutMillis: 5000 }]);
   });
 
   it("keeps connection-string SSL parameters such as sslrootcert for a private CA", async () => {
@@ -704,6 +708,55 @@ describe("pool", () => {
 
     expect(() => (schemaPool as unknown as import("node:events").EventEmitter).emit("error", dropped)).not.toThrow();
     expect(warn).toHaveBeenCalledWith("[db] idle connection dropped: Connection terminated unexpectedly");
+  });
+
+  // A connect with no timeout can hang until Vercel kills the function, which
+  // would spend the schema build's whole retry budget on one attempt.
+  it("bounds every connection attempt", async () => {
+    await import("./db_config");
+    expect(poolConfigs[0]).toMatchObject({ connectionTimeoutMillis: 5000 });
+  });
+
+  // ADR-0028: an unreachable database fails the queries that waited on the
+  // build, not the instance. The build that starts at load has no caller, so its
+  // rejection must be handled here or Node would exit on it anyway.
+  it("survives a failed schema build started at load, without exiting or an unhandled rejection", async () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    schema.failures = [new Error("Connection terminated unexpectedly")];
+
+    await import("./db_config");
+    await tick();
+    await tick();
+
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  it("fails the queries waiting on a failed build, and starts a new build for the next query", async () => {
+    const dropped = new Error("Connection terminated unexpectedly");
+    schema.failures = [dropped];
+    const { pool } = await import("./db_config");
+
+    await expect(pool.query("SELECT 1")).rejects.toBe(dropped);
+    expect(rawCalls).toEqual([]);
+
+    await pool.query("SELECT 2");
+    expect(schema.calls).toBe(2);
+    expect(rawCalls).toEqual(["query:SELECT 2"]);
+  });
+
+  it("keeps a successful build, so later queries do not rebuild", async () => {
+    schema.failures = [new Error("Connection terminated unexpectedly")];
+    const { pool } = await import("./db_config");
+    await pool.query("SELECT 1").catch(() => {});
+
+    await pool.query("SELECT 2");
+    await pool.connect();
+    await pool.query("SELECT 3");
+    expect(schema.calls).toBe(2);
   });
 
   it("gives the schema build a pool that is not gated on itself", async () => {

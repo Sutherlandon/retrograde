@@ -93,6 +93,8 @@ If a setting is missing, malformed or contradictory, the server logs a line begi
 | `SELF_HOSTED=true but CRON_SECRET is set` | Remove `CRON_SECRET`. |
 | `incomplete site logo (missing …)` | Set all three `SITE_LOGO_*` variables, or none. |
 
+A database that is configured correctly but not answering — down, restarting, or dropping connections — does not stop the server. It logs `[db] database unavailable after N attempts`, the requests that need the database fail, and the next one tries again.
+
 Then open `https://retro.example.com/`. On a self-hosted instance `/` goes straight to the dashboard, which sends you to your provider to sign in.
 
 ### Board cleanup

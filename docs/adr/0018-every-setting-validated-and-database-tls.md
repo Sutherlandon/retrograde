@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-09-15) — supersedes the note in [ADR-0013](0013-stripe-subscriptions.md) §5 that `SITE_ADMIN_IDS` stays a warning. Extends [ADR-0017](0017-deployment-configured-by-environment.md). The Stripe rules in ADR-0013 and ADR-0016 are unchanged. `CRON_SECRET` now follows those Stripe rules — required on the hosted service, refused on a self-hosted instance ([ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md)). The schema build that makes the startup connection now also gates every query ([ADR-0024](0024-queries-wait-for-the-schema-build.md)).
+Accepted (2026-09-15) — supersedes the note in [ADR-0013](0013-stripe-subscriptions.md) §5 that `SITE_ADMIN_IDS` stays a warning. Extends [ADR-0017](0017-deployment-configured-by-environment.md). The Stripe rules in ADR-0013 and ADR-0016 are unchanged. `CRON_SECRET` now follows those Stripe rules — required on the hosted service, refused on a self-hosted instance ([ADR-0020](0020-self-hosted-instances-run-no-scheduled-cleanup.md)). The schema build that makes the startup connection now also gates every query ([ADR-0024](0024-queries-wait-for-the-schema-build.md)). §4 is amended by [ADR-0028](0028-an-unreachable-database-fails-requests-not-the-instance.md): a database that is unreachable rather than misconfigured fails requests instead of exiting.
 
 ## Context
 

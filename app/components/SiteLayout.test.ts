@@ -2,7 +2,9 @@
 // The marketing site exists only on the hosted service. On a self-hosted
 // instance the dashboard is home and no site page renders (ADR-0017): the
 // SiteLayout loader redirects, and every site page is one of its children, so
-// one redirect covers all of them.
+// one redirect covers all of them. The site pages need the database only for
+// the header's account menu, so an unreachable database renders the visitor
+// signed out instead of failing the homepage (ADR-0028).
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockGetOptionalUser = vi.fn();
@@ -48,6 +50,31 @@ describe("SiteLayout loader [SITE-001] [SITE-002]", () => {
     expect(result.status).toBe(302);
     expect(result.headers.get("Location")).toBe("/app/dashboard");
     expect(mockGetOptionalUser).not.toHaveBeenCalled();
+  });
+
+  it("renders a signed-in visitor's account in the header", async () => {
+    const user = { id: "u1", username: "ada", is_anonymous: false };
+    mockGetOptionalUser.mockResolvedValue(user);
+    expect(await load()).toMatchObject({ user });
+  });
+
+  it("renders the visitor signed out when the database is unreachable, and logs it", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const dropped = new Error("Connection terminated unexpectedly");
+    mockGetOptionalUser.mockRejectedValue(dropped);
+
+    expect(await load()).toEqual({
+      user: null,
+      hosting: { selfHosted: false, hideLogout: false, siteLogo: null },
+    });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("SiteLayout"), dropped);
+    errorSpy.mockRestore();
+  });
+
+  it("still passes on a response the identity helper throws, such as a redirect", async () => {
+    const signIn = new Response(null, { status: 302, headers: { Location: "/auth/login" } });
+    mockGetOptionalUser.mockRejectedValue(signIn);
+    await expect(load()).rejects.toBe(signIn);
   });
 
   it("is the parent of every site page, so its redirect covers them all", () => {
