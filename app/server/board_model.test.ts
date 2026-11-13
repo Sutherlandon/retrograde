@@ -1382,3 +1382,14 @@ describe("browser writes stay on their board (GAP-009)", () => {
     expect(mockPoolQuery.mock.calls[0][1]).toEqual(["Shipped", "col-1", "board-1"]);
   });
 });
+
+describe("getBoardServer version (ADR-0029)", () => {
+  it("reads the board's version in the same statement, defaulting to 0", async () => {
+    const { getBoardServer } = await import("./board_model");
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 1, rows: [{ board: { id: "b", version: 3 } }] });
+    await getBoardServer("b", null);
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("'version',");
+    expect(sql).toContain("COALESCE((SELECT bv.version FROM board_versions bv WHERE bv.board_id = b.id), 0)");
+  });
+});

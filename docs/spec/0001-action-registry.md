@@ -118,7 +118,7 @@ Participant-level actions. Open to anyone with the link, unless the board's crew
 | ID      | Action                                   | Who                | Code path                                               | Guard                                            | Status     |
 | ------- | ---------------------------------------- | ------------------ | ------------------------------------------------------- | ------------------------------------------------ | ---------- |
 | BRD-001 | View a board                             | Anyone w/ access   | `routes/app/board.tsx`                                  | `requireBoardAccess` (login redirect)            | Verified |
-| BRD-002 | Poll a board for updates | Anyone w/ access | `board.poll.ts` | `requireBoardAccess` · `getBoardSnapshot` (same read as API-003) | Verified |
+| BRD-002 | Poll a board for updates | Anyone w/ access | `board.poll.ts` | `resolveBoardAccess` on every poll · 204 when `?v=` is the board's current version and no timer has run out (ADR-0029) · else `getBoardSnapshot` (same read as API-003) | Verified |
 | BRD-003 | Edit board title | Facilitator | `board.title.ts` · `BoardToolbar` | `requireBoardAccess` → `requireFacilitator` → `requireUnlocked(board)` · `BOARD_LIMITS.boardTitle` → 422 | Verified |
 | BRD-004 | Add a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` · `BOARD_LIMITS.noteText` → 422 | Verified |
 | BRD-005 | Edit a note | Anyone w/ access | `board.notes.ts` PATCH | `requireBoardAccess` · `requireUnlocked(notes)` · `BOARD_LIMITS.noteText` → 422 | Verified |
@@ -298,6 +298,6 @@ No open gaps as of 2026-10-21. GAP-009 (browser note and column writes matching 
 
 ## Untested paths
 
-Every row in this document is **Verified**. Components with no dedicated test of their own: `Board`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`; `board.poll.ts` is covered only through the permission matrix.
+Every row in this document is **Verified**. Components with no dedicated test of their own: `Board`, `AttachmentModal`, `ClaimModal`, `AppLayout`, `ThemeToggle`.
 
 Every row marked **Verified** is named by at least one test, and `app/server/registry_linkage.test.ts` fails if that stops being true — or if a test names a row this file still marks Unverified. `app/server/permission_matrix.test.ts` asserts every server-enforced row × every actor × every board tier resolves to an explicit allow or deny; a missing cell is a failing test.

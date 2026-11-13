@@ -112,6 +112,7 @@ describe("getBoardAccess", () => {
       rows: [{
         team_id: "team-1", restricted: true,
         is_team_member: false, is_board_member: false, is_registered: true,
+        version: "0", timer_expired: false,
         ...over,
       }],
     };
@@ -121,7 +122,7 @@ describe("getBoardAccess", () => {
     const { getBoardAccess } = await import("./board_permissions");
     mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     expect(await getBoardAccess("missing", "user-1")).toEqual({
-      exists: false, allowed: false, userIsRegistered: false,
+      exists: false, allowed: false, userIsRegistered: false, version: 0, timerExpired: false,
     });
   });
 
@@ -159,6 +160,100 @@ describe("getBoardAccess", () => {
     const { getBoardAccess } = await import("./board_permissions");
     mockPoolQuery.mockResolvedValueOnce(accessRow());
     expect((await getBoardAccess("b", "agent", "team-9")).allowed).toBe(false);
+  });
+});
+
+describe("getBoardAccess version and timer (ADR-0029)", () => {
+  const row = (over: Record<string, unknown>) => ({
+    rowCount: 1,
+    rows: [{
+      team_id: null, restricted: false, is_team_member: false, is_board_member: false,
+      is_registered: true, version: "0", timer_expired: false, ...over,
+    }],
+  });
+
+  it("selects the version as text and the timer expiry in the same query", async () => {
+    const { getBoardAccess } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row({}));
+    await getBoardAccess("b", "u");
+    const sql = mockPoolQuery.mock.calls[0][0] as string;
+    expect(sql).toContain("board_versions");
+    expect(sql).toContain("::text AS version");
+    expect(sql).toContain("timer_running AND b.timer_ends_at <= NOW()");
+  });
+
+  it("parses the version and reports timerExpired", async () => {
+    const { getBoardAccess } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row({ version: "42", timer_expired: true }));
+    const a = await getBoardAccess("b", "u");
+    expect(a.version).toBe(42);
+    expect(a.timerExpired).toBe(true);
+  });
+
+  it("treats a missing version as 0", async () => {
+    const { getBoardAccess } = await import("./board_permissions");
+    mockPoolQuery.mockResolvedValueOnce(row({ version: null, timer_expired: null }));
+    const a = await getBoardAccess("b", "u");
+    expect(a.version).toBe(0);
+    expect(a.timerExpired).toBe(false);
+  });
+});
+
+describe("resolveBoardAccess / requireBoardAccess", () => {
+  const accessRow = (over: Record<string, unknown> = {}) => ({
+    rowCount: 1,
+    rows: [{
+      team_id: null, restricted: false, is_team_member: false, is_board_member: false,
+      is_registered: true, version: "7", timer_expired: false, ...over,
+    }],
+  });
+  const req = () => new Request("http://x/app/board/b/poll");
+
+  async function thrown(p: Promise<unknown>): Promise<Response> {
+    try { await p; } catch (e) { return e as Response; }
+    throw new Error("expected a throw");
+  }
+
+  it("returns the caller and the access row", async () => {
+    const { resolveBoardAccess } = await import("./board_permissions");
+    mockGetApiUser.mockResolvedValueOnce({ id: "u1" });
+    mockPoolQuery.mockResolvedValueOnce(accessRow());
+    const r = await resolveBoardAccess(req(), "b");
+    expect(r.user).toEqual({ id: "u1" });
+    expect(r.access).toMatchObject({ exists: true, allowed: true, version: 7 });
+  });
+
+  it("requireBoardAccess returns just the caller", async () => {
+    const { requireBoardAccess } = await import("./board_permissions");
+    mockGetApiUser.mockResolvedValueOnce({ id: "u1" });
+    mockPoolQuery.mockResolvedValueOnce(accessRow());
+    expect(await requireBoardAccess(req(), "b")).toEqual({ id: "u1" });
+  });
+
+  it("throws 404 for a missing board", async () => {
+    const { resolveBoardAccess } = await import("./board_permissions");
+    mockGetApiUser.mockResolvedValueOnce(null);
+    mockPoolQuery.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    expect((await thrown(resolveBoardAccess(req(), "b"))).status).toBe(404);
+  });
+
+  it("throws 401 for an unregistered caller on a restricted board, a login redirect when asked", async () => {
+    const { resolveBoardAccess } = await import("./board_permissions");
+    const restricted = accessRow({ team_id: "t", restricted: true, is_registered: false });
+    mockGetApiUser.mockResolvedValue(null);
+    mockPoolQuery.mockResolvedValueOnce(restricted);
+    expect((await thrown(resolveBoardAccess(req(), "b"))).status).toBe(401);
+    mockPoolQuery.mockResolvedValueOnce(restricted);
+    const redirected = await thrown(resolveBoardAccess(req(), "b", { loginRedirect: true }));
+    expect(redirected.status).toBe(302);
+    expect(redirected.headers.get("Location")).toContain("/auth/login?returnTo=");
+  });
+
+  it("throws 403 for a registered non-member of a restricted board", async () => {
+    const { requireBoardAccess } = await import("./board_permissions");
+    mockGetApiUser.mockResolvedValueOnce({ id: "u1" });
+    mockPoolQuery.mockResolvedValueOnce(accessRow({ team_id: "t", restricted: true }));
+    expect((await thrown(requireBoardAccess(req(), "b"))).status).toBe(403);
   });
 });
 

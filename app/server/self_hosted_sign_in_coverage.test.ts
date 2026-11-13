@@ -15,6 +15,7 @@ const GATED_HELPERS = [
   "getApiUser",
   "getOrCreateUser",
   "requireBoardAccess",
+  "resolveBoardAccess", // board_permissions.ts; requireBoardAccess is a wrapper around it
   "requireFacilitator",
   "requireApiBoardAccess", // api_board_guard.ts, through getApiUser
 ];

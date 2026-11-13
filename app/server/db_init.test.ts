@@ -96,6 +96,21 @@ describe("initializeDatabase", () => {
     expect(schemaConnect.calls).toBe(0);
   });
 
+  // ADR-0029: block 35 builds board_versions and its triggers, after the
+  // last table and before the dev data.
+  it("issues the board version DDL after the schema and before the dev data", async () => {
+    const { BOARD_VERSION_DDL } = await import("./board_version");
+
+    await runInit();
+
+    const q = schemaConnect.queries;
+    const first = q.indexOf(BOARD_VERSION_DDL[0]);
+    expect(first).toBeGreaterThan(-1);
+    for (const [i, stmt] of BOARD_VERSION_DDL.entries()) expect(q[first + i]).toBe(stmt);
+    expect(q.findIndex((s) => s.includes("CREATE TABLE IF NOT EXISTS events"))).toBeLessThan(first);
+    expect(q.findIndex((s) => s.includes("INSERT INTO boards (id, title)"))).toBeGreaterThan(first);
+  });
+
   it("exits with a FATAL message when it cannot connect, without retrying a TLS verification failure", async () => {
     schemaConnect.always = connectError;
 

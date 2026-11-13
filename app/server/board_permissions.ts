@@ -48,10 +48,14 @@ export async function requireFacilitator(request: Request, boardId: string) {
 // can only be opened by that crew's members (or the board's own members).
 // ---------------------------------------------------------------------------
 
-interface BoardAccess {
+export interface BoardAccess {
   exists: boolean;
   allowed: boolean;
   userIsRegistered: boolean;
+  /** board_versions.version (0 when the board has no row yet). ADR-0029. */
+  version: number;
+  /** A running timer whose end has passed: the snapshot changes without a write. */
+  timerExpired: boolean;
 }
 
 /**
@@ -71,20 +75,26 @@ export async function getBoardAccess(
     is_team_member: boolean;
     is_board_member: boolean;
     is_registered: boolean;
+    version: string | null;
+    timer_expired: boolean | null;
   }>(
     `SELECT
        b.team_id,
        COALESCE(t.restrict_board_access, FALSE) AS restricted,
        EXISTS(SELECT 1 FROM team_members tm WHERE tm.team_id = b.team_id AND tm.user_id = $2::uuid) AS is_team_member,
        EXISTS(SELECT 1 FROM board_members bm WHERE bm.board_id = b.id AND bm.user_id = $2::uuid) AS is_board_member,
-       EXISTS(SELECT 1 FROM users u WHERE u.id = $2::uuid AND NOT u.is_anonymous) AS is_registered
+       EXISTS(SELECT 1 FROM users u WHERE u.id = $2::uuid AND NOT u.is_anonymous) AS is_registered,
+       COALESCE((SELECT bv.version FROM board_versions bv WHERE bv.board_id = b.id), 0)::text AS version,
+       COALESCE(b.timer_running AND b.timer_ends_at <= NOW(), FALSE) AS timer_expired
      FROM boards b
      LEFT JOIN teams t ON t.id = b.team_id
      WHERE b.id = $1`,
     [boardId, userId]
   );
 
-  if (res.rowCount === 0) return { exists: false, allowed: false, userIsRegistered: false };
+  if (res.rowCount === 0) {
+    return { exists: false, allowed: false, userIsRegistered: false, version: 0, timerExpired: false };
+  }
 
   const row = res.rows[0];
   const allowed =
@@ -94,7 +104,13 @@ export async function getBoardAccess(
     row.is_board_member ||
     (!!apiTeamId && apiTeamId === row.team_id);
 
-  return { exists: true, allowed, userIsRegistered: row.is_registered };
+  return {
+    exists: true,
+    allowed,
+    userIsRegistered: row.is_registered,
+    version: Number(row.version ?? 0),
+    timerExpired: row.timer_expired === true,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,9 +184,10 @@ export async function requireUnlocked(
  * Guard a board route by access. Throws 404 (missing), a login redirect or 401
  * (anonymous caller who might be a member once signed in), or 403 (a registered
  * non-member). `loginRedirect` is for the page loader; resource/API routes get
- * a 401 instead so fetchers don't chase a redirect. Returns the caller.
+ * a 401 instead so fetchers don't chase a redirect. Returns the caller and the
+ * access row (which carries the board's version, for the poll).
  */
-export async function requireBoardAccess(
+export async function resolveBoardAccess(
   request: Request,
   boardId: string,
   opts: { loginRedirect?: boolean } = {}
@@ -190,5 +207,14 @@ export async function requireBoardAccess(
     }
     throw new Response("This board is restricted to its crew", { status: 403 });
   }
-  return user;
+  return { user, access };
+}
+
+/** `resolveBoardAccess`, returning only the caller. */
+export async function requireBoardAccess(
+  request: Request,
+  boardId: string,
+  opts: { loginRedirect?: boolean } = {}
+) {
+  return (await resolveBoardAccess(request, boardId, opts)).user;
 }

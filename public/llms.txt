@@ -269,6 +269,8 @@ Response (200):
 
 - This is the same snapshot the board page polls. A timer that has run out
   reads as stopped.
+- `version` goes up whenever anything on the board changes; if it equals the
+  one you last saw, nothing has.
 - `votes` is the note's total; `user_votes` is your share of it.
 - `author` is `null` on a human's note unless `attributionEnabled` is on.
 - With `hideOthersNotes` on (blind brainstorm), every viewer, you included,

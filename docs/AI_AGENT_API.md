@@ -439,6 +439,9 @@ describe the caller.
 ```
 
 - This is the same snapshot the board page polls, so you read what people see.
+- `version` is a number that goes up every time anything on the board
+  changes. If it equals the one you last saw, nothing has changed. Compare it;
+  do not count with it, since one write can raise it by more than one.
 - `team_id` and `team_name` are `null` on a crewless board.
 - `attachments` are the links and images a facilitator attached (`type` is
   `"link"` or `"image"`). An image's `image_data` is a data URL, up to 5 images

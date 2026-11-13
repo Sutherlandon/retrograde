@@ -17,6 +17,9 @@ export async function getBoardServer(id: string, userId?: string | null): Promis
     SELECT json_build_object(
       'id',             b.id,
       'title',          b.title,
+      -- ADR-0029: the board's version, read in the same statement as the data
+      -- so the pair is consistent. A missing row is version 0.
+      'version',        COALESCE((SELECT bv.version FROM board_versions bv WHERE bv.board_id = b.id), 0),
       'team_id',        b.team_id,
       'team_name',      MAX(t.name),
       'readonly',       false,

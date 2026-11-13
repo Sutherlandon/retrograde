@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { schemaPool } from "./db_config.js";
+import { BOARD_VERSION_DDL } from "./board_version";
 
 // A connection dropped in transit — typically Neon waking a suspended compute
 // while a cold serverless instance opens its first connection — succeeds on a
@@ -584,6 +585,13 @@ async function createSchema(client: PoolClient): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_events_name_created ON events(name, created_at);
     CREATE INDEX IF NOT EXISTS idx_events_action_created ON events(action_id, created_at);
   `);
+
+  // 35 Board versions (board_version.ts, ADR-0029): a per-board counter bumped
+  //    by deferred constraint triggers on every table a snapshot reads, so a
+  //    poll can ask "has anything changed?" with one cheap query.
+  for (const statement of BOARD_VERSION_DDL) {
+    await client.query(statement);
+  }
 
   console.log("Done");
   console.log("Inserting dev data...");
