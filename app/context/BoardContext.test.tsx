@@ -15,7 +15,9 @@ const mockLoaderData = vi.fn();
 // lets a test deliver a server response to that specific fetcher.
 const COLUMN_FETCHER = 0;
 const NOTE_FETCHER = 1;
+const SETTINGS_FETCHER = 3;
 const fetcherData = new Map<number, unknown>();
+const fetcherState = new Map<number, string>();
 let nextFetcher = 0;
 
 vi.mock("react-router", async () => {
@@ -24,12 +26,12 @@ vi.mock("react-router", async () => {
     useLoaderData: () => mockLoaderData(),
     useFetcher: () => {
       const [index] = useState(() => nextFetcher++);
-      return { submit: vi.fn(), load: vi.fn(), data: fetcherData.get(index) ?? null, state: "idle" as const };
+      return { submit: vi.fn(), load: vi.fn(), data: fetcherData.get(index) ?? null, state: (fetcherState.get(index) ?? "idle") as "idle" | "submitting" };
     },
   };
 });
 
-import { BoardProvider, useBoard } from "./BoardContext";
+import { BoardProvider, useBoard, POLL_INTERVAL_MS, FULL_REFRESH_MS } from "./BoardContext";
 
 function TestConsumer() {
   const { columns, sortNotesByScore } = useBoard();
@@ -388,10 +390,12 @@ describe("BoardContext back-to-back saves", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  const savedItems = (...texts: string[]) => ({
+  const savedItems = (...texts: string[]) => versionedItems(undefined, ...texts);
+  const versionedItems = (version: number | undefined, ...texts: string[]) => ({
     ok: true,
     json: async () => ({
       ...twoColumns([]),
+      version,
       actionItems: texts.map((text, i) => ({ id: `a${i}`, text, completed: false, item_order: i, created_at: "t" })),
     }),
   });
@@ -442,10 +446,10 @@ describe("BoardContext back-to-back saves", () => {
     expect(screen.getByTestId("action-items").textContent).toBe("first item, second item");
   });
 
-  // The poll runs every 3 seconds, so on a slow server it often overlaps a save
+  // The poll runs every second, so on a slow server it often overlaps a save
   // and comes back without what was just saved.
   describe("a poll that overlaps a save", () => {
-    const poll = () => act(async () => { vi.advanceTimersByTime(3000); });
+    const poll = () => act(async () => { vi.advanceTimersByTime(POLL_INTERVAL_MS); });
 
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
@@ -462,15 +466,17 @@ describe("BoardContext back-to-back saves", () => {
       expect(screen.getByTestId("action-items").textContent).toBe("one item");
     });
 
+    // The poll predates the save, so only the version says it is the older one.
     it("leaves a saved action item alone when it answers after the save", async () => {
+      mockLoaderData.mockReturnValue({ ...twoColumns([]), version: 1 });
       const { responses } = deferredFetch();
       render(<BoardProvider><BurstConsumer /></BoardProvider>);
       await poll();
       fireEvent.click(screen.getByText("add one item"));
       await act(async () => {});
 
-      await act(async () => responses[1](savedItems("one item")));
-      await act(async () => responses[0](savedItems()));
+      await act(async () => responses[1](versionedItems(2, "one item")));
+      await act(async () => responses[0](versionedItems(1)));
 
       expect(screen.getByTestId("action-items").textContent).toBe("one item");
     });
@@ -599,5 +605,236 @@ describe("BoardContext action item draft", () => {
   ])("is unavailable to %s, so Shift+Tab skips Action Items", (_, overrides) => {
     renderWith(overrides);
     expect(screen.getByRole("button")).toHaveTextContent("can add: false");
+  });
+});
+
+function PollConsumer() {
+  const { title, columns, offline, updateColumnTitle } = useBoard();
+  return (
+    <div>
+      <button onClick={() => updateColumnTitle("c1", "Renamed")}>rename</button>
+      <output data-testid="title">{title}</output>
+      <output data-testid="col">{columns[0].title}</output>
+      <output data-testid="offline">{String(offline)}</output>
+    </div>
+  );
+}
+
+// Every server snapshot carries a version; a snapshot older than what is on
+// screen must never replace it, and an unchanged board costs a 204.
+describe("BoardContext version-gated polling", () => {
+  const snap = (version: number | undefined, title = "Test board", col = "Col 1"): BoardDTO => ({
+    ...baseLoaderData([]),
+    title,
+    version,
+    columns: [{ id: "c1", title: col, prompt: "", col_order: 0, notes: [] }],
+  });
+  const ok = (body: BoardDTO) => ({ ok: true, status: 200, json: async () => body });
+  const noChange = () => ({ ok: true, status: 204, json: vi.fn() });
+  const urls = (fetchMock: ReturnType<typeof vi.fn>) => fetchMock.mock.calls.map(([u]) => u);
+  const tick = (ms = POLL_INTERVAL_MS) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+  const text = (id: string) => screen.getByTestId(id).textContent;
+  const tree = () => <BoardProvider><PollConsumer /></BoardProvider>;
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+  const setVisibility = (state: string) =>
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    nextFetcher = 0;
+    fetcherData.clear();
+    fetcherState.clear();
+    mockLoaderData.mockReturnValue(snap(5));
+    fetchMock = vi.fn(() => Promise.resolve(noChange()));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    delete (document as unknown as Record<string, unknown>).visibilityState;
+  });
+
+  it("polls every second, sending the version it has", async () => {
+    render(tree());
+    await tick(POLL_INTERVAL_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await tick(1);
+    expect(urls(fetchMock)).toEqual(["/app/board/board-1/poll?v=5"]);
+    await tick();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("changes nothing on a 204, and clears offline without reading a body", async () => {
+    const res = noChange();
+    fetchMock.mockRejectedValueOnce(new Error("down")).mockResolvedValueOnce(res);
+    render(tree());
+    await tick();
+    expect(text("offline")).toBe("true");
+
+    await tick();
+    expect(text("offline")).toBe("false");
+    expect(res.json).not.toHaveBeenCalled();
+    expect(text("title")).toBe("Test board");
+  });
+
+  it("applies a newer snapshot and sends its version on the next poll", async () => {
+    fetchMock.mockResolvedValueOnce(ok(snap(7, "Seven", "Col seven")));
+    render(tree());
+    await tick();
+    expect(text("title")).toBe("Seven");
+    expect(text("col")).toBe("Col seven");
+
+    await tick();
+    expect(urls(fetchMock)[1]).toBe("/app/board/board-1/poll?v=7");
+  });
+
+  it("drops a poll older than what is applied, and never moves the version back", async () => {
+    fetchMock.mockResolvedValueOnce(ok(snap(7, "Seven"))).mockResolvedValueOnce(ok(snap(6, "Six")));
+    render(tree());
+    await tick();
+    await tick();
+    expect(text("title")).toBe("Seven");
+
+    await tick();
+    expect(urls(fetchMock)[2]).toBe("/app/board/board-1/poll?v=7");
+  });
+
+  it("drops a poll that predates a save response which landed first", async () => {
+    let answerPoll = (_r: unknown) => {};
+    let answerSave = (_r: unknown) => {};
+    fetchMock.mockImplementation((url: string) =>
+      new Promise((resolve) => { if (url.includes("/poll")) answerPoll = resolve; else answerSave = resolve; })
+    );
+    render(tree());
+    await tick();
+    fireEvent.click(screen.getByText("rename"));
+
+    await act(async () => answerSave(ok(snap(9, "Test board", "Saved"))));
+    expect(text("col")).toBe("Saved");
+    await act(async () => answerPoll(ok(snap(8, "Test board", "Old"))));
+
+    expect(text("col")).toBe("Saved");
+  });
+
+  it("drops a save response older than what is applied", async () => {
+    let answerSave = (_r: unknown) => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.includes("/poll")
+        ? Promise.resolve(ok(snap(7, "Test board", "Seven")))
+        : new Promise((resolve) => { answerSave = resolve; })
+    );
+    render(tree());
+    await tick();
+    expect(text("col")).toBe("Seven");
+
+    fireEvent.click(screen.getByText("rename"));
+    await act(async () => answerSave(ok(snap(6, "Test board", "Server six"))));
+
+    expect(text("col")).toBe("Renamed");
+  });
+
+  it("drops a settings response older than what is applied", async () => {
+    fetchMock.mockResolvedValueOnce(ok(snap(7, "Seven", "Seven")));
+    const { rerender } = render(tree());
+    await tick();
+
+    fetcherData.set(SETTINGS_FETCHER, snap(6, "Six", "Stale"));
+    rerender(tree());
+
+    expect(text("col")).toBe("Seven");
+  });
+
+  it("ignores loader data older than what is applied", async () => {
+    fetchMock.mockResolvedValueOnce(ok(snap(7, "Seven")));
+    const { rerender } = render(tree());
+    await tick();
+
+    mockLoaderData.mockReturnValue(snap(6, "Stale loader"));
+    rerender(tree());
+
+    expect(text("title")).toBe("Seven");
+  });
+
+  it("applies loader data that is not older", () => {
+    const { rerender } = render(tree());
+    mockLoaderData.mockReturnValue(snap(6, "Fresh loader"));
+    rerender(tree());
+    expect(text("title")).toBe("Fresh loader");
+  });
+
+  it("does not apply a poll while a save is pending", async () => {
+    let answerSave = (_r: unknown) => {};
+    fetchMock.mockImplementation((url: string) =>
+      url.includes("/poll")
+        ? Promise.resolve(ok(snap(6, "Test board", "Polled")))
+        : new Promise((resolve) => { answerSave = resolve; })
+    );
+    render(tree());
+    fireEvent.click(screen.getByText("rename"));
+    await tick();
+
+    expect(text("col")).toBe("Renamed");
+    // Dropped for now, not consumed: the version it carried is still wanted.
+    await act(async () => answerSave({ ok: false }));
+    await tick();
+    expect(text("col")).toBe("Polled");
+    expect(urls(fetchMock).filter((u: string) => u.includes("/poll"))[0]).toBe("/app/board/board-1/poll?v=5");
+  });
+
+  it("does not apply a poll while a fetcher is not idle", async () => {
+    fetchMock.mockResolvedValue(ok(snap(6, "Test board", "Polled")));
+    fetcherState.set(NOTE_FETCHER, "submitting");
+    const { rerender } = render(tree());
+    await tick();
+    expect(text("col")).toBe("Col 1");
+
+    fetcherState.set(NOTE_FETCHER, "idle");
+    rerender(tree());
+    await tick();
+    expect(text("col")).toBe("Polled");
+  });
+
+  it("does not poll while the tab is hidden, and polls at once when it is shown", async () => {
+    setVisibility("hidden");
+    render(tree());
+    await tick(3 * POLL_INTERVAL_MS);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    setVisibility("visible");
+    await act(async () => { document.dispatchEvent(new Event("visibilitychange")); });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops listening for visibility changes when it unmounts", async () => {
+    const { unmount } = render(tree());
+    unmount();
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("asks for a full snapshot once FULL_REFRESH_MS has passed without one", async () => {
+    render(tree());
+    for (let i = 0; i < FULL_REFRESH_MS / POLL_INTERVAL_MS; i++) await tick();
+
+    const sent = urls(fetchMock);
+    expect(sent).toHaveLength(FULL_REFRESH_MS / POLL_INTERVAL_MS);
+    expect(sent.slice(0, -1).every((u: string) => u.endsWith("?v=5"))).toBe(true);
+    expect(sent.at(-1)).toBe("/app/board/board-1/poll");
+  });
+
+  it("applies a snapshot that has no version, such as an example board", async () => {
+    mockLoaderData.mockReturnValue(snap(undefined));
+    fetchMock.mockResolvedValue(ok(snap(undefined, "Legacy")));
+    render(tree());
+    await tick();
+
+    expect(urls(fetchMock)[0]).toBe("/app/board/board-1/poll");
+    expect(text("title")).toBe("Legacy");
   });
 });

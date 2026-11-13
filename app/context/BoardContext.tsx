@@ -74,6 +74,100 @@ function mergeColumns(serverCols: Column[], prevCols: Column[]): Column[] {
 }
 
 // ---------------------------------------------------------------------------
+// Version gate and polling
+// ---------------------------------------------------------------------------
+
+export const POLL_INTERVAL_MS = 1000;
+// An unchanged poll answers 204 and carries nothing, so every so often the poll
+// asks for the whole board anyway: that bounds how stale the inputs the server
+// does not version (crew name, author names) can get.
+export const FULL_REFRESH_MS = 30_000;
+
+/**
+ * Decides whether a server snapshot may touch state. One that is older than
+ * what was already applied is dropped; anything else is applied and moves the
+ * high-water mark. A snapshot without a version (the static example boards)
+ * always applies, as before. Equal versions apply: a forced full refresh may
+ * carry changes the version does not track.
+ */
+function admitSnapshot(versionRef: { current: number | null }, snapshot: { version?: number }): boolean {
+  const v = snapshot.version;
+  if (typeof v !== "number") return true;
+  if (versionRef.current !== null && v < versionRef.current) return false;
+  versionRef.current = v;
+  return true;
+}
+
+type PollInputs = {
+  boardId: string;
+  isReadOnly: boolean;
+  versionRef: { current: number | null };
+  pendingSaves: { current: number };
+  // Refreshed every render so the interval callback sees current values.
+  latest: { current: { apply: (data: BoardDTO) => void; fetchersIdle: boolean } };
+  setOffline: (v: boolean) => void;
+};
+
+/**
+ * Polls for other people's changes. Plain fetch() bypasses RR7's turbostream
+ * pipeline entirely, so network errors never reach the ErrorBoundary.
+ */
+function useBoardPoll({ boardId, isReadOnly, versionRef, pendingSaves, latest, setOffline }: PollInputs) {
+  const isFetching = useRef(false);
+
+  useEffect(() => {
+    if (isReadOnly) return;
+    // The page load was a full snapshot.
+    let lastFull = Date.now();
+
+    const poll = async () => {
+      if (isFetching.current || document.visibilityState === "hidden") return;
+      isFetching.current = true;
+      try {
+        const v = versionRef.current;
+        const wantFull = v === null || Date.now() - lastFull >= FULL_REFRESH_MS;
+        const url = wantFull ? `/app/board/${boardId}/poll` : `/app/board/${boardId}/poll?v=${v}`;
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+
+        if (res.status === 204) {
+          setOffline(false);
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data: BoardDTO = await res.json();
+        setOffline(false);
+        // Optimistic state from a save or fetcher is not on the server yet, so a
+        // snapshot taken now would take it off the screen until the next one.
+        if (pendingSaves.current > 0 || !latest.current.fetchersIdle) return;
+        if (!admitSnapshot(versionRef, data)) return;
+        latest.current.apply(data);
+        // Only an applied snapshot counts: one set aside above may have been the
+        // full refresh, and its unversioned changes are still owed.
+        lastFull = Date.now();
+      } catch (err) {
+        console.error("[poll] failed:", err);
+        setOffline(true);
+      } finally {
+        isFetching.current = false;
+      }
+    };
+
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+    // A hidden tab does not poll, so catch up the moment it is looked at again.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") poll();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [boardId, isReadOnly]);
+}
+
+// ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
 
@@ -82,6 +176,16 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
 
   const boardId = loaderData.id;
   const isReadOnly = loaderData.readonly;
+
+  // Highest snapshot version applied; every server snapshot goes through
+  // admit() before it touches state.
+  const versionRef = useRef<number | null>(loaderData.version ?? null);
+  const versionBoardId = useRef(boardId);
+  if (versionBoardId.current !== boardId) {
+    versionBoardId.current = boardId;
+    versionRef.current = loaderData.version ?? null;
+  }
+  const admit = (snapshot: BoardDTO) => admitSnapshot(versionRef, snapshot);
 
   const [title, setTitle] = useState(loaderData.title);
   const teamName = (loaderData.team_name as string | null | undefined) ?? null;
@@ -138,15 +242,17 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // Sync server → local when loader revalidates
   // ---------------------------------------------------------------------------
 
+  // A loader result older than what a poll or save already applied updates nothing.
   useEffect(() => {
-    setColumns((prev) => mergeColumns(loaderData.columns as Column[], prev));
+    if (admit(loaderData)) setColumns((prev) => mergeColumns(loaderData.columns as Column[], prev));
   }, [loaderData.columns]);
 
   useEffect(() => {
-    setTitle(loaderData.title);
+    if (admit(loaderData)) setTitle(loaderData.title);
   }, [loaderData.title]);
 
   useEffect(() => {
+    if (!admit(loaderData)) return;
     setVotingEnabled(loaderData.votingEnabled ?? false);
     setVotingAllowed(loaderData.votingAllowed ?? 5);
     setVotingScope(loaderData.votingScope ?? "board");
@@ -158,6 +264,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [loaderData.votingEnabled, loaderData.votingAllowed, loaderData.votingScope, loaderData.notesLocked, loaderData.boardLocked, loaderData.attributionEnabled, loaderData.actionItemsVisible, loaderData.hideOthersNotes]);
 
   useEffect(() => {
+    if (!admit(loaderData)) return;
     setActionItems((loaderData.actionItems as ActionItem[]) ?? []);
     setCanFacilitate(loaderData.canFacilitate ?? loaderData.isOwner ?? false);
     setOpenFacilitation(loaderData.openFacilitation ?? false);
@@ -167,6 +274,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // timerEndsAt is always a UTC ISO string (forced by the SQL query), so
   // new Date(timerEndsAt) is unambiguous — no timezone offset accumulation.
   useEffect(() => {
+    if (!admit(loaderData)) return;
     syncTimerState(loaderData, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
   }, [loaderData.timerRunning, loaderData.timerEndsAt]);
 
@@ -177,11 +285,13 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (columnFetcher.data) {
       const data = columnFetcher.data as BoardDTO;
+      if (!admit(data)) return;
       setColumns((prev) => mergeColumns(data.columns as Column[], prev));
     }
   }, [columnFetcher.data]);
 
   const applySaveResponse = (data: BoardDTO) => {
+    if (!admit(data)) return;
     setColumns((prev) => mergeColumns(data.columns as Column[], prev));
     if (data.voterCount !== undefined) setVoterCount(data.voterCount);
     if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
@@ -201,8 +311,6 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   // the poll to reconcile. Pass `after` to hold a save until an earlier one lands;
   // it counts as pending from the moment it is asked for.
   const pendingSaves = useRef(0);
-  // Bumped when a save starts and when it ends, so a poll can tell one overlapped it.
-  const saveActivity = useRef(0);
 
   const saveToServer = async (
     resource: "notes" | "columns" | "action-items",
@@ -211,7 +319,6 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
     after?: Promise<void>
   ) => {
     pendingSaves.current += 1;
-    saveActivity.current += 1;
     if (after) await after;
     let data: BoardDTO | null = null;
     try {
@@ -225,7 +332,6 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
       // Offline: the poll reports it.
     }
     pendingSaves.current -= 1;
-    saveActivity.current += 1;
     if (data && pendingSaves.current === 0) applySaveResponse(data);
   };
 
@@ -238,6 +344,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (actionItemFetcher.data) {
       const data = actionItemFetcher.data as BoardDTO;
+      if (!admit(data)) return;
       if (data.actionItems) setActionItems(data.actionItems as ActionItem[]);
     }
   }, [actionItemFetcher.data]);
@@ -245,6 +352,7 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (settingsFetcher.data) {
       const data = settingsFetcher.data as BoardDTO;
+      if (!admit(data)) return;
       setColumns(data.columns as Column[]);
       setVotingEnabled(data.votingEnabled ?? false);
       setVotingAllowed(data.votingAllowed ?? 5);
@@ -257,59 +365,34 @@ export function BoardProvider({ children }: { children: React.ReactNode }) {
   }, [settingsFetcher.data]);
 
   // ---------------------------------------------------------------------------
-  // Polling for multi-user sync — plain fetch() bypasses RR7's turbostream
-  // pipeline entirely, so network errors never reach the ErrorBoundary.
+  // Polling for multi-user sync
   // ---------------------------------------------------------------------------
 
-  const isFetching = useRef(false);
+  const applyPollSnapshot = (data: BoardDTO) => {
+    setColumns((prev) => mergeColumns(data.columns as Column[], prev));
+    setTitle(data.title);
+    setVotingEnabled(data.votingEnabled ?? false);
+    setVotingAllowed(data.votingAllowed ?? 5);
+    setNotesLocked(data.notesLocked ?? false);
+    setLocked(data.boardLocked ?? false);
+    setActionItemsVisible(data.actionItemsVisible ?? true);
+    setHideOthersNotes(data.hideOthersNotes ?? false);
+    if (data.voterCount !== undefined) setVoterCount(data.voterCount);
+    if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
+    if (data.attachments) setAttachments(data.attachments);
+    setActionItems((data.actionItems as ActionItem[]) ?? []);
+    setCanFacilitate(data.canFacilitate ?? false);
+    setOpenFacilitation(data.openFacilitation ?? false);
+    syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
+  };
 
-  useEffect(() => {
-    if (isReadOnly) return;
+  const fetchersIdle = [
+    columnFetcher, noteFetcher, timerFetcher, settingsFetcher, attachmentFetcher, actionItemFetcher,
+  ].every((f) => f.state === "idle");
+  const pollLatest = useRef({ apply: applyPollSnapshot, fetchersIdle });
+  pollLatest.current = { apply: applyPollSnapshot, fetchersIdle };
 
-    const interval = setInterval(async () => {
-      if (isFetching.current) return;
-      isFetching.current = true;
-      const activityAtStart = saveActivity.current;
-
-      try {
-        const res = await fetch(`/app/board/${boardId}/poll`, {
-          headers: { Accept: "application/json" },
-        });
-
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-        const data: BoardDTO = await res.json();
-        setOffline(false);
-        // A save that overlapped this poll may be missing from it, and applying
-        // it would take that save off the screen until the next one.
-        if (saveActivity.current !== activityAtStart || pendingSaves.current > 0) return;
-
-        setColumns((prev) => mergeColumns(data.columns as Column[], prev));
-        setTitle(data.title);
-        setVotingEnabled(data.votingEnabled ?? false);
-        setVotingAllowed(data.votingAllowed ?? 5);
-        setNotesLocked(data.notesLocked ?? false);
-        setLocked(data.boardLocked ?? false);
-        setActionItemsVisible(data.actionItemsVisible ?? true);
-        setHideOthersNotes(data.hideOthersNotes ?? false);
-        if (data.voterCount !== undefined) setVoterCount(data.voterCount);
-        if (data.contributorCount !== undefined) setContributorCount(data.contributorCount);
-        if (data.attachments) setAttachments(data.attachments);
-        setActionItems((data.actionItems as ActionItem[]) ?? []);
-        setCanFacilitate(data.canFacilitate ?? false);
-        setOpenFacilitation(data.openFacilitation ?? false);
-
-        syncTimerState(data, timerRunning, timerEndsAt, setTimerRunning, setTimerEndsAt);
-      } catch (err) {
-        console.error("[poll] failed:", err);
-        setOffline(true);
-      } finally {
-        isFetching.current = false;
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [boardId, isReadOnly, timerRunning, timerEndsAt]);
+  useBoardPoll({ boardId, isReadOnly, versionRef, pendingSaves, latest: pollLatest, setOffline });
 
   // ---------------------------------------------------------------------------
   // Timer countdown

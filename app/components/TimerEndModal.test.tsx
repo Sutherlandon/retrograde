@@ -85,7 +85,7 @@ describe("Board timer-end trigger (DECK-005)", () => {
     vi.useFakeTimers();
     const start = new Date("2024-01-01T00:00:00.000Z");
     vi.setSystemTime(start);
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, status: 204, json: async () => ({}) })));
 
     mockLoaderData.mockReturnValue(baseLoaderData(new Date(start.getTime() + 2000).toISOString()));
 
@@ -118,7 +118,7 @@ describe("Board timer-end trigger (DECK-005)", () => {
 
   it("does not show the modal when the board loads with the timer already stopped", async () => {
     vi.useFakeTimers();
-    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, json: async () => ({}) })));
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true, status: 204, json: async () => ({}) })));
     mockLoaderData.mockReturnValue({
       id: "board-1",
       title: "Test board",
