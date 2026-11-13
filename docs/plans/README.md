@@ -35,5 +35,6 @@ Keeping shipped plans around produces an archive of how we got here, which nobod
 
 | # | Plan | Status |
 |---|---|---|
+| 0007 | [Version-gated polling](0007-version-gated-polling.md) | Accepted |
 
-Plans 0001–0006 shipped and have been deleted. Their decisions live in ADRs 0001–0011 and the action registry. There is no open plan.
+Plans 0001–0006 shipped and have been deleted. Their decisions live in ADRs 0001–0011 and the action registry.

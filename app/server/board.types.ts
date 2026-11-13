@@ -73,6 +73,7 @@ export interface BoardDTO {
   id: string;
   title: string;
   readonly: boolean;       // true for example boards — server sets this
+  version?: number;        // board_versions.version, bumped on every change to the snapshot; absent on the static example boards
   hasOwner?: boolean;      // true when ANY owner row exists — drives the claim button (BRD-020)
   isOwner?: boolean;       // true when the current user is the board owner
   isCreator?: boolean;     // true when the current user is boards.created_by (attribution, not ownership)
